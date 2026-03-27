@@ -167,6 +167,7 @@ interface FogRegion {
 - **Listens to:** `initiative-tracker:stop-viewing`, `initiative-tracker:unloaded` → disconnects
 - **Triggers:** `initiative-tracker:start-encounter` → launches encounter from Encounter Battlemap panel
 - **Data access:** Reads `itPlugin.data.encounters` for encounter list
+- **Battlemap auto-add:** When an encounter starts (round ≤ 1) and has a mapped battlemap, it is added as a **hidden** image layer. The DM toggles visibility when ready to reveal it to players.
 
 ### Fantasy Statblocks
 - **Access:** `window.FantasyStatblocks.getCreatureFromBestiary(name)` → looks up statblock for DM panel display

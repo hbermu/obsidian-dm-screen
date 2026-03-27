@@ -800,7 +800,7 @@ export default class DmScreenPlugin extends Plugin {
             for (const leaf of dmLeaves) {
               const view = leaf.view as DmControlPanel;
               if (view.addImageLayer) {
-                view.addImageLayer(state.name || "Battlemap", dataUrl, "encounter");
+                view.addImageLayer(state.name || "Battlemap", dataUrl, "encounter", false);
               }
             }
           }
