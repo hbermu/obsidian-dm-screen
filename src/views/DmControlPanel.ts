@@ -245,11 +245,16 @@ export class DmControlPanel extends ItemView {
         cls: "dm-status-detail",
       });
 
-      const url = `http://localhost:${this.plugin.settings.serverPort}`;
+      const port = this.plugin.settings.serverPort;
+      const localUrl = `http://localhost:${port}`;
+      const lanIp = this.getLanIp();
+      const lanUrl = lanIp ? `http://${lanIp}:${port}` : null;
+
+      // Local URL
       const urlRow = section.createDiv("dm-server-url");
       const urlLink = urlRow.createEl("a", {
-        text: url,
-        href: url,
+        text: localUrl,
+        href: localUrl,
         cls: "dm-server-url-link",
       });
       urlLink.setAttr("target", "_blank");
@@ -259,10 +264,31 @@ export class DmControlPanel extends ItemView {
         cls: "dm-copy-url-btn",
       });
       copyBtn.addEventListener("click", () => {
-        navigator.clipboard.writeText(url);
+        navigator.clipboard.writeText(localUrl);
         copyBtn.textContent = "Copied!";
         setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
       });
+
+      // LAN URL
+      if (lanUrl) {
+        const lanRow = section.createDiv("dm-server-url");
+        const lanLink = lanRow.createEl("a", {
+          text: `LAN: ${lanUrl}`,
+          href: lanUrl,
+          cls: "dm-server-url-link",
+        });
+        lanLink.setAttr("target", "_blank");
+
+        const lanCopyBtn = lanRow.createEl("button", {
+          text: "Copy",
+          cls: "dm-copy-url-btn",
+        });
+        lanCopyBtn.addEventListener("click", () => {
+          navigator.clipboard.writeText(lanUrl);
+          lanCopyBtn.textContent = "Copied!";
+          setTimeout(() => { lanCopyBtn.textContent = "Copy"; }, 1500);
+        });
+      }
 
       if (this.playerConnected) {
         const clientInfo = section.createDiv("dm-client-info");
@@ -281,6 +307,21 @@ export class DmControlPanel extends ItemView {
       this.plugin.toggleServer();
       this.render();
     });
+  }
+
+  private getLanIp(): string | null {
+    try {
+      const os = require("os");
+      const interfaces = os.networkInterfaces();
+      for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+          if (iface.family === "IPv4" && !iface.internal) {
+            return iface.address;
+          }
+        }
+      }
+    } catch { /* ignore */ }
+    return null;
   }
 
   // ─── Player Screen Section ──────────────────────────────────────────
