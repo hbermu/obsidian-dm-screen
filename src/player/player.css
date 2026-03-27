@@ -1,0 +1,365 @@
+/* Player Screen Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0a0a0a;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+/* Waiting Screen */
+#waiting-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 20px;
+}
+
+#waiting-screen h1 {
+  font-size: 3rem;
+  color: #c9aa71;
+  text-shadow: 0 0 20px rgba(201, 170, 113, 0.3);
+}
+
+#waiting-screen p {
+  font-size: 1.2rem;
+  color: #888;
+}
+
+.pulse-dot {
+  width: 20px;
+  height: 20px;
+  background: #c9aa71;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Map Container */
+#map-container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+#leaflet-map {
+  width: 100%;
+  height: 100%;
+  background: #1a1a2e;
+}
+
+.map-title {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: #c9aa71;
+  padding: 10px 30px;
+  border-radius: 8px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  z-index: 1000;
+  pointer-events: none;
+  border: 1px solid rgba(201, 170, 113, 0.3);
+}
+
+/* POI Markers */
+.poi-marker {
+  background: none;
+  border: none;
+}
+
+.poi-marker-inner {
+  font-size: 24px;
+  text-align: center;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
+}
+
+.poi-marker-label {
+  text-align: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  text-shadow: 0 0 4px #000, 0 0 8px #000;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+/* Battlemap Container */
+#battlemap-container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+#battlemap-image {
+  display: block;
+}
+
+#grid-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Initiative Tracker */
+#initiative-tracker {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 280px;
+  background: rgba(10, 10, 10, 0.9);
+  border: 1px solid rgba(201, 170, 113, 0.4);
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+}
+
+#initiative-tracker h2 {
+  color: #c9aa71;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+  text-align: center;
+  border-bottom: 1px solid rgba(201, 170, 113, 0.2);
+  padding-bottom: 8px;
+}
+
+#initiative-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.init-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  transition: all 0.3s ease;
+}
+
+.init-entry.init-active {
+  background: rgba(201, 170, 113, 0.15);
+  border-left: 3px solid #c9aa71;
+  padding-left: 7px;
+}
+
+.init-roll {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #888;
+  min-width: 24px;
+  text-align: center;
+}
+
+.init-active .init-roll {
+  color: #c9aa71;
+}
+
+.init-name {
+  flex: 1;
+  font-size: 0.9rem;
+  color: #ddd;
+}
+
+.init-active .init-name {
+  color: #fff;
+  font-weight: bold;
+}
+
+.init-hp-text {
+  font-size: 0.75rem;
+  color: #888;
+  min-width: 50px;
+  text-align: right;
+}
+
+.init-condition {
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+}
+
+.init-condition-well {
+  color: #4caf50;
+}
+
+.init-condition-hurt {
+  color: #ff9800;
+}
+
+.init-condition-bloodied {
+  color: #f44336;
+}
+
+.init-condition-down {
+  color: #888;
+  text-decoration: line-through;
+}
+
+.init-friendly {
+  border-left: 3px solid #4169E1;
+}
+
+.init-friendly .init-name {
+  color: #7EB3FF;
+}
+
+.init-pc-tag {
+  font-size: 0.6rem;
+  color: #4169E1;
+  background: rgba(65, 105, 225, 0.2);
+  padding: 1px 4px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.init-statuses {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.init-status-badge {
+  font-size: 0.6rem;
+  color: #fff;
+  background: rgba(255, 152, 0, 0.6);
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Faction Zone Legend */
+.faction-legend {
+  background: rgba(10, 10, 10, 0.85);
+  border: 1px solid rgba(201, 170, 113, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  backdrop-filter: blur(10px);
+}
+
+.faction-legend-title {
+  color: #c9aa71;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(201, 170, 113, 0.2);
+  padding-bottom: 6px;
+}
+
+.faction-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  font-size: 0.85rem;
+  color: #e0e0e0;
+}
+
+.faction-legend-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.faction-legend-label {
+  white-space: nowrap;
+}
+
+/* Dark theme for Leaflet layer control */
+.leaflet-control-layers {
+  background: rgba(10, 10, 10, 0.85) !important;
+  border: 1px solid rgba(201, 170, 113, 0.3) !important;
+  border-radius: 8px !important;
+  color: #e0e0e0 !important;
+  backdrop-filter: blur(10px);
+}
+
+.leaflet-control-layers label {
+  color: #e0e0e0;
+  font-size: 0.85rem;
+}
+
+/* Leaflet popup styling */
+.leaflet-popup-content-wrapper {
+  background: rgba(20, 20, 30, 0.95);
+  color: #e0e0e0;
+  border: 1px solid rgba(201, 170, 113, 0.3);
+  border-radius: 8px;
+}
+
+.leaflet-popup-tip {
+  background: rgba(20, 20, 30, 0.95);
+}
+
+.leaflet-popup-content strong {
+  color: #c9aa71;
+}
+
+/* Video Background */
+#video-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: 0;
+  display: none;
+  pointer-events: none;
+}
+
+/* Image Layers Container */
+#image-layers-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 500;
+}
+
+#image-layers-container img {
+  position: absolute;
+  object-fit: cover;
+  pointer-events: none;
+}

@@ -1,0 +1,977 @@
+/* DM Screen Plugin - Obsidian Styles */
+
+
+/* ─── Navigation Bar (shared by map + place notes) ─── */
+
+.dm-nav-bar {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  border-left: 3px solid var(--text-accent);
+}
+
+/* ─── Breadcrumbs ─── */
+
+.dm-map-breadcrumbs,
+.dm-place-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+
+.dm-breadcrumb-link {
+  cursor: pointer;
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.dm-breadcrumb-link:hover {
+  color: var(--text-accent-hover);
+  text-decoration: underline;
+}
+
+.dm-breadcrumb-current {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.dm-breadcrumb-sep {
+  color: var(--text-muted);
+  margin: 0 2px;
+}
+
+/* ─── Place Action Buttons ─── */
+
+.dm-place-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.dm-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.82em;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.dm-view-map-btn {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.dm-view-map-btn:hover {
+  filter: brightness(1.1);
+  color: var(--text-on-accent);
+  text-decoration: none;
+}
+
+.dm-parent-map-btn {
+  background: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.dm-parent-map-btn:hover {
+  background: var(--background-modifier-border-hover);
+  text-decoration: none;
+}
+
+/* ─── DM Control Panel ─── */
+
+.dm-control-panel {
+  padding: 12px;
+}
+
+.dm-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dm-section h3 {
+  margin-bottom: 8px;
+  font-size: 0.95em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.dm-server-status {
+  margin-bottom: 8px;
+}
+
+.dm-status-on {
+  color: #4caf50;
+  font-weight: bold;
+}
+
+.dm-status-off {
+  color: #f44336;
+  font-weight: bold;
+}
+
+.dm-status-detail {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.dm-server-url {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+
+.dm-server-url-link {
+  font-size: 0.85em;
+  color: var(--text-accent);
+  word-break: break-all;
+}
+
+.dm-copy-url-btn {
+  font-size: 0.75em;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+
+.dm-mode-row {
+  display: flex;
+  gap: 8px;
+}
+
+.dm-mode-row button {
+  flex: 1;
+}
+
+/* ─── Initiative Tracker ─── */
+
+.dm-add-combatant {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.dm-add-combatant input {
+  padding: 4px 6px;
+  font-size: 0.85em;
+}
+
+.dm-initiative-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.dm-combatant-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--background-secondary);
+}
+
+.dm-active-turn {
+  background: var(--background-modifier-success);
+  border-left: 3px solid var(--text-accent);
+}
+
+.dm-init-num {
+  font-weight: bold;
+  min-width: 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.dm-combatant-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.dm-hp-input {
+  width: 50px;
+  padding: 2px 4px;
+  font-size: 0.85em;
+}
+
+.dm-hp-max {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.dm-remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 0.8em;
+}
+
+.dm-remove-btn:hover {
+  color: #f44336;
+}
+
+.dm-turn-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.dm-turn-controls button {
+  flex: 1;
+  font-size: 0.85em;
+}
+
+/* ─── Initiative Tracker — Plugin Sync Mode ─── */
+
+.dm-tracker-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.dm-tracker-title-col h3 {
+  margin-bottom: 2px;
+}
+
+.dm-tracker-sync-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8em;
+}
+
+.dm-sync-indicator {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.dm-round-badge {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dm-disconnect-btn {
+  font-size: 0.8em;
+  margin-bottom: 8px;
+}
+
+.dm-tracker-hint {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-bottom: 8px;
+}
+
+.dm-empty-tracker {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 12px;
+}
+
+/* Combatant rows — plugin mode */
+
+.dm-combatant-wrapper {
+  margin-bottom: 2px;
+}
+
+.dm-combatant-hidden {
+  opacity: 0.45;
+}
+
+.dm-combatant-friendly {
+  border-left: 3px solid #4169E1;
+  padding-left: 5px;
+}
+
+.dm-pc-badge {
+  font-size: 0.7em;
+  color: #4169E1;
+  margin-left: 4px;
+}
+
+.dm-hidden-badge {
+  font-size: 0.7em;
+  color: #f44336;
+  margin-left: 4px;
+}
+
+.dm-status-badges {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.dm-status-badge {
+  font-size: 0.65em;
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.dm-hp-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dm-hp-bar-inline {
+  width: 40px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dm-hp-fill-inline {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.dm-hp-text {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.dm-ac-display {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.dm-expand-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 0.7em;
+}
+
+.dm-expand-btn:hover {
+  color: var(--text-accent);
+}
+
+/* ─── Statblock Panel ─── */
+
+.dm-statblock-container {
+  margin: 4px 0 8px 28px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dm-statblock-panel {
+  padding: 10px 12px;
+  font-size: 0.82em;
+  line-height: 1.5;
+  background: var(--background-secondary);
+}
+
+.dm-sb-header {
+  margin-bottom: 4px;
+}
+
+.dm-sb-name {
+  margin: 0 0 2px 0;
+  font-size: 1.1em;
+  color: var(--text-accent);
+}
+
+.dm-sb-subtitle {
+  font-size: 0.9em;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.dm-sb-divider {
+  border-top: 2px solid var(--text-accent);
+  opacity: 0.3;
+  margin: 6px 0;
+}
+
+.dm-sb-core {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dm-sb-stat {
+  color: var(--text-normal);
+}
+
+.dm-sb-stat strong {
+  color: var(--text-accent);
+}
+
+.dm-sb-abilities {
+  display: flex;
+  justify-content: space-between;
+  text-align: center;
+  gap: 4px;
+}
+
+.dm-sb-ability {
+  flex: 1;
+}
+
+.dm-sb-ability-label {
+  font-weight: 700;
+  font-size: 0.85em;
+  color: var(--text-accent);
+}
+
+.dm-sb-ability-score {
+  font-size: 0.85em;
+  color: var(--text-normal);
+}
+
+.dm-sb-props {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dm-sb-prop {
+  color: var(--text-normal);
+}
+
+.dm-sb-prop strong {
+  color: var(--text-accent);
+}
+
+.dm-sb-action-section {
+  margin-top: 2px;
+}
+
+.dm-sb-section-title {
+  margin: 0 0 4px 0;
+  font-size: 1em;
+  color: var(--text-accent);
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 2px;
+}
+
+.dm-sb-action {
+  margin-bottom: 4px;
+  color: var(--text-normal);
+}
+
+.dm-sb-action strong {
+  color: var(--text-normal);
+}
+
+.dm-statblock-not-found {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.85em;
+}
+
+/* ─── POI Sidebar ─── */
+
+.dm-poi-sidebar {
+  padding: 0;
+}
+
+.dm-poi-header {
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dm-poi-header h3 {
+  margin: 4px 0 0 0;
+  font-size: 1.05em;
+}
+
+.dm-poi-count {
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.dm-poi-up-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.8em;
+  color: var(--text-accent);
+  cursor: pointer;
+  text-decoration: none;
+  padding: 2px 0;
+}
+
+.dm-poi-up-btn:hover {
+  text-decoration: underline;
+}
+
+.dm-poi-view-map-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.78em;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.dm-poi-view-map-btn:hover {
+  filter: brightness(1.1);
+  text-decoration: none;
+  color: var(--text-on-accent);
+}
+
+.dm-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dm-filter-btn {
+  font-size: 0.75em;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.dm-filter-btn:hover {
+  color: var(--text-normal);
+  border-color: var(--text-muted);
+}
+
+.dm-filter-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+/* POI List */
+
+.dm-poi-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 0;
+}
+
+.dm-poi-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  transition: background 0.1s ease;
+}
+
+.dm-poi-row:hover {
+  background: var(--background-secondary);
+}
+
+.dm-poi-hidden {
+  opacity: 0.45;
+}
+
+.dm-poi-hidden:hover {
+  opacity: 0.7;
+}
+
+.dm-poi-icon {
+  font-size: 1.1em;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.dm-poi-name {
+  flex: 1;
+  cursor: pointer;
+  font-size: 0.9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-poi-type-badge {
+  font-size: 0.65em;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  padding: 1px 6px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.dm-poi-dm-only {
+  font-size: 0.6em;
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.1);
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.dm-poi-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dm-poi-drill-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-accent);
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.dm-poi-drill-btn:hover {
+  opacity: 1;
+  background: var(--background-modifier-border);
+}
+
+.dm-poi-vis-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.dm-poi-vis-btn:hover {
+  opacity: 1;
+  background: var(--background-modifier-border);
+}
+
+.dm-vis-on {
+  color: var(--text-muted);
+}
+
+.dm-vis-off {
+  color: #f44336;
+}
+
+.dm-poi-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+/* ─── Encounter Battlemaps ─── */
+
+.dm-toggle-icon {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.dm-encounter-toolbar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 0;
+  align-items: center;
+}
+
+.dm-encounter-search {
+  flex: 1;
+  font-size: 0.85em;
+  padding: 4px 8px;
+}
+
+.dm-encounter-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 8px 12px !important;
+}
+
+.dm-encounter-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dm-encounter-title-area {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.dm-encounter-title-area h3 {
+  margin: 0;
+  font-size: 0.95em;
+}
+
+.dm-encounter-count {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  padding: 1px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.dm-encounter-launch {
+  padding: 2px 12px !important;
+  font-size: 0.8em !important;
+  flex-shrink: 0;
+}
+
+.dm-encounter-field-label {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.dm-encounter-creatures {
+  margin-top: 6px;
+}
+
+.dm-creature-table {
+  width: 100%;
+  font-size: 0.8em;
+  border-collapse: collapse;
+}
+
+.dm-creature-table th {
+  text-align: left;
+  padding: 3px 6px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dm-creature-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.dm-creature-table tr:last-child td {
+  border-bottom: none;
+}
+
+.dm-creature-name-cell {
+  font-weight: 500;
+}
+
+.dm-creature-hidden {
+  opacity: 0.4;
+}
+
+.dm-creature-friendly td:first-child {
+  color: var(--text-accent);
+}
+
+.dm-encounter-map-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  flex-wrap: wrap;
+}
+
+.dm-encounter-name {
+  font-size: 0.85em;
+  font-weight: 600;
+  min-width: 100px;
+}
+
+.dm-encounter-map-input {
+  flex: 1;
+  min-width: 150px;
+  font-size: 0.8em;
+  padding: 3px 6px;
+}
+
+.dm-encounter-map-status {
+  font-size: 0.9em;
+  flex-shrink: 0;
+}
+
+/* ─── Image Layers ─── */
+
+.dm-layer-btn-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dm-layer-preview {
+  position: relative;
+  width: 100%;
+  background: #1a1a2e;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  margin: 8px 0;
+  overflow: hidden;
+  outline: 2px dashed rgba(255,255,255,0.1);
+  outline-offset: -2px;
+}
+
+.dm-layer-rect {
+  position: absolute;
+  opacity: 0.85;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 3px;
+  cursor: grab;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  font-size: 0.6em;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 6px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 4px;
+  user-select: none;
+}
+
+.dm-layer-rect:hover {
+  opacity: 1;
+  border-width: 3px;
+}
+
+.dm-layer-rect:active {
+  cursor: grabbing;
+}
+
+.dm-layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 8px 0;
+}
+
+.dm-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--background-secondary);
+}
+
+.dm-layer-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.dm-layer-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dm-layer-label {
+  flex: 1;
+  font-size: 0.85em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dm-layer-controls {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.dm-layer-scale-slider {
+  width: 60px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.dm-layer-scale-label {
+  font-size: 0.7em;
+  color: var(--text-muted);
+  min-width: 32px;
+  text-align: right;
+}
+
+.dm-layer-btn {
+  background: none;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 1px 5px;
+  font-size: 0.75em;
+  line-height: 1;
+}
+
+.dm-layer-btn:hover {
+  color: var(--text-normal);
+  border-color: var(--text-muted);
+}
+
+.dm-layer-remove:hover {
+  color: #f44336;
+  border-color: #f44336;
+}
+
+.dm-layer-hidden {
+  opacity: 0.5;
+}
+
+.dm-layer-vis-toggle {
+  font-size: 0.85em !important;
+  padding: 0 3px !important;
+  border: none !important;
+}
+
+.dm-layer-vis-on {
+  opacity: 1;
+}
+
+.dm-layer-vis-off {
+  opacity: 0.4;
+}
