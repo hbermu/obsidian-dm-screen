@@ -11,6 +11,19 @@ export interface DmScreenSettings {
   factionZoneOpacity: number;
   showFactionZonesByDefault: boolean;
   encounterBattlemaps: Record<string, string>; // encounter name → battlemap vault path
+  fogOfWarState: Record<string, FogRegion[]>; // map name → revealed regions
+  // Persisted player screen state
+  lastPlayerScreenWidth: number;
+  lastPlayerScreenHeight: number;
+  lastImageLayers: string; // JSON-serialized ImageLayer[] (without dataUrl to save space)
+  lastBroadcastCache: Record<string, string>; // message type → JSON payload (for late joiners)
+}
+
+export interface FogRegion {
+  x: number;      // map coordinate
+  y: number;      // map coordinate
+  w: number;      // width in map coordinates
+  h: number;      // height in map coordinates
 }
 
 export const DEFAULT_SETTINGS: DmScreenSettings = {
@@ -23,6 +36,11 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   factionZoneOpacity: 0.2,
   showFactionZonesByDefault: true,
   encounterBattlemaps: {},
+  fogOfWarState: {},
+  lastPlayerScreenWidth: 0,
+  lastPlayerScreenHeight: 0,
+  lastImageLayers: "[]",
+  lastBroadcastCache: {},
 };
 
 export class DmScreenSettingTab extends PluginSettingTab {

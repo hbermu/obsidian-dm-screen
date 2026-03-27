@@ -347,7 +347,7 @@ body {
   pointer-events: none;
 }
 
-/* Image Layers Container */
+/* Image Layers Container — pannable viewport */
 #image-layers-container {
   position: fixed;
   top: 0;
@@ -356,10 +356,16 @@ body {
   height: 100vh;
   pointer-events: none;
   z-index: 500;
+  overflow: hidden;
+}
+
+#image-layers-inner {
+  position: absolute;
+  transform-origin: center center;
+  transition: transform 0.3s ease;
+  /* Sized dynamically by JS to maintain content aspect ratio */
 }
 
 #image-layers-container img {
-  position: absolute;
-  object-fit: cover;
   pointer-events: none;
 }

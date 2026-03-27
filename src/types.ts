@@ -101,6 +101,8 @@ export interface ImageLayer {
   zIndex: number;
   rotation: number; // degrees
   visible: boolean;
+  fogEnabled: boolean;
+  fogDataUrl: string; // data URL of the fog canvas (black = fogged, transparent = revealed)
 }
 
 // Window API augmentations

@@ -9,7 +9,7 @@ import { DmControlPanel, DM_CONTROL_VIEW_TYPE } from "./views/DmControlPanel";
 import { PoiSidebar, POI_SIDEBAR_VIEW_TYPE } from "./views/PoiSidebar";
 import { EncounterBattlemapPanel, ENCOUNTER_BATTLEMAP_VIEW_TYPE } from "./views/EncounterBattlemapPanel";
 import { PlayerScreenServer } from "./server";
-import { DmScreenSettingTab, DmScreenSettings, DEFAULT_SETTINGS } from "./settings";
+import { DmScreenSettingTab, DmScreenSettings, DEFAULT_SETTINGS, type FogRegion } from "./settings";
 import type { InitiativeViewState, TrackerCombatant } from "./types";
 
 // Faction zone data sent to the player screen
@@ -141,8 +141,26 @@ export default class DmScreenPlugin extends Plugin {
   startServer() {
     if (this.server) return;
     this.server = new PlayerScreenServer(this);
+    this.server.onClientInfo = (info) => this.onPlayerClientInfo(info);
+    this.server.onClientCountChanged = () => {
+      const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
+      for (const leaf of leaves) {
+        const view = leaf.view as DmControlPanel;
+        view.debouncedRender?.();
+      }
+    };
     this.server.start(this.settings.serverPort);
     new Notice(`Player Screen server started on port ${this.settings.serverPort}`);
+  }
+
+  private onPlayerClientInfo(info: { width: number; height: number; devicePixelRatio: number }) {
+    const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
+    for (const leaf of leaves) {
+      const view = leaf.view as DmControlPanel;
+      if (view.onPlayerConnected) {
+        view.onPlayerConnected(info);
+      }
+    }
   }
 
   stopServer() {
@@ -545,12 +563,14 @@ export default class DmScreenPlugin extends Plugin {
       let mapBounds = [0, 0, 1000, 1000];
       let markers: Array<{ name: string; location: number[]; type: string; link: string }> = [];
       let factionZones: FactionZone[] = [];
+      let fogOfWar = false;
 
       if (placeFile) {
         const placeFm = this.getFrontmatter(placeFile);
         if (placeFm) {
           mapImage = (placeFm["map-image"] as string) || "";
           mapBounds = (placeFm["map-bounds"] as number[]) || mapBounds;
+          fogOfWar = (placeFm["fogOfWar"] as boolean) === true;
           const result = await this.getChildMarkers(placeFile);
           markers = result.markers;
           factionZones = result.factionZones;
@@ -583,18 +603,35 @@ export default class DmScreenPlugin extends Plugin {
         imageDataUrl = await this.imageToDataUrl(mapImage);
       }
 
+      const mapName = (frontmatter.name as string) || activeFile.basename;
+      const fogRevealed = fogOfWar ? (this.settings.fogOfWarState[mapName] || []) : [];
+
       this.server.broadcast({
         type: "show-map",
         payload: {
-          name: frontmatter.name || activeFile.basename,
+          name: mapName,
           image: imageDataUrl,
           bounds: mapBounds,
           markers: markers.filter((m) => m.location),
           factionZones,
           factionZoneOpacity: this.settings.factionZoneOpacity,
           showFactionZones: this.settings.showFactionZonesByDefault,
+          fogOfWar,
+          fogRevealed,
         },
       });
+
+      // Notify DM Control Panel about active fog state
+      if (fogOfWar) {
+        const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
+        for (const leaf of leaves) {
+          const view = leaf.view as DmControlPanel;
+          if (view.setFogOfWarState) {
+            view.setFogOfWarState(mapName, mapBounds, fogRevealed);
+          }
+        }
+      }
+
       new Notice("Map pushed to Player Screen");
     } else if (frontmatter.type === "encounter") {
       const battlemapPath = (frontmatter.battlemap as string) || "";
@@ -697,6 +734,19 @@ export default class DmScreenPlugin extends Plugin {
     const mime =
       ext === "png" ? "image/png" : ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/webp";
     return `data:${mime};base64,${base64}`;
+  }
+
+  // ─── Fog of War ─────────────────────────────────────────────────
+
+  broadcastFogUpdate(mapName: string, revealed: FogRegion[]) {
+    if (!this.server) return;
+    this.server.broadcast({
+      type: "fog-update",
+      payload: { revealed },
+    });
+    // Persist fog state
+    this.settings.fogOfWarState[mapName] = revealed;
+    this.saveSettings();
   }
 
   sendInitiativeUpdate(combatants: Array<{

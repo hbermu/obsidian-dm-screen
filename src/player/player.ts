@@ -28,6 +28,13 @@ interface Combatant {
   statuses?: string[];
 }
 
+interface FogRegion {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 interface ShowMapPayload {
   name: string;
   image: string;
@@ -36,6 +43,8 @@ interface ShowMapPayload {
   factionZones?: FactionZone[];
   factionZoneOpacity?: number;
   showFactionZones?: boolean;
+  fogOfWar?: boolean;
+  fogRevealed?: FogRegion[];
 }
 
 interface ShowBattlemapPayload {
@@ -62,6 +71,8 @@ interface ImageLayer {
   zIndex: number;
   rotation: number;
   visible: boolean;
+  fogEnabled: boolean;
+  fogDataUrl: string;
 }
 
 interface PlayerMessage {
@@ -76,9 +87,27 @@ class PlayerScreen {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private factionLayer: L.LayerGroup | null = null;
   private factionLegend: L.Control | null = null;
+  private fogLayer: L.SVGOverlay | null = null;
+  private fogActive = false;
+  private fogBounds: number[] = [];
+  private fogRevealed: FogRegion[] = [];
 
   constructor() {
     this.connect();
+    window.addEventListener("resize", () => this.sendClientInfo());
+  }
+
+  private sendClientInfo() {
+    if (this.ws && this.ws.readyState === 1) {
+      this.ws.send(JSON.stringify({
+        type: "client-info",
+        payload: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          devicePixelRatio: window.devicePixelRatio || 1,
+        },
+      }));
+    }
   }
 
   private connect() {
@@ -93,6 +122,7 @@ class PlayerScreen {
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
       }
+      this.sendClientInfo();
     });
 
     this.ws.addEventListener("message", (event) => {
@@ -136,6 +166,12 @@ class PlayerScreen {
         break;
       case "hide-video-bg":
         this.hideVideoBackground();
+        break;
+      case "fog-update":
+        this.updateFog((msg.payload as { revealed: FogRegion[] }).revealed);
+        break;
+      case "viewport-update":
+        this.updateViewport(msg.payload as { panX: number; panY: number; zoom: number });
         break;
       case "clear":
         this.showWaiting();
@@ -247,6 +283,15 @@ class PlayerScreen {
       }
     }
 
+    // Fog of war overlay (above factions, below markers)
+    this.fogActive = payload.fogOfWar ?? false;
+    this.fogBounds = payload.bounds;
+    this.fogRevealed = payload.fogRevealed ?? [];
+    this.fogLayer = null;
+    if (this.fogActive) {
+      this.renderFog();
+    }
+
     // Add markers (on top of faction zones)
     payload.markers.forEach((marker) => {
       if (!marker.location || marker.location.length < 2) return;
@@ -306,6 +351,80 @@ class PlayerScreen {
 
         this.drawGrid(canvas, displayW, displayH, imgW, imgH, payload.gridType);
       };
+    }
+  }
+
+  private renderFog() {
+    if (!this.map || !this.fogActive) return;
+
+    // Remove existing fog layer
+    if (this.fogLayer) {
+      this.map.removeLayer(this.fogLayer);
+      this.fogLayer = null;
+    }
+
+    const [y0, x0, y1, x1] = this.fogBounds;
+    const w = x1 - x0;
+    const h = y1 - y0;
+
+    // Create SVG element with fog
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("xmlns", svgNS);
+    svg.setAttribute("viewBox", `${x0} ${y0} ${w} ${h}`);
+
+    // Define clip path — fog is everywhere except revealed regions
+    const defs = document.createElementNS(svgNS, "defs");
+    const mask = document.createElementNS(svgNS, "mask");
+    mask.setAttribute("id", "fog-mask");
+
+    // White = visible fog, black = revealed (inverted for mask)
+    const maskBg = document.createElementNS(svgNS, "rect");
+    maskBg.setAttribute("x", String(x0));
+    maskBg.setAttribute("y", String(y0));
+    maskBg.setAttribute("width", String(w));
+    maskBg.setAttribute("height", String(h));
+    maskBg.setAttribute("fill", "white");
+    mask.appendChild(maskBg);
+
+    // Cut out revealed regions (black in mask = transparent)
+    for (const region of this.fogRevealed) {
+      const rect = document.createElementNS(svgNS, "rect");
+      rect.setAttribute("x", String(region.x));
+      rect.setAttribute("y", String(region.y));
+      rect.setAttribute("width", String(region.w));
+      rect.setAttribute("height", String(region.h));
+      rect.setAttribute("fill", "black");
+      rect.setAttribute("rx", "2");
+      mask.appendChild(rect);
+    }
+
+    defs.appendChild(mask);
+    svg.appendChild(defs);
+
+    // Fog rectangle with mask applied
+    const fogRect = document.createElementNS(svgNS, "rect");
+    fogRect.setAttribute("x", String(x0));
+    fogRect.setAttribute("y", String(y0));
+    fogRect.setAttribute("width", String(w));
+    fogRect.setAttribute("height", String(h));
+    fogRect.setAttribute("fill", "black");
+    fogRect.setAttribute("mask", "url(#fog-mask)");
+    svg.appendChild(fogRect);
+
+    const svgBounds: L.LatLngBoundsExpression = [[y0, x0], [y1, x1]];
+    this.fogLayer = L.svgOverlay(svg, svgBounds, { interactive: false, pane: "overlayPane" });
+    this.fogLayer.addTo(this.map);
+
+    // Ensure fog is on top of other overlays
+    const el = this.fogLayer.getElement();
+    if (el) el.style.zIndex = "1000";
+  }
+
+  private updateFog(revealed: FogRegion[]) {
+    this.fogRevealed = revealed;
+    if (this.fogActive) {
+      this.renderFog();
     }
   }
 
@@ -447,23 +566,66 @@ class PlayerScreen {
 
   private syncImageLayers(layers: ImageLayer[]) {
     const container = document.getElementById("image-layers-container")!;
-    container.innerHTML = "";
+
+    // Create or reuse inner div for pan/zoom
+    let inner = document.getElementById("image-layers-inner");
+    if (!inner) {
+      inner = document.createElement("div");
+      inner.id = "image-layers-inner";
+      container.appendChild(inner);
+    }
+    inner.innerHTML = "";
+
+    // Size inner to viewport, maintaining a reference frame where 100% = viewport
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    inner.style.width = `${vw}px`;
+    inner.style.height = `${vh}px`;
+    inner.style.left = "0";
+    inner.style.top = "0";
 
     const sorted = [...layers].filter(l => l.visible !== false).sort((a, b) => a.zIndex - b.zIndex);
     for (const layer of sorted) {
+      // Wrap image + fog in a container div
+      const wrapper = document.createElement("div");
+      wrapper.style.position = "absolute";
+      wrapper.style.left = `${layer.x}%`;
+      wrapper.style.top = `${layer.y}%`;
+      wrapper.style.width = `${layer.width}%`;
+      wrapper.style.height = `${layer.height}%`;
+      wrapper.style.zIndex = String(layer.zIndex);
+      if (layer.rotation) {
+        wrapper.style.transform = `rotate(${layer.rotation}deg)`;
+      }
+
       const img = document.createElement("img");
       img.src = layer.dataUrl;
-      img.style.position = "absolute";
-      img.style.left = `${layer.x}%`;
-      img.style.top = `${layer.y}%`;
-      img.style.width = `${layer.width}%`;
-      img.style.height = `${layer.height}%`;
-      img.style.zIndex = String(layer.zIndex);
-      img.style.objectFit = "cover";
-      if (layer.rotation) {
-        img.style.transform = `rotate(${layer.rotation}deg)`;
+      img.style.width = "100%";
+      img.style.height = "100%";
+      img.style.display = "block";
+      wrapper.appendChild(img);
+
+      // Fog overlay
+      if (layer.fogEnabled && layer.fogDataUrl) {
+        const fogImg = document.createElement("img");
+        fogImg.src = layer.fogDataUrl;
+        fogImg.style.position = "absolute";
+        fogImg.style.top = "0";
+        fogImg.style.left = "0";
+        fogImg.style.width = "100%";
+        fogImg.style.height = "100%";
+        fogImg.style.pointerEvents = "none";
+        wrapper.appendChild(fogImg);
       }
-      container.appendChild(img);
+
+      inner.appendChild(wrapper);
+    }
+  }
+
+  private updateViewport(payload: { panX: number; panY: number; zoom: number }) {
+    const inner = document.getElementById("image-layers-inner");
+    if (inner) {
+      inner.style.transform = `translate(${payload.panX}px, ${payload.panY}px) scale(${payload.zoom})`;
     }
   }
 

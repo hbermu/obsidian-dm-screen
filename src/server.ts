@@ -22,9 +22,17 @@ export class PlayerScreenServer {
   private plugin: DmScreenPlugin;
   private httpServer: Server | null = null;
   private clients: Set<WebSocketLike> = new Set();
+  onClientInfo: ((info: { width: number; height: number; devicePixelRatio: number }) => void) | null = null;
+  onClientCountChanged: (() => void) | null = null;
+  // Cache last broadcast per message type for late-joining clients
+  private lastState = new Map<string, string>();
 
   constructor(plugin: DmScreenPlugin) {
     this.plugin = plugin;
+  }
+
+  get clientCount(): number {
+    return this.clients.size;
   }
 
   start(port: number) {
@@ -42,15 +50,28 @@ export class PlayerScreenServer {
       wss.on("connection", (ws: WebSocketLike) => {
         this.clients.add(ws);
         console.log(`[DM Screen] Player connected. Total: ${this.clients.size}`);
+        if (this.onClientCountChanged) this.onClientCountChanged();
+
+        // Replay last state to late-joining client
+        for (const data of this.lastState.values()) {
+          if (ws.readyState === 1) ws.send(data);
+        }
 
         ws.on("close", () => {
           this.clients.delete(ws);
           console.log(`[DM Screen] Player disconnected. Total: ${this.clients.size}`);
+          if (this.onClientCountChanged) this.onClientCountChanged();
         });
 
         ws.on("message", (data: unknown) => {
-          // Handle messages from player screen (future: ping/pong, etc.)
-          console.log("[DM Screen] Message from player:", data);
+          try {
+            const msg = JSON.parse(String(data));
+            if (msg.type === "client-info" && this.onClientInfo) {
+              this.onClientInfo(msg.payload);
+            }
+          } catch (e) {
+            console.log("[DM Screen] Message from player:", data);
+          }
         });
       });
     } catch (e) {
@@ -75,9 +96,16 @@ export class PlayerScreenServer {
 
   broadcast(message: PlayerMessage) {
     const data = JSON.stringify(message);
+
+    // Cache state per message type for late-joining clients
+    if (message.type === "clear") {
+      this.lastState.clear();
+    } else {
+      this.lastState.set(message.type, data);
+    }
+
     for (const client of this.clients) {
       if (client.readyState === 1) {
-        // OPEN
         client.send(data);
       }
     }

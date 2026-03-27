@@ -975,3 +975,206 @@
 .dm-layer-vis-off {
   opacity: 0.4;
 }
+
+/* ─── Preview Pan/Zoom ─── */
+
+.dm-layer-preview {
+  overflow: hidden;
+}
+
+.dm-layer-preview-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+}
+
+.dm-player-viewport-rect {
+  position: absolute;
+  border-style: dashed;
+  border-color: rgba(0, 255, 0, 0.8);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 99999;
+}
+
+.dm-preview-view-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.dm-zoom-label {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  min-width: 40px;
+}
+
+.dm-layer-fog-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: 100% 100%;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.dm-fog-draw-canvas-inline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  z-index: 10;
+}
+
+.dm-layer-rect.dm-fog-editing {
+  border-color: #0f0 !important;
+  border-width: 2px !important;
+  border-style: solid !important;
+}
+
+.dm-fog-hint {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* ─── Per-Layer Fog of War ─── */
+
+.dm-fog-toggle {
+  padding: 2px 4px;
+}
+
+.dm-fog-toggle.dm-fog-active {
+  color: var(--text-accent);
+  background: var(--background-modifier-hover);
+}
+
+.dm-fog-editor {
+  margin: 4px 0 8px 0;
+  padding: 8px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  border-left: 3px solid var(--text-accent);
+}
+
+.dm-fog-edit-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.dm-fog-edit-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.dm-fog-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.dm-fog-tool-label {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  min-width: 48px;
+}
+
+.dm-fog-tool-btn {
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dm-fog-tool-btn.dm-fog-tool-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.dm-fog-canvas-wrapper {
+  margin-top: 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dm-fog-draw-canvas {
+  display: block;
+  cursor: crosshair;
+  width: 100%;
+}
+
+.dm-fog-edit-hint {
+  padding: 2px 0;
+}
+
+/* ─── Fog of War (map-level, legacy) ─── */
+
+.dm-fog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dm-fog-preview-wrapper {
+  margin: 8px 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dm-fog-preview {
+  width: 100%;
+  display: block;
+  cursor: crosshair;
+  background: var(--background-primary);
+}
+
+.dm-fog-list {
+  margin: 8px 0;
+}
+
+.dm-fog-list h4 {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin: 4px 0;
+}
+
+.dm-fog-region-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 4px;
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+.dm-fog-btn-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.dm-fog-btn-row button {
+  font-size: 0.85em;
+}
+
+.dm-fog-reset-btn {
+  color: var(--text-error) !important;
+}

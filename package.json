@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
-    "deploy": "node esbuild.config.mjs production && cp main.js manifest.json styles.css ../../vault/.obsidian/plugins/dm-screen/"
+    "deploy": "node esbuild.config.mjs production && cp main.js manifest.json styles.css ../../obsidian/calradia/.obsidian/plugins/dm-screen/"
   },
   "keywords": [
     "obsidian",
