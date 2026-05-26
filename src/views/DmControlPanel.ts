@@ -345,7 +345,7 @@ export class DmControlPanel extends ItemView {
       if (this.activeVideoPath) {
         this.activeVideoPath = null;
         if (this.plugin.server) {
-          this.plugin.server.broadcast({ type: "hide-video-bg", payload: {} });
+          this.plugin.server.broadcast({ type: "hide-background-media", payload: {} });
         }
         this.render();
       } else {
@@ -363,7 +363,10 @@ export class DmControlPanel extends ItemView {
               const port = this.plugin.settings.serverPort;
               const videoUrl = `http://localhost:${port}/vault/${encodeURIComponent(file.path)}`;
               if (this.plugin.server) {
-                this.plugin.server.broadcast({ type: "show-video-bg", payload: { url: videoUrl } });
+                this.plugin.server.broadcast({
+                  type: "show-background-media",
+                  payload: { url: videoUrl, mediaType: "video", loop: true, muted: true },
+                });
               }
               this.render();
             });
@@ -375,6 +378,18 @@ export class DmControlPanel extends ItemView {
         menu.showAtMouseEvent(evt);
       }
     });
+
+    if (this.plugin.settings.hydrusEnabled && this.plugin.settings.hydrusApiUrl) {
+      const hydrusBtn = btnRow.createEl("button", { text: "Hydrus Source" });
+      hydrusBtn.addEventListener("click", async () => {
+        try {
+          const { HydrusExplorerModal } = await import("./HydrusExplorerModal");
+          new HydrusExplorerModal(this.plugin.app, this.plugin).open();
+        } catch (err) {
+          console.error("[DM Screen] Hydrus modal failed:", err);
+        }
+      });
+    }
 
     const pushNoteBtn = btnRow.createEl("button", { text: "Push Note" });
     pushNoteBtn.addEventListener("click", () => {
@@ -1124,7 +1139,7 @@ export class DmControlPanel extends ItemView {
         // Stop video
         this.activeVideoPath = null;
         if (this.plugin.server) {
-          this.plugin.server.broadcast({ type: "hide-video-bg", payload: {} });
+          this.plugin.server.broadcast({ type: "hide-background-media", payload: {} });
         }
         this.render();
       } else {
@@ -1143,7 +1158,10 @@ export class DmControlPanel extends ItemView {
               const port = this.plugin.settings.serverPort;
               const videoUrl = `http://localhost:${port}/vault/${encodeURIComponent(file.path)}`;
               if (this.plugin.server) {
-                this.plugin.server.broadcast({ type: "show-video-bg", payload: { url: videoUrl } });
+                this.plugin.server.broadcast({
+                  type: "show-background-media",
+                  payload: { url: videoUrl, mediaType: "video", loop: true, muted: true },
+                });
               }
               this.render();
             });
@@ -1155,6 +1173,18 @@ export class DmControlPanel extends ItemView {
         menu.showAtMouseEvent(evt);
       }
     });
+
+    if (this.plugin.settings.hydrusEnabled && this.plugin.settings.hydrusApiUrl) {
+      const hydrusBtn = btnRow.createEl("button", { text: "Hydrus Source" });
+      hydrusBtn.addEventListener("click", async () => {
+        try {
+          const { HydrusExplorerModal } = await import("./HydrusExplorerModal");
+          new HydrusExplorerModal(this.plugin.app, this.plugin).open();
+        } catch (err) {
+          console.error("[DM Screen] Hydrus modal failed:", err);
+        }
+      });
+    }
 
     // Preview area
     const tvW = this.plugin.settings.tvWidth || 1920;

@@ -334,8 +334,9 @@ body {
   color: #c9aa71;
 }
 
-/* Video Background */
-#video-background {
+/* Background media (video or image) */
+#video-background,
+#image-background {
   position: fixed;
   top: 0;
   left: 0;

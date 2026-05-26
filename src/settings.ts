@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type DmScreenPlugin from "./main";
 
 export interface DmScreenSettings {
@@ -17,6 +17,15 @@ export interface DmScreenSettings {
   lastPlayerScreenHeight: number;
   lastImageLayers: string; // JSON-serialized ImageLayer[] (without dataUrl to save space)
   lastBroadcastCache: Record<string, string>; // message type → JSON payload (for late joiners)
+  // Hydrus integration
+  hydrusEnabled: boolean;
+  hydrusApiUrl: string;
+  hydrusApiKey: string;
+  hydrusTagService: string;
+  hydrusCacheFolder: string;
+  hydrusCacheTtlDays: number;
+  hydrusDefaultLoop: boolean;
+  hydrusDefaultMuted: boolean;
 }
 
 export interface FogRegion {
@@ -41,6 +50,14 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   lastPlayerScreenHeight: 0,
   lastImageLayers: "[]",
   lastBroadcastCache: {},
+  hydrusEnabled: false,
+  hydrusApiUrl: "https://hydrus-api.int.hbermu.com",
+  hydrusApiKey: "",
+  hydrusTagService: "A.I. Tags",
+  hydrusCacheFolder: ".hydrus-cache",
+  hydrusCacheTtlDays: 30,
+  hydrusDefaultLoop: true,
+  hydrusDefaultMuted: true,
 };
 
 export class DmScreenSettingTab extends PluginSettingTab {
@@ -152,6 +169,141 @@ export class DmScreenSettingTab extends PluginSettingTab {
           this.plugin.settings.showFactionZonesByDefault = value;
           await this.plugin.saveSettings();
         })
+      );
+
+    containerEl.createEl("h3", { text: "Hydrus Library" });
+
+    new Setting(containerEl)
+      .setName("Enable Hydrus integration")
+      .setDesc("Surfaces a Hydrus Source button in the DM panel to browse the tagged library")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.hydrusEnabled).onChange(async (value) => {
+          this.plugin.settings.hydrusEnabled = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("API URL")
+      .setDesc("Base URL of the Hydrus Client API (no trailing slash)")
+      .addText((text) =>
+        text
+          .setPlaceholder("https://hydrus-api.int.hbermu.com")
+          .setValue(this.plugin.settings.hydrusApiUrl)
+          .onChange(async (value) => {
+            this.plugin.settings.hydrusApiUrl = value.replace(/\/+$/, "");
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("API key")
+      .setDesc("64-hex Hydrus-Client-API-Access-Key — kept locally, never sent to the player browser")
+      .addText((text) =>
+        text
+          .setValue(this.plugin.settings.hydrusApiKey)
+          .onChange(async (value) => {
+            this.plugin.settings.hydrusApiKey = value.trim();
+            await this.plugin.saveSettings();
+          })
+      )
+      .addButton((btn) =>
+        btn
+          .setButtonText("Test connection")
+          .setCta()
+          .onClick(async () => {
+            try {
+              const { HydrusClient } = await import("./hydrus/client");
+              const client = new HydrusClient({
+                baseUrl: this.plugin.settings.hydrusApiUrl,
+                apiKey: this.plugin.settings.hydrusApiKey,
+              });
+              const info = await client.verifyAccess();
+              new Notice(`Hydrus OK: ${info.human_description ?? "access verified"}`, 5000);
+            } catch (err) {
+              new Notice(`Hydrus failed: ${(err as Error).message}`, 8000);
+            }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Tag service")
+      .setDesc('Name of the Hydrus tag service to search (typically "A.I. Tags")')
+      .addText((text) =>
+        text
+          .setValue(this.plugin.settings.hydrusTagService)
+          .onChange(async (value) => {
+            this.plugin.settings.hydrusTagService = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Cache folder")
+      .setDesc("Relative vault path where downloaded files are kept. Hidden by default.")
+      .addText((text) =>
+        text
+          .setValue(this.plugin.settings.hydrusCacheFolder)
+          .onChange(async (value) => {
+            const normalized = value.trim().replace(/^\/+|\/+$/g, "");
+            if (normalized.includes("..")) {
+              new Notice('Cache folder must be relative to the vault, no ".." segments', 6000);
+              return;
+            }
+            this.plugin.settings.hydrusCacheFolder = normalized || ".hydrus-cache";
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Cache TTL (days)")
+      .setDesc("Files unused for this many days are removed on plugin reload")
+      .addText((text) =>
+        text
+          .setValue(String(this.plugin.settings.hydrusCacheTtlDays))
+          .onChange(async (value) => {
+            const n = parseInt(value, 10);
+            this.plugin.settings.hydrusCacheTtlDays = Number.isFinite(n) && n > 0 ? n : 30;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Loop background media")
+      .setDesc("Default loop flag when setting media as player background")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.hydrusDefaultLoop).onChange(async (value) => {
+          this.plugin.settings.hydrusDefaultLoop = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Mute background media")
+      .setDesc("Default mute flag when setting media as player background (videos autoplay only when muted)")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.hydrusDefaultMuted).onChange(async (value) => {
+          this.plugin.settings.hydrusDefaultMuted = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Clear Hydrus cache")
+      .setDesc("Deletes everything under the cache folder. Cannot be undone.")
+      .addButton((btn) =>
+        btn
+          .setWarning()
+          .setButtonText("Clear cache")
+          .onClick(async () => {
+            const cache = this.plugin.hydrusCache;
+            if (!cache) {
+              new Notice("Hydrus cache not initialised");
+              return;
+            }
+            const removed = await cache.clear();
+            new Notice(`Removed ${removed} cached files`);
+          })
       );
   }
 }

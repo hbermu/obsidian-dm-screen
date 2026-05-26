@@ -55,7 +55,10 @@ Obsidian plugin for D&D 5e campaign management. Provides a WebSocket-based playe
 | `src/views/PoiSidebar.ts` | Context-aware POI list for current place/map note |
 | `src/views/EncounterBattlemapPanel.ts` | Encounter list from Initiative Tracker with battlemap assignment and launch |
 | `src/views/StatblockPanel.ts` | 5e statblock renderer for DM panel |
-| `styles.css` | Obsidian-side UI styles |
+| `src/views/HydrusExplorerModal.ts` | Modal that searches a Hydrus instance by tag, downloads selected media into the vault cache, and pushes it as background or image layer. Falls back to local-only mode when Hydrus is unreachable |
+| `src/hydrus/client.ts` | `HydrusClient`: thin wrapper over `requestUrl` for `/verify_access_key`, `/get_files/search_files`, `/get_files/file_metadata`, `/get_files/file`, `/get_files/thumbnail`, `/get_services` |
+| `src/hydrus/cache.ts` | `HydrusCache`: vault-backed file cache with `index.json` sidecar, write queue, TTL sweep, and explicit `markUsed` (TTL only resets on actual usage) |
+| `styles.css` | Obsidian-side UI styles (DM panel + Hydrus modal grid) |
 
 ## Build System
 
@@ -83,8 +86,10 @@ All messages are JSON: `{ type: string, payload: Record<string, unknown> }`
 | `initiative-update` | `{ combatants, round }` | Updates initiative tracker sidebar (visible combatants only) |
 | `set-mode` | `{ mode: "exploration" \| "combat" }` | Sets display mode without changing content |
 | `image-layers-sync` | `{ layers: ImageLayer[] }` | Full sync of all image layers (position, scale, rotation, visibility, fog) |
-| `show-video-bg` | `{ url }` | Plays looping video background (served via `/vault/` HTTP route) |
-| `hide-video-bg` | `{}` | Stops and hides video background |
+| `show-background-media` | `{ url, mediaType: "image" \| "video", loop?, muted? }` | Sets a full-screen background. `mediaType: "video"` plays a looping video; `"image"` swaps in a fitted still. URL is served via the `/vault/` HTTP route (videos via vault path, Hydrus assets via `.hydrus-cache/<hash>.<ext>`). |
+| `hide-background-media` | `{}` | Stops and hides whichever background is currently shown. |
+| `show-video-bg` | `{ url }` | **Deprecated alias** for `show-background-media` with `mediaType: "video"`. Old senders still work; new code should emit `show-background-media`. |
+| `hide-video-bg` | `{}` | **Deprecated alias** for `hide-background-media`. |
 | `fog-update` | `{ revealed: FogRegion[] }` | Updates map-level fog of war revealed regions |
 | `viewport-update` | `{ panX, panY, zoom }` | Updates player screen viewport pan/zoom |
 | `clear` | `{}` | Returns to waiting screen, clears all layers and video |
@@ -280,6 +285,46 @@ The preview area supports local pan/zoom that does NOT affect the player screen:
 ### State Persistence
 Image layers, player screen dimensions, and server broadcast cache are saved to plugin settings. On Obsidian reload, layers restore and late-joining browsers receive cached state.
 
+## Hydrus Integration
+
+The plugin can browse a self-hosted Hydrus Network instance to pull tagged media into the vault and push it to the player. Useful when scenes live outside the vault (Czepeku, asset packs) and you want tag search instead of folder hierarchy.
+
+### Components
+| Module | Responsibility |
+|---|---|
+| `src/hydrus/client.ts` | Stateless HTTP wrapper over `requestUrl()`. Header `Hydrus-Client-API-Access-Key` for every call. Tags JSON-encoded on the wire as `system:limit=N` is appended when a `limit` is provided to `searchFiles`. |
+| `src/hydrus/cache.ts` | Single-process write queue around the vault adapter. `index.json` sidecar keyed by file hash. `markUsed()` is the only mutator that resets the TTL — `fetchAndCache()` deliberately does not. |
+| `src/views/HydrusExplorerModal.ts` | UI. Modal `dm-hydrus-modal` with a search box, source toggle (Remote+Local / Local only), and a CSS grid of tiles. Each tile carries `data-hash` and a thumbnail loaded from the vault (local) or via the Client API as a data URL (remote, lazy on render). |
+| `src/main.ts` | Owns the `HydrusCache` instance, calls `sweep()` on `onload` plus a 24-hour `setInterval`. Saves rebuild the cache so settings changes take effect immediately. |
+
+### Tile actions
+| Gesture | Effect |
+|---|---|
+| Click | `cache.fetchAndCache()` (no-op if already local) → broadcast `show-background-media` with `mediaType` derived from MIME → `cache.markUsed()` → close modal |
+| Shift+click | `cache.fetchAndCache()` → `plugin.imageToDataUrl(vaultPath)` → `DmControlPanel.addImageLayer(...)` → `cache.markUsed()`. Rejected for video MIMEs |
+| `⋮` button | Tag list (read-only), copy vault path (local only), evict |
+
+### Cache layout (vault-relative)
+```
+<hydrusCacheFolder>/
+  index.json                 // { version: 1, entries: { [hash]: CachedEntry } }
+  <sha256>.<ext>             // raw bytes from /get_files/file
+  <sha256>.thumb.jpg         // bytes from /get_files/thumbnail (~20 KB)
+```
+
+`CachedEntry` keys: `hash, ext, mime, sizeBytes, width?, height?, downloadedAt, lastUsedAt, knownTags, vaultPath, thumbVaultPath`.
+
+### Offline mode
+The modal calls `verifyAccess()` on open. On failure the banner appears, the source dropdown is forced to **Local only**, and `searchLocal()` filters `cache.listCached()` by substring match on `knownTags`. Click still works for cached files (no network needed); shift-click likewise.
+
+### Network path
+- Plugin (Electron) → `https://hydrus-api.int.hbermu.com/...` (managed via the LAN-only Ingress in `k3s/qol/hydrus.yaml`).
+- Player browser → only ever talks to `localhost:<serverPort>/vault/<path>`. The API key never reaches the player.
+
+### Tests
+- `src/__tests__/hydrus-client.test.ts` mocks `requestUrl` and asserts URL composition + auth header.
+- `src/__tests__/hydrus-cache.test.ts` swaps the vault adapter for an in-memory map and exercises fetch / markUsed / sweep / evict / clear.
+
 ## HTTP Server Routes
 
 | Route | Method | Response |
@@ -294,7 +339,7 @@ Image layers, player screen dimensions, and server broadcast cache are saved to 
 
 The player screen (`player.ts`) runs in any browser (typically a TV). It connects via WebSocket, sends its viewport dimensions, and renders content in layers:
 
-1. **Video background** (`z-index: 0`) — Optional looping video
+1. **Background media** (`z-index: 0`) — Optional full-screen still image (`<img id="image-background">`) or looping video (`<video id="video-background">`). Only one is shown at a time; the other is hidden and emptied
 2. **Map/Battlemap content** — Leaflet map or battlemap with grid
 3. **Image layers container** (`z-index: 500`) — Composited images from DM, each with optional fog overlay. Inner container supports DM-controlled pan/zoom via `viewport-update`.
 4. **Initiative tracker** (`z-index: 1000`) — Combat initiative list (top-right)
@@ -344,3 +389,11 @@ Image layers use percentage-based positioning relative to the viewport:
 | `lastPlayerScreenHeight` | 0 | Persisted player screen height from last connected browser |
 | `lastImageLayers` | "[]" | JSON-serialized `ImageLayer[]` for state persistence |
 | `lastBroadcastCache` | {} | Cached server broadcasts for late-joining clients |
+| `hydrusEnabled` | false | Master switch for the Hydrus integration and the **Hydrus Source** button |
+| `hydrusApiUrl` | `https://hydrus-api.int.hbermu.com` | Base URL of the Hydrus Client API |
+| `hydrusApiKey` | "" | 64-hex `Hydrus-Client-API-Access-Key` (kept locally, never broadcast) |
+| `hydrusTagService` | `A.I. Tags` | Tag service used to populate `knownTags` in cached entries |
+| `hydrusCacheFolder` | `.hydrus-cache` | Vault-relative folder for downloaded files |
+| `hydrusCacheTtlDays` | 30 | Days of `lastUsedAt` inactivity before sweep collects an entry |
+| `hydrusDefaultLoop` | true | Default `loop` flag passed to `show-background-media` from Hydrus |
+| `hydrusDefaultMuted` | true | Default `muted` flag passed to `show-background-media` from Hydrus |

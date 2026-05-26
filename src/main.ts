@@ -11,6 +11,8 @@ import { EncounterBattlemapPanel, ENCOUNTER_BATTLEMAP_VIEW_TYPE } from "./views/
 import { PlayerScreenServer } from "./server";
 import { DmScreenSettingTab, DmScreenSettings, DEFAULT_SETTINGS, type FogRegion } from "./settings";
 import type { InitiativeViewState, TrackerCombatant } from "./types";
+import { HydrusCache } from "./hydrus/cache";
+import { HydrusClient } from "./hydrus/client";
 
 // Faction zone data sent to the player screen
 interface FactionZone {
@@ -37,9 +39,30 @@ function defaultFactionColor(name: string): string {
 export default class DmScreenPlugin extends Plugin {
   settings: DmScreenSettings = DEFAULT_SETTINGS;
   server: PlayerScreenServer | null = null;
+  hydrusCache: HydrusCache | null = null;
+  private hydrusSweepInterval: number | null = null;
+
+  /** Returns the first DM Control Panel view that is currently open. */
+  async findOpenDmControlPanel(): Promise<DmControlPanel | null> {
+    const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
+    if (leaves.length === 0) return null;
+    return leaves[0].view as DmControlPanel;
+  }
+
+  /** Build a HydrusClient from current settings. Returns null when not configured. */
+  buildHydrusClient(): HydrusClient | null {
+    const { hydrusEnabled, hydrusApiUrl, hydrusApiKey } = this.settings;
+    if (!hydrusEnabled || !hydrusApiUrl || !hydrusApiKey) return null;
+    try {
+      return new HydrusClient({ baseUrl: hydrusApiUrl, apiKey: hydrusApiKey });
+    } catch {
+      return null;
+    }
+  }
 
   async onload() {
     await this.loadSettings();
+    this.initHydrusCache();
 
     // Register views
     this.registerView(DM_CONTROL_VIEW_TYPE, (leaf) => new DmControlPanel(leaf, this));
@@ -128,6 +151,10 @@ export default class DmScreenPlugin extends Plugin {
 
   async onunload() {
     this.stopServer();
+    if (this.hydrusSweepInterval !== null) {
+      window.clearInterval(this.hydrusSweepInterval);
+      this.hydrusSweepInterval = null;
+    }
   }
 
   async loadSettings() {
@@ -136,6 +163,26 @@ export default class DmScreenPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+    // Reflect any settings change in the live cache instance.
+    this.initHydrusCache();
+  }
+
+  private initHydrusCache() {
+    this.hydrusCache = new HydrusCache(this.app, {
+      folder: this.settings.hydrusCacheFolder,
+      ttlDays: this.settings.hydrusCacheTtlDays,
+    });
+    if (this.settings.hydrusEnabled) {
+      // Don't await — startup must not block on a sweep.
+      void this.hydrusCache.sweep().catch((e) =>
+        console.error("[DM Screen] Hydrus cache sweep failed:", e)
+      );
+      if (this.hydrusSweepInterval === null) {
+        this.hydrusSweepInterval = window.setInterval(() => {
+          void this.hydrusCache?.sweep().catch(() => {});
+        }, 24 * 60 * 60 * 1000);
+      }
+    }
   }
 
   startServer() {

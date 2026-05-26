@@ -161,11 +161,22 @@ class PlayerScreen {
       case "image-layers-sync":
         this.syncImageLayers((msg.payload as { layers: ImageLayer[] }).layers);
         break;
-      case "show-video-bg":
-        this.showVideoBackground((msg.payload as { url: string }).url);
+      case "show-video-bg": {
+        // Deprecated alias — keep handling old senders.
+        const { url } = msg.payload as { url: string };
+        this.showBackgroundMedia({ url, mediaType: "video", loop: true, muted: true });
         break;
+      }
       case "hide-video-bg":
-        this.hideVideoBackground();
+        this.hideBackgroundMedia();
+        break;
+      case "show-background-media":
+        this.showBackgroundMedia(
+          msg.payload as { url: string; mediaType: "image" | "video"; loop?: boolean; muted?: boolean }
+        );
+        break;
+      case "hide-background-media":
+        this.hideBackgroundMedia();
         break;
       case "fog-update":
         this.updateFog((msg.payload as { revealed: FogRegion[] }).revealed);
@@ -176,7 +187,7 @@ class PlayerScreen {
       case "clear":
         this.showWaiting();
         this.clearImageLayers();
-        this.hideVideoBackground();
+        this.hideBackgroundMedia();
         break;
       default:
         console.log("[Player Screen] Unknown message type:", msg.type);
@@ -629,18 +640,39 @@ class PlayerScreen {
     }
   }
 
-  private showVideoBackground(url: string) {
+  private showBackgroundMedia(payload: {
+    url: string;
+    mediaType: "image" | "video";
+    loop?: boolean;
+    muted?: boolean;
+  }) {
     const video = document.getElementById("video-background") as HTMLVideoElement;
-    video.src = url;
-    video.style.display = "block";
-    video.play().catch(e => console.error("[Player Screen] Video autoplay failed:", e));
+    const image = document.getElementById("image-background") as HTMLImageElement;
+    if (payload.mediaType === "video") {
+      image.style.display = "none";
+      image.src = "";
+      video.loop = payload.loop ?? true;
+      video.muted = payload.muted ?? true;
+      video.src = payload.url;
+      video.style.display = "block";
+      video.play().catch((e) => console.error("[Player Screen] Video autoplay failed:", e));
+    } else {
+      video.pause();
+      video.src = "";
+      video.style.display = "none";
+      image.src = payload.url;
+      image.style.display = "block";
+    }
   }
 
-  private hideVideoBackground() {
+  private hideBackgroundMedia() {
     const video = document.getElementById("video-background") as HTMLVideoElement;
+    const image = document.getElementById("image-background") as HTMLImageElement;
     video.pause();
     video.src = "";
     video.style.display = "none";
+    image.src = "";
+    image.style.display = "none";
   }
 
   private clearImageLayers() {

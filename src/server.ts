@@ -194,6 +194,7 @@ export class PlayerScreenServer {
       <img id="battlemap-image" />
     </div>
     <video id="video-background" muted loop playsinline></video>
+    <img id="image-background" alt="" />
     <div id="image-layers-container"></div>
     <div id="initiative-tracker" style="display:none;">
       <h2>Initiative</h2>

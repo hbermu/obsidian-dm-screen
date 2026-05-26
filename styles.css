@@ -1178,3 +1178,119 @@
 .dm-fog-reset-btn {
   color: var(--text-error) !important;
 }
+
+/* ─── Hydrus Source Modal ─── */
+
+.dm-hydrus-modal {
+  width: min(90vw, 1100px);
+  max-height: 85vh;
+}
+
+.dm-hydrus-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dm-hydrus-banner {
+  background: var(--background-modifier-error-hover, #5a3a1a);
+  color: var(--text-warning, #f0c674);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+
+.dm-hydrus-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dm-hydrus-controls input[type="search"] {
+  min-width: 240px;
+}
+
+.dm-hydrus-source-toggle {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.dm-hydrus-status {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.dm-hydrus-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.dm-hydrus-tile {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--background-secondary);
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.dm-hydrus-tile:hover {
+  border-color: var(--interactive-accent);
+}
+
+.dm-hydrus-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.dm-hydrus-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 0.7em;
+  font-weight: bold;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+}
+
+.dm-hydrus-mediakind {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  font-size: 1.1em;
+  color: white;
+  text-shadow: 0 0 4px black;
+  pointer-events: none;
+}
+
+.dm-hydrus-more {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 0 6px;
+  cursor: pointer;
+  font-size: 1em;
+  line-height: 1.2;
+}
+
+.dm-hydrus-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 24px;
+  color: var(--text-muted);
+}

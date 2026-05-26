@@ -5,8 +5,8 @@
 Obsidian plugin for D&D 5e campaign management. Provides a WebSocket-based player screen server, multi-image layer compositing, initiative tracking, interactive Leaflet maps with faction zones, and encounter management.
 
 **Runtime:** Obsidian desktop (Electron/Node.js)
-**Build:** `npm run build` (esbuild) / `npm run deploy` (build + copy to vault)
-**Dependencies:** `ws` (WebSocket server), `d3-delaunay` (Voronoi tessellation)
+**Build:** `npm run build` (esbuild) / `npm run deploy` (build + copy to vault) / `make build` (Docker, no host install)
+**Dependencies:** `ws` (WebSocket server), `d3-delaunay` (Voronoi tessellation), Obsidian's `requestUrl` for the Hydrus client
 
 ## Architecture
 
@@ -54,7 +54,10 @@ Obsidian plugin for D&D 5e campaign management. Provides a WebSocket-based playe
 | `src/views/PoiSidebar.ts` | ~330 | Context-aware POI list for current place/map note |
 | `src/views/EncounterBattlemapPanel.ts` | ~290 | Encounter list from Initiative Tracker with battlemap assignment and launch |
 | `src/views/StatblockPanel.ts` | ~170 | 5e statblock renderer for DM panel |
-| `styles.css` | ~980 | Obsidian-side UI styles |
+| `src/views/HydrusExplorerModal.ts` | ~330 | Hydrus library browser: search by tag, online/offline modes, click-to-cache, set as background or image layer |
+| `src/hydrus/client.ts` | ~170 | Hydrus Client API wrapper (verifyAccess / searchFiles / getFileMetadata / getFileBytes / getThumbnailBytes) |
+| `src/hydrus/cache.ts` | ~210 | Vault-side cache: downloads files + thumbnails, persists `index.json` sidecar, TTL sweep |
+| `styles.css` | ~1100 | Obsidian-side UI styles (DM panel, Hydrus modal grid) |
 
 ## Build System
 
@@ -80,9 +83,11 @@ All messages are JSON: `{ type: string, payload: Record<string, unknown> }`
 | `initiative-update` | DM → Player | `{ combatants, round }` | Updates initiative tracker sidebar (visible combatants only) |
 | `set-mode` | DM → Player | `{ mode: "exploration" \| "combat" }` | Sets display mode without changing content |
 | `image-layers-sync` | DM → Player | `{ layers: ImageLayer[] }` | Full sync of all image layers (position, scale, rotation, visibility) |
-| `show-video-bg` | DM → Player | `{ url }` | Plays looping video background (served via `/vault/` HTTP route) |
-| `hide-video-bg` | DM → Player | `{}` | Stops and hides video background |
-| `clear` | DM → Player | `{}` | Returns to waiting screen, clears all layers and video |
+| `show-background-media` | DM → Player | `{ url, mediaType: "image" \| "video", loop?, muted? }` | Sets a full-screen background. Videos play looping (default), images swap into a fitted `<img>`. URL is served via the `/vault/` HTTP route |
+| `hide-background-media` | DM → Player | `{}` | Stops and hides whichever background is showing |
+| `show-video-bg` | DM → Player | `{ url }` | **Deprecated** alias for `show-background-media` with `mediaType: "video"` |
+| `hide-video-bg` | DM → Player | `{}` | **Deprecated** alias for `hide-background-media` |
+| `clear` | DM → Player | `{}` | Returns to waiting screen, clears all layers and background |
 
 ## Key Data Structures
 
@@ -220,9 +225,32 @@ The DM can push multiple images to the player screen and control them independen
 4. **Scale** — Slider from 10% to 500%. Images can exceed screen bounds for pan-and-reveal
 5. **Rotation** — ↺/↻ buttons rotate in 15° steps
 6. **Z-order** — ▲/▼ buttons change stacking order
-7. **Video background** — Loops `.webm`/`.mp4` files behind all layers (served via HTTP, not base64)
+7. **Background media** — A full-screen still image or looping video sits behind all layers, served via the `/vault/` HTTP route (not base64). Sources: vault `.webm`/`.mp4` files via the **Video BG** picker, or any Hydrus file via **Hydrus Source** (see below).
 
 Shift+Arrow keys on the scale slider snap to nearest 10% increment.
+
+## Hydrus Library Integration
+
+The plugin can browse a self-hosted [Hydrus Network](https://hydrusnetwork.github.io/hydrus/) instance from the DM panel and pull tagged media into the vault on demand. Useful when your scene library lives outside the vault (e.g. an indexed Czepeku catalogue) and you want tag-based search instead of folders.
+
+### Workflow
+1. Enable Hydrus in **Settings → DM Screen → Hydrus Library**, set the API URL + key, and hit **Test connection**.
+2. In the DM Control Panel, click **Hydrus Source** to open the explorer modal.
+3. Search by tags (space-separated). Tiles are tagged `R` (remote, not yet downloaded) or `L` (already cached locally).
+4. **Click a tile** — downloads the binary + a JPEG thumbnail to the vault cache (if remote) and pushes it as the player background. Image MIME → `mediaType: "image"`, video MIME → `mediaType: "video"`.
+5. **Shift-click a tile** — downloads it (if remote) and adds it to the DM Control Panel as an image layer (still images only).
+6. **⋮ menu** per tile — view tags, copy vault path (local only), evict from cache.
+7. If Hydrus is unreachable when the modal opens, a yellow banner appears and the grid falls back to whatever lives in the cache (search filters on each entry's stored `knownTags`).
+
+### Cache behaviour
+- Files land at `<vault>/<cacheFolder>/<sha256>.<ext>` plus a sibling `<sha256>.thumb.jpg`.
+- A sidecar `index.json` tracks `downloadedAt`, `lastUsedAt`, mime, dimensions, and known tags.
+- `lastUsedAt` is **only** bumped when the file is used as background or added as a layer — appearing in a search result does not count.
+- Files unused for `hydrusCacheTtlDays` (default 30) are deleted on plugin load and on a 24-hour timer thereafter.
+- Settings → DM Screen → **Clear Hydrus cache** wipes everything in the cache folder.
+
+### Network path
+The plugin calls Hydrus from Electron via `requestUrl()` (no CORS, API key never reaches the player browser). The cluster manifest in `k3s/qol/hydrus.yaml` exposes the Client API at `https://hydrus-api.int.hbermu.com` for LAN clients. The player browser still only ever talks to the plugin's own HTTP server on `localhost:3000`, fetching the cached file via `/vault/<cacheFolder>/<hash>.<ext>`.
 
 ## HTTP Server Routes
 
@@ -277,3 +305,11 @@ Image layers use percentage-based positioning relative to the viewport:
 | `factionZoneOpacity` | 0.2 | Voronoi zone fill opacity |
 | `showFactionZonesByDefault` | true | Auto-show faction zones on map load |
 | `encounterBattlemaps` | {} | Map of encounter name → battlemap vault path |
+| `hydrusEnabled` | false | Master switch for Hydrus integration (also gates the **Hydrus Source** button) |
+| `hydrusApiUrl` | `https://hydrus-api.int.hbermu.com` | Base URL of the Hydrus Client API (no trailing slash) |
+| `hydrusApiKey` | "" | 64-hex `Hydrus-Client-API-Access-Key`, kept locally |
+| `hydrusTagService` | `A.I. Tags` | Name of the Hydrus tag service used to scope `knownTags` |
+| `hydrusCacheFolder` | `.hydrus-cache` | Vault-relative folder where downloaded files live |
+| `hydrusCacheTtlDays` | 30 | Days of `lastUsedAt` inactivity before a cached file is swept |
+| `hydrusDefaultLoop` | true | Default `loop` flag on `show-background-media` |
+| `hydrusDefaultMuted` | true | Default `muted` flag on `show-background-media` (videos autoplay only when muted) |
