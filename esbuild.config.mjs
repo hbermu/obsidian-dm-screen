@@ -4,6 +4,15 @@ import fs from "fs";
 import path from "path";
 
 const prod = process.argv[2] === "production";
+const outDir = process.env.BUILD_OUT;
+const mainOutfile = outDir ? path.join(outDir, "main.js") : "main.js";
+
+if (outDir) {
+  fs.mkdirSync(outDir, { recursive: true });
+  for (const f of ["manifest.json", "styles.css"]) {
+    if (fs.existsSync(f)) fs.copyFileSync(f, path.join(outDir, f));
+  }
+}
 
 // Build the player screen separately (bundled as a string to serve via HTTP)
 const playerScreenBuild = async () => {
@@ -36,7 +45,7 @@ const context = await esbuild.context({
   logLevel: "info",
   sourcemap: prod ? false : "inline",
   treeShaking: true,
-  outfile: "main.js",
+  outfile: mainOutfile,
   minify: prod,
   define: {
     "PLAYER_HTML": JSON.stringify(playerHtml),

@@ -1,0 +1,29 @@
+# ===========================
+# Build artefacts
+# ===========================
+node_modules/
+main.js
+*.log
+
+# ===========================
+# Editor / OS
+# ===========================
+.DS_Store
+.idea/
+.vscode/
+
+# ===========================
+# Test / coverage
+# ===========================
+coverage/
+.vitest-cache/
+
+# ===========================
+# Dev vault runtime state
+# (the .dev/vault skeleton itself IS committed; only generated files inside it are ignored)
+# ===========================
+.dev/config/
+.dev/vault/.obsidian/workspace*
+.dev/vault/.obsidian/plugins/dm-screen/*
+!.dev/vault/.obsidian/plugins/dm-screen/.gitkeep
+.dev/vault/.obsidian/plugins/hot-reload/

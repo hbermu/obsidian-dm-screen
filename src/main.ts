@@ -107,19 +107,19 @@ export default class DmScreenPlugin extends Plugin {
 
     // Listen to Initiative Tracker plugin events
     this.registerEvent(
-      this.app.workspace.on("initiative-tracker:save-state" as any, (state: InitiativeViewState) => {
+      (this.app.workspace.on as any)("initiative-tracker:save-state", (state: InitiativeViewState) => {
         this.onInitiativeStateChange(state);
       })
     );
 
     this.registerEvent(
-      this.app.workspace.on("initiative-tracker:stop-viewing" as any, () => {
+      (this.app.workspace.on as any)("initiative-tracker:stop-viewing", () => {
         this.onInitiativeStop();
       })
     );
 
     this.registerEvent(
-      this.app.workspace.on("initiative-tracker:unloaded" as any, () => {
+      (this.app.workspace.on as any)("initiative-tracker:unloaded", () => {
         this.onInitiativeStop();
       })
     );

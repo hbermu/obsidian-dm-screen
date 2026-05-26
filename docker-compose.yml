@@ -1,0 +1,74 @@
+# Dev environment for the dm-screen Obsidian plugin.
+# Everything runs in containers — no Node, Obsidian, or vault on the host.
+#
+# Quick start:
+#   make up         # build watcher + Obsidian (https://localhost:3001)
+#   make build      # one-shot production build
+#   make typecheck  # tsc --noEmit
+#   make test       # vitest run
+
+services:
+
+  builder:
+    image: node:22-alpine
+    working_dir: /app
+    environment:
+      BUILD_OUT: /plugin-out
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules  # container-only (host's may be wrong arch)
+      - ./.dev/vault/.obsidian/plugins/dm-screen:/plugin-out
+    command: >
+      sh -c "
+        npm install --no-audit --no-fund &&
+        mkdir -p /plugin-out &&
+        sh scripts/bootstrap-hot-reload.sh &&
+        touch /plugin-out/.hotreload &&
+        node esbuild.config.mjs
+      "
+
+  obsidian:
+    image: lscr.io/linuxserver/obsidian:latest
+    depends_on:
+      - builder
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Madrid
+    ports:
+      - "3001:3001"   # KasmVNC HTTPS (Obsidian GUI)
+      - "3000:3000"   # DM Screen player server (plugin opens this from inside the container)
+    volumes:
+      - ./.dev/config:/config
+      - ./.dev/vault:/vaults/dm-test
+    shm_size: "1gb"
+    restart: unless-stopped
+
+  typecheck:
+    image: node:22-alpine
+    profiles: ["tools"]
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    command: >
+      sh -c "
+        npm install --no-audit --no-fund &&
+        npx tsc --noEmit
+      "
+
+  test:
+    image: node:22-alpine
+    profiles: ["tools"]
+    working_dir: /app
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    command: >
+      sh -c "
+        npm install --no-audit --no-fund &&
+        npx vitest run
+      "
+
+volumes:
+  node_modules: {}
