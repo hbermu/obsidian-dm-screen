@@ -1,4 +1,5 @@
 import { createServer, IncomingMessage, ServerResponse, Server } from "http";
+import { TFile } from "obsidian";
 import type DmScreenPlugin from "./main";
 
 // Player screen HTML/CSS/JS are inlined at build time
@@ -140,13 +141,20 @@ export class PlayerScreenServer {
   private async serveVaultFile(vaultPath: string, res: ServerResponse) {
     try {
       const decodedPath = decodeURIComponent(vaultPath);
-      const file = this.plugin.app.vault.getAbstractFileByPath(decodedPath);
-      if (!file || !(file instanceof (require("obsidian").TFile))) {
+      // Guard against path traversal — paths are vault-relative, never absolute,
+      // never escape the vault root.
+      if (decodedPath.includes("..") || decodedPath.startsWith("/")) {
+        res.writeHead(400);
+        res.end("Bad path");
+        return;
+      }
+
+      const data = await readVaultBytes(this.plugin.app, decodedPath);
+      if (!data) {
         res.writeHead(404);
         res.end("Not found");
         return;
       }
-      const data = await this.plugin.app.vault.readBinary(file as any);
       const ext = decodedPath.split(".").pop()?.toLowerCase() || "";
       const mimeMap: Record<string, string> = {
         webm: "video/webm",
@@ -165,6 +173,7 @@ export class PlayerScreenServer {
       });
       res.end(Buffer.from(data));
     } catch (e) {
+      console.error("[DM Screen] serveVaultFile failed:", e);
       res.writeHead(500);
       res.end("Server error");
     }
@@ -205,4 +214,38 @@ export class PlayerScreenServer {
 </body>
 </html>`;
   }
+}
+
+interface AppLike {
+  vault: {
+    getAbstractFileByPath(path: string): unknown;
+    readBinary(file: never): Promise<ArrayBuffer>;
+    adapter: {
+      exists?: (path: string) => Promise<boolean>;
+      readBinary?: (path: string) => Promise<ArrayBuffer>;
+    };
+  };
+}
+
+/**
+ * Reads bytes from the vault, falling back to the raw DataAdapter for paths
+ * that the vault index doesn't surface — dotfolders like `.hydrus-cache/` are
+ * the canonical case, since Obsidian skips them on indexing but they are real
+ * files on disk.
+ */
+export async function readVaultBytes(
+  app: AppLike,
+  decodedPath: string
+): Promise<ArrayBuffer | null> {
+  const file = app.vault.getAbstractFileByPath(decodedPath);
+  if (file instanceof TFile) {
+    return await app.vault.readBinary(file as never);
+  }
+  const adapter = app.vault.adapter;
+  if (typeof adapter.readBinary === "function" && typeof adapter.exists === "function") {
+    if (await adapter.exists(decodedPath)) {
+      return await adapter.readBinary(decodedPath);
+    }
+  }
+  return null;
 }

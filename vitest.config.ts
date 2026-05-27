@@ -12,6 +12,7 @@ export default defineConfig({
   resolve: {
     alias: {
       obsidian: new URL("./test/stubs/obsidian.ts", import.meta.url).pathname,
+      "player-screen-bundle": new URL("./test/stubs/player-screen-bundle.ts", import.meta.url).pathname,
     },
   },
 });
