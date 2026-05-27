@@ -27,6 +27,11 @@ export interface HydrusAccessInfo {
   human_description: string;
 }
 
+export interface HydrusTagSuggestion {
+  value: string;
+  count?: number;
+}
+
 const MIME_TO_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/jpg": "jpg",
@@ -78,6 +83,19 @@ export class HydrusClient {
     const res = await this.get(`/get_files/search_files?${qs.toString()}`);
     const body = res.json as { hashes?: string[] };
     return { hashes: body.hashes ?? [] };
+  }
+
+  async searchTags(
+    prefix: string,
+    opts?: { tagServiceKey?: string; limit?: number }
+  ): Promise<HydrusTagSuggestion[]> {
+    const qs = new URLSearchParams({ search: prefix });
+    if (opts?.tagServiceKey) qs.set("tag_service_key", opts.tagServiceKey);
+    const res = await this.get(`/add_tags/search_tags?${qs.toString()}`);
+    const body = res.json as { tags?: HydrusTagSuggestion[] };
+    const list = Array.isArray(body.tags) ? body.tags : [];
+    const limit = opts?.limit ?? 50;
+    return limit > 0 ? list.slice(0, limit) : list;
   }
 
   async getFileMetadata(hashes: string[], tagService?: string): Promise<HydrusFile[]> {

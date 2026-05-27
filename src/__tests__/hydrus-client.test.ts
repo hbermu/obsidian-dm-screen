@@ -121,6 +121,37 @@ describe("HydrusClient", () => {
     expect(captured?.url).toBe("https://hydrus-api.test/get_files/file?hash=abcd");
   });
 
+  it("searchTags hits /add_tags/search_tags with the service key and slices to the requested limit", async () => {
+    let captured: CapturedCall | undefined;
+    mockRequestUrl((call) => {
+      captured = call;
+      return {
+        json: {
+          tags: [
+            { value: "tavern", count: 12 },
+            { value: "tavern night", count: 4 },
+            { value: "tavern day", count: 2 },
+          ],
+        },
+      };
+    });
+    const client = new HydrusClient(baseOpts);
+    const out = await client.searchTags("tav", { tagServiceKey: "KEY", limit: 2 });
+    expect(out).toHaveLength(2);
+    expect(out[0]).toEqual({ value: "tavern", count: 12 });
+    const u = new URL(captured!.url);
+    expect(u.pathname).toBe("/add_tags/search_tags");
+    expect(u.searchParams.get("search")).toBe("tav");
+    expect(u.searchParams.get("tag_service_key")).toBe("KEY");
+    expect(captured?.headers?.["Hydrus-Client-API-Access-Key"]).toBe("deadbeef");
+  });
+
+  it("searchTags returns an empty array when Hydrus omits the tags field", async () => {
+    mockRequestUrl(() => ({ json: {} }));
+    const client = new HydrusClient(baseOpts);
+    expect(await client.searchTags("zzz")).toEqual([]);
+  });
+
   it("throws with a useful message on non-2xx", async () => {
     mockRequestUrl(() => ({ status: 401, text: "Bad key" }));
     const client = new HydrusClient(baseOpts);

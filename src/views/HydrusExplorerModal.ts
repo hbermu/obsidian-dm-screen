@@ -3,6 +3,7 @@ import type DmScreenPlugin from "../main";
 import { HydrusClient, type HydrusFile, extFromMime } from "../hydrus/client";
 import type { CachedEntry, HydrusCache } from "../hydrus/cache";
 import { paginate } from "../hydrus/pagination";
+import { TagSuggester } from "./HydrusTagSuggester";
 
 interface RemoteTile {
   kind: "remote";
@@ -49,6 +50,8 @@ export class HydrusExplorerModal extends Modal {
   private statusEl: HTMLElement | null = null;
   private bannerEl: HTMLElement | null = null;
   private localOnly = false;
+  private tagServiceKey: string | null = null;
+  private tagSuggester: TagSuggester | null = null;
 
   constructor(app: App, plugin: DmScreenPlugin) {
     super(app);
@@ -73,11 +76,13 @@ export class HydrusExplorerModal extends Modal {
     const controls = contentEl.createDiv({ cls: "dm-hydrus-controls" });
     const input = controls.createEl("input", {
       type: "search",
-      placeholder: 'tags separated by space, e.g. "tavern night rain"',
+      placeholder: 'tags separated by commas, e.g. "tavern night, castle exterior, rain"',
     });
     input.style.flex = "1";
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") void this.runSearch(input.value);
+    this.tagSuggester = new TagSuggester({
+      inputEl: input,
+      fetchSuggestions: (prefix) => this.suggestTags(prefix),
+      onSubmit: (raw) => void this.runSearch(raw),
     });
     const searchBtn = controls.createEl("button", { text: "Search" });
     searchBtn.addEventListener("click", () => void this.runSearch(input.value));
@@ -108,7 +113,54 @@ export class HydrusExplorerModal extends Modal {
   }
 
   onClose() {
+    this.tagSuggester?.destroy();
+    this.tagSuggester = null;
     this.contentEl.empty();
+  }
+
+  private async resolveTagServiceKey(): Promise<string | null> {
+    if (this.tagServiceKey) return this.tagServiceKey;
+    if (!this.client) return null;
+    try {
+      const services = await this.client.getServices();
+      const target = this.plugin.settings.hydrusTagService;
+      const hit = services.find((s) => s.name === target);
+      this.tagServiceKey = hit?.service_key ?? null;
+    } catch {
+      this.tagServiceKey = null;
+    }
+    return this.tagServiceKey;
+  }
+
+  private async suggestTags(prefix: string): Promise<string[]> {
+    if (this.client && !this.localOnly && this.mode === "online") {
+      try {
+        const tagServiceKey = (await this.resolveTagServiceKey()) ?? undefined;
+        const remote = await this.client.searchTags(prefix, { tagServiceKey, limit: 50 });
+        if (remote.length > 0 || prefix.length > 0) {
+          return remote.map((s) => s.value);
+        }
+      } catch {
+        // fall through to local fallback
+      }
+    }
+    return this.suggestFromCache(prefix);
+  }
+
+  private async suggestFromCache(prefix: string): Promise<string[]> {
+    const entries = await this.cache.listCached();
+    const counts = new Map<string, number>();
+    for (const e of entries) {
+      for (const tag of e.knownTags) {
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+    const needle = prefix.trim().toLowerCase();
+    const filtered = needle
+      ? [...counts.entries()].filter(([tag]) => tag.toLowerCase().includes(needle))
+      : [...counts.entries()];
+    filtered.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    return filtered.slice(0, 50).map(([tag]) => tag);
   }
 
   private async resolveMode() {
@@ -155,7 +207,7 @@ export class HydrusExplorerModal extends Modal {
     this.setStatus("Searching…");
 
     const tags = this.query
-      .split(/\s+/)
+      .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
 

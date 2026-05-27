@@ -1,7 +1,7 @@
 {
   "id": "dm-screen",
   "name": "DM Screen",
-  "version": "0.3.0",
+  "version": "0.4.0-beta.1",
   "minAppVersion": "1.5.0",
   "description": "Campaign management with interactive maps, player screen server, and initiative tracker for D&D 5e.",
   "author": "DMTool",

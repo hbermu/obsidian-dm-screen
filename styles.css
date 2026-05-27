@@ -1205,10 +1205,53 @@
   gap: 6px;
   align-items: center;
   flex-wrap: wrap;
+  position: relative;
 }
 
 .dm-hydrus-controls input[type="search"] {
   min-width: 240px;
+}
+
+.dm-hydrus-suggest {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 2px;
+  z-index: 50;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  display: none;
+}
+
+.dm-hydrus-suggest.is-open {
+  display: block;
+}
+
+.dm-hydrus-suggest-item {
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.9em;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  user-select: none;
+}
+
+.dm-hydrus-suggest-item:hover,
+.dm-hydrus-suggest-item.is-active {
+  background: var(--background-modifier-hover);
+}
+
+.dm-hydrus-suggest-empty {
+  padding: 6px 10px;
+  color: var(--text-muted);
+  font-size: 0.85em;
+  font-style: italic;
 }
 
 .dm-hydrus-source-toggle {
