@@ -250,7 +250,7 @@ The plugin can browse a self-hosted [Hydrus Network](https://hydrusnetwork.githu
 - Settings → DM Screen → **Clear Hydrus cache** wipes everything in the cache folder.
 
 ### Network path
-The plugin calls Hydrus from Electron via `requestUrl()` (no CORS, API key never reaches the player browser). The cluster manifest in `k3s/qol/hydrus.yaml` exposes the Client API at `https://hydrus-api.int.hbermu.com` for LAN clients. The player browser still only ever talks to the plugin's own HTTP server on `localhost:3000`, fetching the cached file via `/vault/<cacheFolder>/<hash>.<ext>`.
+The plugin calls Hydrus from Electron via `requestUrl()` (no CORS, API key never reaches the player browser). Set the URL of your Hydrus Client API in the plugin settings — typically a reverse-proxied HTTPS host that fronts port `45869`, or `http://localhost:45869` if you run Hydrus desktop on the same machine. The player browser still only ever talks to the plugin's own HTTP server on `localhost:3000`, fetching the cached file via `/vault/<cacheFolder>/<hash>.<ext>`.
 
 ## HTTP Server Routes
 
@@ -306,7 +306,7 @@ Image layers use percentage-based positioning relative to the viewport:
 | `showFactionZonesByDefault` | true | Auto-show faction zones on map load |
 | `encounterBattlemaps` | {} | Map of encounter name → battlemap vault path |
 | `hydrusEnabled` | false | Master switch for Hydrus integration (also gates the **Hydrus Source** button) |
-| `hydrusApiUrl` | `https://hydrus-api.int.hbermu.com` | Base URL of the Hydrus Client API (no trailing slash) |
+| `hydrusApiUrl` | `""` | Base URL of the Hydrus Client API (no trailing slash). Must be set before the integration becomes usable. |
 | `hydrusApiKey` | "" | 64-hex `Hydrus-Client-API-Access-Key`, kept locally |
 | `hydrusTagService` | `A.I. Tags` | Name of the Hydrus tag service used to scope `knownTags` |
 | `hydrusCacheFolder` | `.hydrus-cache` | Vault-relative folder where downloaded files live |

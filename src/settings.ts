@@ -51,7 +51,7 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   lastImageLayers: "[]",
   lastBroadcastCache: {},
   hydrusEnabled: false,
-  hydrusApiUrl: "https://hydrus-api.int.hbermu.com",
+  hydrusApiUrl: "",
   hydrusApiKey: "",
   hydrusTagService: "A.I. Tags",
   hydrusCacheFolder: ".hydrus-cache",
@@ -188,7 +188,7 @@ export class DmScreenSettingTab extends PluginSettingTab {
       .setDesc("Base URL of the Hydrus Client API (no trailing slash)")
       .addText((text) =>
         text
-          .setPlaceholder("https://hydrus-api.int.hbermu.com")
+          .setPlaceholder("https://your-hydrus-host.example/")
           .setValue(this.plugin.settings.hydrusApiUrl)
           .onChange(async (value) => {
             this.plugin.settings.hydrusApiUrl = value.replace(/\/+$/, "");

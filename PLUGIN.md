@@ -318,7 +318,7 @@ The plugin can browse a self-hosted Hydrus Network instance to pull tagged media
 The modal calls `verifyAccess()` on open. On failure the banner appears, the source dropdown is forced to **Local only**, and `searchLocal()` filters `cache.listCached()` by substring match on `knownTags`. Click still works for cached files (no network needed); shift-click likewise.
 
 ### Network path
-- Plugin (Electron) → `https://hydrus-api.int.hbermu.com/...` (managed via the LAN-only Ingress in `k3s/qol/hydrus.yaml`).
+- Plugin (Electron) → `https://<your-hydrus-host>/...` (whatever URL exposes the Hydrus Client API on your network — typically a reverse proxy in front of port 45869).
 - Player browser → only ever talks to `localhost:<serverPort>/vault/<path>`. The API key never reaches the player.
 
 ### Tests
@@ -390,7 +390,7 @@ Image layers use percentage-based positioning relative to the viewport:
 | `lastImageLayers` | "[]" | JSON-serialized `ImageLayer[]` for state persistence |
 | `lastBroadcastCache` | {} | Cached server broadcasts for late-joining clients |
 | `hydrusEnabled` | false | Master switch for the Hydrus integration and the **Hydrus Source** button |
-| `hydrusApiUrl` | `https://hydrus-api.int.hbermu.com` | Base URL of the Hydrus Client API |
+| `hydrusApiUrl` | `""` | Base URL of the Hydrus Client API. Must be set before "Test connection" works. |
 | `hydrusApiKey` | "" | 64-hex `Hydrus-Client-API-Access-Key` (kept locally, never broadcast) |
 | `hydrusTagService` | `A.I. Tags` | Tag service used to populate `knownTags` in cached entries |
 | `hydrusCacheFolder` | `.hydrus-cache` | Vault-relative folder for downloaded files |
