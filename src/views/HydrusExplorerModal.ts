@@ -2,6 +2,7 @@ import { App, Modal, Notice } from "obsidian";
 import type DmScreenPlugin from "../main";
 import { HydrusClient, type HydrusFile, extFromMime } from "../hydrus/client";
 import type { CachedEntry, HydrusCache } from "../hydrus/cache";
+import { paginate } from "../hydrus/pagination";
 
 interface RemoteTile {
   kind: "remote";
@@ -28,7 +29,11 @@ interface LocalTile {
 
 type Tile = RemoteTile | LocalTile;
 
-const PAGE_LIMIT = 60;
+// Hydrus has no offset/cursor on /get_files/search_files, so we ask for the
+// largest reasonable batch and paginate client-side. Catalogues bigger than
+// this should be filtered with extra tags rather than navigated blindly.
+const HARD_CAP = 1000;
+const PAGE_SIZE = 100;
 
 export class HydrusExplorerModal extends Modal {
   private plugin: DmScreenPlugin;
@@ -38,7 +43,9 @@ export class HydrusExplorerModal extends Modal {
   private tiles: Tile[] = [];
   private query = "";
   private busy = false;
+  private pageIndex = 0;
   private gridEl: HTMLElement | null = null;
+  private paginationEl: HTMLElement | null = null;
   private statusEl: HTMLElement | null = null;
   private bannerEl: HTMLElement | null = null;
   private localOnly = false;
@@ -88,6 +95,7 @@ export class HydrusExplorerModal extends Modal {
 
     this.statusEl = contentEl.createDiv({ cls: "dm-hydrus-status" });
     this.gridEl = contentEl.createDiv({ cls: "dm-hydrus-grid" });
+    this.paginationEl = contentEl.createDiv({ cls: "dm-hydrus-pagination" });
 
     await this.resolveMode();
     if (this.mode === "offline") {
@@ -142,6 +150,8 @@ export class HydrusExplorerModal extends Modal {
       return;
     }
     this.gridEl.empty();
+    this.paginationEl?.empty();
+    this.pageIndex = 0;
     this.setStatus("Searching…");
 
     const tags = this.query
@@ -155,18 +165,70 @@ export class HydrusExplorerModal extends Modal {
       } else {
         this.tiles = await this.searchMerged(this.client, tags);
       }
-      this.renderGrid();
-      this.setStatus(
-        `${this.tiles.length} result${this.tiles.length === 1 ? "" : "s"}` +
-          (this.localOnly || this.mode === "offline" ? " (local cache)" : "")
-      );
+      this.renderPage();
     } catch (err) {
       this.setStatus(`Error: ${(err as Error).message}`);
       this.tiles = [];
-      this.renderGrid();
+      this.renderPage();
     } finally {
       this.busy = false;
     }
+  }
+
+  private renderPage() {
+    if (!this.gridEl) return;
+    const page = paginate(this.tiles, this.pageIndex, PAGE_SIZE);
+    this.pageIndex = page.pageIndex;
+    this.renderGrid(page.items);
+    this.renderPagination(page.totalPages);
+    this.updateStatus(page.totalItems, page.totalPages);
+  }
+
+  private updateStatus(totalItems: number, totalPages: number) {
+    const isLocalScope = this.localOnly || this.mode === "offline";
+    const scope = isLocalScope ? " (local cache)" : "";
+    if (totalItems === 0) {
+      this.setStatus(`0 results${scope}`);
+      return;
+    }
+    const cap =
+      this.mode === "online" && !this.localOnly && totalItems >= HARD_CAP
+        ? ` · capped at ${HARD_CAP}, refine your tags to see more`
+        : "";
+    this.setStatus(
+      `${totalItems} result${totalItems === 1 ? "" : "s"}${scope} · page ${
+        this.pageIndex + 1
+      }/${totalPages}${cap}`
+    );
+  }
+
+  private renderPagination(totalPages: number) {
+    if (!this.paginationEl) return;
+    this.paginationEl.empty();
+    if (totalPages <= 1) return;
+
+    const prev = this.paginationEl.createEl("button", { text: "« Prev" });
+    prev.disabled = this.pageIndex === 0;
+    prev.addEventListener("click", () => {
+      if (this.pageIndex > 0) {
+        this.pageIndex -= 1;
+        this.renderPage();
+      }
+    });
+
+    this.paginationEl.createEl("span", {
+      cls: "dm-hydrus-pageinfo",
+      text: `Page ${this.pageIndex + 1} / ${totalPages}`,
+    });
+
+    const next = this.paginationEl.createEl("button", { text: "Next »" });
+    next.disabled = this.pageIndex >= totalPages - 1;
+    next.addEventListener("click", () => {
+      if (this.pageIndex < totalPages - 1) {
+        this.pageIndex += 1;
+        this.renderPage();
+      }
+    });
   }
 
   private async searchLocal(tags: string[]): Promise<Tile[]> {
@@ -190,7 +252,7 @@ export class HydrusExplorerModal extends Modal {
   }
 
   private async searchMerged(client: HydrusClient, tags: string[]): Promise<Tile[]> {
-    const search = await client.searchFiles(tags, PAGE_LIMIT);
+    const search = await client.searchFiles(tags, HARD_CAP);
     if (search.hashes.length === 0) return [];
     const meta = await client.getFileMetadata(search.hashes, this.plugin.settings.hydrusTagService);
     const cached = new Map((await this.cache.listCached()).map((e) => [e.hash, e]));
@@ -222,27 +284,31 @@ export class HydrusExplorerModal extends Modal {
     });
   }
 
-  private renderGrid() {
+  private renderGrid(tiles: Tile[]) {
     if (!this.gridEl) return;
     this.gridEl.empty();
-    if (this.tiles.length === 0) {
+    if (tiles.length === 0) {
       this.gridEl.createDiv({ cls: "dm-hydrus-empty", text: "No results." });
       return;
     }
-    for (const tile of this.tiles) {
+    for (const tile of tiles) {
       const card = this.gridEl.createDiv({ cls: "dm-hydrus-tile" });
       card.dataset.hash = tile.hash;
       card.title = `${tile.knownTags.slice(0, 8).join(", ") || "(no tags)"}\nclick → background · shift+click → image layer`;
-
-      const badge = card.createDiv({ cls: "dm-hydrus-badge" });
-      badge.setText(tile.kind === "local" ? "L" : "R");
 
       const thumb = card.createEl("img", { cls: "dm-hydrus-thumb" });
       thumb.alt = "";
       this.loadThumb(tile, thumb);
 
+      if (tile.kind === "local") {
+        const badge = card.createDiv({ cls: "dm-hydrus-badge-local", text: "Local" });
+        badge.title = "Already downloaded to vault cache";
+      }
+
       if (mediaTypeOf(tile.mime) === "video") {
-        card.createDiv({ cls: "dm-hydrus-mediakind", text: "▶" });
+        const ext = (tile.ext || "").toUpperCase() || "VIDEO";
+        const pill = card.createDiv({ cls: "dm-hydrus-mediakind-pill", text: `▶ ${ext}` });
+        pill.title = `Video — ${tile.mime}`;
       }
 
       card.addEventListener("click", (evt) => {
@@ -257,7 +323,7 @@ export class HydrusExplorerModal extends Modal {
       const more = card.createEl("button", { cls: "dm-hydrus-more", text: "⋮" });
       more.addEventListener("click", (evt) => {
         evt.stopPropagation();
-        void this.openTileMenu(tile);
+        void this.openTileMenu(tile, evt);
       });
     }
   }
@@ -346,7 +412,7 @@ export class HydrusExplorerModal extends Modal {
     return entry;
   }
 
-  private async openTileMenu(tile: Tile) {
+  private async openTileMenu(tile: Tile, evt: MouseEvent) {
     const { Menu } = await import("obsidian");
     const menu = new Menu();
     menu.addItem((item: any) =>
@@ -372,11 +438,7 @@ export class HydrusExplorerModal extends Modal {
           })
       );
     }
-    const anchor = this.gridEl?.querySelector(`[data-hash="${tile.hash}"] .dm-hydrus-more`) as HTMLElement | null;
-    if (anchor) {
-      const rect = anchor.getBoundingClientRect();
-      menu.showAtPosition({ x: rect.left, y: rect.bottom });
-    }
+    menu.showAtMouseEvent(evt);
   }
 }
 

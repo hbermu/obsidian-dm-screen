@@ -1252,25 +1252,30 @@
   pointer-events: none;
 }
 
-.dm-hydrus-badge {
+.dm-hydrus-badge-local {
   position: absolute;
   top: 4px;
   left: 4px;
-  font-size: 0.7em;
-  font-weight: bold;
+  font-size: 0.65em;
+  font-weight: 500;
   padding: 1px 5px;
   border-radius: 3px;
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.02em;
 }
 
-.dm-hydrus-mediakind {
+.dm-hydrus-mediakind-pill {
   position: absolute;
   bottom: 4px;
   left: 4px;
-  font-size: 1.1em;
+  font-size: 0.7em;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(220, 38, 38, 0.85);
   color: white;
-  text-shadow: 0 0 4px black;
+  letter-spacing: 0.03em;
   pointer-events: none;
 }
 
@@ -1292,5 +1297,23 @@
   grid-column: 1 / -1;
   text-align: center;
   padding: 24px;
+  color: var(--text-muted);
+}
+
+.dm-hydrus-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.dm-hydrus-pagination button[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dm-hydrus-pagination .dm-hydrus-pageinfo {
+  font-size: 0.85em;
   color: var(--text-muted);
 }
