@@ -389,7 +389,7 @@ Image layers use percentage-based positioning relative to the viewport:
 | `lastPlayerScreenHeight` | 0 | Persisted player screen height from last connected browser |
 | `lastImageLayers` | "[]" | JSON-serialized `ImageLayer[]` for state persistence |
 | `lastBroadcastCache` | {} | Cached server broadcasts for late-joining clients |
-| `hydrusEnabled` | false | Master switch for the Hydrus integration and the **Hydrus Source** button |
+| `hydrusEnabled` | false | Master switch for the Hydrus integration and the **BG from Hydrus** button |
 | `hydrusApiUrl` | `""` | Base URL of the Hydrus Client API. Must be set before "Test connection" works. |
 | `hydrusApiKey` | "" | 64-hex `Hydrus-Client-API-Access-Key` (kept locally, never broadcast) |
 | `hydrusTagService` | `A.I. Tags` | Tag service used to populate `knownTags` in cached entries |

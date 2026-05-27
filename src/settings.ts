@@ -175,7 +175,7 @@ export class DmScreenSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Enable Hydrus integration")
-      .setDesc("Surfaces a Hydrus Source button in the DM panel to browse the tagged library")
+      .setDesc('Surfaces a "BG from Hydrus" button in the DM panel to browse the tagged library')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.hydrusEnabled).onChange(async (value) => {
           this.plugin.settings.hydrusEnabled = value;

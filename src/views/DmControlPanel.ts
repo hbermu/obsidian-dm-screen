@@ -360,8 +360,9 @@ export class DmControlPanel extends ItemView {
             item.setTitle(file.path);
             item.onClick(() => {
               this.activeVideoPath = file.path;
-              const port = this.plugin.settings.serverPort;
-              const videoUrl = `http://localhost:${port}/vault/${encodeURIComponent(file.path)}`;
+              // Relative URL — the player browser resolves it against the
+              // plugin server's own origin, not the DM machine's localhost.
+              const videoUrl = `/vault/${encodeURIComponent(file.path)}`;
               if (this.plugin.server) {
                 this.plugin.server.broadcast({
                   type: "show-background-media",
@@ -380,7 +381,7 @@ export class DmControlPanel extends ItemView {
     });
 
     if (this.plugin.settings.hydrusEnabled && this.plugin.settings.hydrusApiUrl) {
-      const hydrusBtn = btnRow.createEl("button", { text: "Hydrus Source" });
+      const hydrusBtn = btnRow.createEl("button", { text: "BG from Hydrus" });
       hydrusBtn.addEventListener("click", async () => {
         try {
           const { HydrusExplorerModal } = await import("./HydrusExplorerModal");
@@ -1155,8 +1156,7 @@ export class DmControlPanel extends ItemView {
             item.setTitle(file.path);
             item.onClick(() => {
               this.activeVideoPath = file.path;
-              const port = this.plugin.settings.serverPort;
-              const videoUrl = `http://localhost:${port}/vault/${encodeURIComponent(file.path)}`;
+              const videoUrl = `/vault/${encodeURIComponent(file.path)}`;
               if (this.plugin.server) {
                 this.plugin.server.broadcast({
                   type: "show-background-media",
@@ -1175,7 +1175,7 @@ export class DmControlPanel extends ItemView {
     });
 
     if (this.plugin.settings.hydrusEnabled && this.plugin.settings.hydrusApiUrl) {
-      const hydrusBtn = btnRow.createEl("button", { text: "Hydrus Source" });
+      const hydrusBtn = btnRow.createEl("button", { text: "BG from Hydrus" });
       hydrusBtn.addEventListener("click", async () => {
         try {
           const { HydrusExplorerModal } = await import("./HydrusExplorerModal");

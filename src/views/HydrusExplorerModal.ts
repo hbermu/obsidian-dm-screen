@@ -62,7 +62,7 @@ export class HydrusExplorerModal extends Modal {
 
   async onOpen() {
     this.modalEl.addClass("dm-hydrus-modal");
-    this.titleEl.setText("Hydrus Source");
+    this.titleEl.setText("BG from Hydrus");
 
     const { contentEl } = this;
     contentEl.empty();
@@ -331,6 +331,8 @@ export class HydrusExplorerModal extends Modal {
   private async loadThumb(tile: Tile, img: HTMLImageElement) {
     try {
       if (tile.kind === "local" && tile.thumbVaultPath) {
+        // The DM modal runs inside Electron on the same machine as the plugin
+        // server, so localhost is fine here.
         const url = `http://localhost:${this.plugin.settings.serverPort}/vault/${encodeForVaultUrl(tile.thumbVaultPath)}`;
         img.src = url;
         return;
@@ -351,8 +353,10 @@ export class HydrusExplorerModal extends Modal {
     }
     try {
       const entry = await this.ensureCached(tile);
-      const port = this.plugin.settings.serverPort;
-      const url = `http://localhost:${port}/vault/${encodeForVaultUrl(entry.vaultPath)}`;
+      // Relative URL — the player browser resolves it against the plugin
+      // server's own origin (whatever LAN IP/host it bound to). Hardcoding
+      // localhost breaks any client that isn't on the DM machine.
+      const url = `/vault/${encodeForVaultUrl(entry.vaultPath)}`;
       const mediaType = mediaTypeOf(entry.mime);
       this.plugin.server.broadcast({
         type: "show-background-media",

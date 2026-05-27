@@ -225,7 +225,7 @@ The DM can push multiple images to the player screen and control them independen
 4. **Scale** — Slider from 10% to 500%. Images can exceed screen bounds for pan-and-reveal
 5. **Rotation** — ↺/↻ buttons rotate in 15° steps
 6. **Z-order** — ▲/▼ buttons change stacking order
-7. **Background media** — A full-screen still image or looping video sits behind all layers, served via the `/vault/` HTTP route (not base64). Sources: vault `.webm`/`.mp4` files via the **Video BG** picker, or any Hydrus file via **Hydrus Source** (see below).
+7. **Background media** — A full-screen still image or looping video sits behind all layers, served via the `/vault/` HTTP route (not base64). Sources: vault `.webm`/`.mp4` files via the **Video BG** picker, or any Hydrus file via **BG from Hydrus** (see below).
 
 Shift+Arrow keys on the scale slider snap to nearest 10% increment.
 
@@ -235,7 +235,7 @@ The plugin can browse a self-hosted [Hydrus Network](https://hydrusnetwork.githu
 
 ### Workflow
 1. Enable Hydrus in **Settings → DM Screen → Hydrus Library**, set the API URL + key, and hit **Test connection**.
-2. In the DM Control Panel, click **Hydrus Source** to open the explorer modal.
+2. In the DM Control Panel, click **BG from Hydrus** to open the explorer modal.
 3. Search by tags (space-separated). Tiles are tagged `R` (remote, not yet downloaded) or `L` (already cached locally).
 4. **Click a tile** — downloads the binary + a JPEG thumbnail to the vault cache (if remote) and pushes it as the player background. Image MIME → `mediaType: "image"`, video MIME → `mediaType: "video"`.
 5. **Shift-click a tile** — downloads it (if remote) and adds it to the DM Control Panel as an image layer (still images only).
@@ -305,7 +305,7 @@ Image layers use percentage-based positioning relative to the viewport:
 | `factionZoneOpacity` | 0.2 | Voronoi zone fill opacity |
 | `showFactionZonesByDefault` | true | Auto-show faction zones on map load |
 | `encounterBattlemaps` | {} | Map of encounter name → battlemap vault path |
-| `hydrusEnabled` | false | Master switch for Hydrus integration (also gates the **Hydrus Source** button) |
+| `hydrusEnabled` | false | Master switch for Hydrus integration (also gates the **BG from Hydrus** button) |
 | `hydrusApiUrl` | `""` | Base URL of the Hydrus Client API (no trailing slash). Must be set before the integration becomes usable. |
 | `hydrusApiKey` | "" | 64-hex `Hydrus-Client-API-Access-Key`, kept locally |
 | `hydrusTagService` | `A.I. Tags` | Name of the Hydrus tag service used to scope `knownTags` |
