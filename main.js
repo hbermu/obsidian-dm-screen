@@ -374,6 +374,12 @@ body {
   /* Sized dynamically by JS to maintain content aspect ratio */
 }
 
+#image-layers-inner > div {
+  border: 2px solid #c9aa71;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
 #image-layers-container img {
   pointer-events: none;
 }
