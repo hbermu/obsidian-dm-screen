@@ -12,7 +12,7 @@ import { HydrusCache } from "./hydrus/cache";
 import type { VaultAdapterLike } from "./hydrus/cache";
 import { HydrusClient } from "./hydrus/client";
 import { DdbImageCache } from "./dndbeyond/imageCache";
-import { initDebug } from "./debug";
+import { initDebug, debug } from "./debug";
 
 export default class DmScreenPlugin extends Plugin {
   settings: DmScreenSettings = DEFAULT_SETTINGS;
@@ -221,11 +221,26 @@ export default class DmScreenPlugin extends Plugin {
 
 
   async imageToDataUrl(path: string): Promise<string> {
+    let imgData: ArrayBuffer | null = null;
+
     const imgFile = this.app.vault.getAbstractFileByPath(path);
-    if (!(imgFile instanceof TFile)) return "";
-    const imgData = await this.app.vault.readBinary(imgFile);
+    if (imgFile instanceof TFile) {
+      imgData = await this.app.vault.readBinary(imgFile);
+    } else {
+      // Dotfolders aren't indexed — fall back to raw adapter
+      const adapter = this.app.vault.adapter as unknown as { exists(p: string): Promise<boolean>; readBinary(p: string): Promise<ArrayBuffer> };
+      if (typeof adapter.exists === "function" && await adapter.exists(path)) {
+        imgData = await adapter.readBinary(path);
+      }
+    }
+
+    if (!imgData) {
+      debug("imageToDataUrl: file not found", path);
+      return "";
+    }
+    debug("imageToDataUrl: loaded", path, imgData.byteLength, "bytes");
     const base64 = arrayBufferToBase64(imgData);
-    const ext = imgFile.extension.toLowerCase();
+    const ext = path.split(".").pop()?.toLowerCase() || "";
     const mime =
       ext === "png" ? "image/png" : ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/webp";
     return `data:${mime};base64,${base64}`;

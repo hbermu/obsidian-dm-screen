@@ -98,8 +98,15 @@ export class DdbImageCache {
   }
 
   private async ensureFolder(): Promise<void> {
-    if (!(await this.adapter.exists(this.folder))) {
-      await this.adapter.mkdir(this.folder);
+    if (await this.adapter.exists(this.folder)) return;
+    // Create parent directories if needed
+    const parts = this.folder.split("/");
+    let current = "";
+    for (const part of parts) {
+      current = current ? `${current}/${part}` : part;
+      if (!(await this.adapter.exists(current))) {
+        await this.adapter.mkdir(current);
+      }
     }
   }
 }
