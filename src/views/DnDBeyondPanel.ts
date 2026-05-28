@@ -129,7 +129,12 @@ export class DnDBeyondPanel {
       nameEl.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
-        window.open(`https://www.dndbeyond.com/encounters/${enc.id}`, "_blank");
+        const url = `https://www.dndbeyond.com/encounters/${enc.id}`;
+        try {
+          require("electron").shell.openExternal(url);
+        } catch {
+          window.open(url, "_blank");
+        }
       });
 
       // In progress badge
