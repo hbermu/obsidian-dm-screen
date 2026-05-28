@@ -135,6 +135,7 @@ export default class DmScreenPlugin extends Plugin {
   startServer() {
     if (this.server) return;
     this.server = new PlayerScreenServer(this);
+    this.server.maxClients = this.settings.maxClients;
     this.server.onClientInfo = (info) => this.onPlayerClientInfo(info);
     this.server.onClientCountChanged = () => {
       const clients = this.server?.getConnectedClients() ?? [];

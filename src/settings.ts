@@ -29,6 +29,8 @@ export interface DmScreenSettings {
   // D&D Beyond integration
   ddbEnabled: boolean;
   ddbCobaltSession: string;
+  // Server limits
+  maxClients: number;
 }
 
 export const DEFAULT_SETTINGS: DmScreenSettings = {
@@ -60,6 +62,7 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   ],
   ddbEnabled: false,
   ddbCobaltSession: "",
+  maxClients: 10,
 };
 
 export class DmScreenSettingTab extends PluginSettingTab {
@@ -97,6 +100,18 @@ export class DmScreenSettingTab extends PluginSettingTab {
           this.plugin.settings.autoStartServer = value;
           await this.plugin.saveSettings();
         })
+      );
+
+    new Setting(containerEl)
+      .setName("Max connected clients")
+      .setDesc("Maximum number of player screens that can connect simultaneously")
+      .addText((text) =>
+        text
+          .setValue(String(this.plugin.settings.maxClients))
+          .onChange(async (value) => {
+            this.plugin.settings.maxClients = parseInt(value) || 10;
+            await this.plugin.saveSettings();
+          })
       );
 
     containerEl.createEl("h3", { text: "Combat Grid" });

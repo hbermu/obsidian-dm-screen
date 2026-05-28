@@ -9,7 +9,7 @@ import playerJs from "player-screen-bundle";
 
 interface WebSocketLike {
   send(data: string): void;
-  close(): void;
+  close(code?: number, reason?: string): void;
   readyState: number;
   on(event: string, handler: (...args: unknown[]) => void): void;
 }
@@ -30,6 +30,7 @@ export class PlayerScreenServer {
   private httpServer: Server | null = null;
   private clients: Set<WebSocketLike> = new Set();
   private clientInfoMap: Map<WebSocketLike, ClientInfo> = new Map();
+  maxClients = 10;
   onClientInfo: ((info: ClientInfo) => void) | null = null;
   onClientCountChanged: (() => void) | null = null;
   // Cache last broadcast per message type for late-joining clients
@@ -60,6 +61,10 @@ export class PlayerScreenServer {
       const wss = new WebSocketServer({ server: this.httpServer });
 
       wss.on("connection", (ws: WebSocketLike) => {
+        if (this.clients.size >= this.maxClients) {
+          ws.close(1013, "Max clients reached");
+          return;
+        }
         this.clients.add(ws);
         console.log(`[DM Screen] Player connected. Total: ${this.clients.size}`);
         if (this.onClientCountChanged) this.onClientCountChanged();
