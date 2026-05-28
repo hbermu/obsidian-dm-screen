@@ -29,6 +29,9 @@ export interface DmScreenSettings {
   hydrusDefaultLoop: boolean;
   hydrusDefaultMuted: boolean;
   hydrusIgnoredTagPatterns: string[];
+  // D&D Beyond integration
+  ddbEnabled: boolean;
+  ddbCobaltSession: string;
 }
 
 export interface FogRegion {
@@ -68,6 +71,8 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
     "wd v1\\.4 vit v2 tagger ai generated tags",
     "rating:.*",
   ],
+  ddbEnabled: false,
+  ddbCobaltSession: "",
 };
 
 export class DmScreenSettingTab extends PluginSettingTab {
@@ -381,5 +386,68 @@ export class DmScreenSettingTab extends PluginSettingTab {
             new Notice(`Removed ${removed} cached files`);
           })
       );
+
+    // ─── D&D Beyond ───
+    containerEl.createEl("h3", { text: "D&D Beyond" });
+
+    new Setting(containerEl)
+      .setName("Enable D&D Beyond integration")
+      .setDesc("Adds a D&D Beyond tab in combat mode to sync encounters and initiative")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.ddbEnabled).onChange(async (value) => {
+          this.plugin.settings.ddbEnabled = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("CobaltSession cookie")
+      .setDesc("Paste your CobaltSession cookie from dndbeyond.com (DevTools → Application → Cookies)")
+      .addText((text) => {
+        text.inputEl.type = "password";
+        text.inputEl.style.width = "100%";
+        text
+          .setPlaceholder("Paste CobaltSession value here")
+          .setValue(this.plugin.settings.ddbCobaltSession)
+          .onChange(async (value) => {
+            this.plugin.settings.ddbCobaltSession = value.trim();
+            await this.plugin.saveSettings();
+          });
+      });
+
+    const ddbBtnRow = new Setting(containerEl)
+      .setName("Connection")
+      .setDesc("Open D&D Beyond to log in, then test your session");
+
+    ddbBtnRow.addButton((btn) =>
+      btn.setButtonText("Open D&D Beyond").onClick(() => {
+        window.open("https://www.dndbeyond.com");
+      })
+    );
+
+    ddbBtnRow.addButton((btn) =>
+      btn
+        .setButtonText("Test connection")
+        .setCta()
+        .onClick(async () => {
+          const session = this.plugin.settings.ddbCobaltSession;
+          if (!session) {
+            new Notice("Paste a CobaltSession cookie first", 4000);
+            return;
+          }
+          try {
+            const { DdbClient } = await import("./dndbeyond/client");
+            const client = new DdbClient(session);
+            const valid = await client.validateSession();
+            if (valid) {
+              new Notice("D&D Beyond session is valid ✓", 5000);
+            } else {
+              new Notice("D&D Beyond session is invalid or expired", 6000);
+            }
+          } catch (err) {
+            new Notice(`D&D Beyond test failed: ${(err as Error).message}`, 6000);
+          }
+        })
+    );
   }
 }

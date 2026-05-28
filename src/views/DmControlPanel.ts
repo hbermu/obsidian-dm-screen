@@ -3,6 +3,7 @@ import type DmScreenPlugin from "../main";
 import type { TrackerCombatant, ImageLayer } from "../types";
 import type { FogRegion } from "../settings";
 import { renderStatblock } from "./StatblockPanel";
+import { DnDBeyondPanel } from "./DnDBeyondPanel";
 
 export const DM_CONTROL_VIEW_TYPE = "dm-control-panel";
 
@@ -65,6 +66,10 @@ export class DmControlPanel extends ItemView {
   playerScreenHeight = 0;
   playerConnected = false;
 
+  // D&D Beyond integration
+  private combatTab: "initiative" | "dndbeyond" = "initiative";
+  private ddbPanel: DnDBeyondPanel | null = null;
+
   // UI state
   expandedCreature: string | null = null;
   private renderDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -101,6 +106,10 @@ export class DmControlPanel extends ItemView {
 
   async onClose() {
     document.removeEventListener("keydown", this.escHandler);
+    if (this.ddbPanel) {
+      this.ddbPanel.destroy();
+      this.ddbPanel = null;
+    }
     this.saveState();
   }
 
@@ -793,10 +802,41 @@ export class DmControlPanel extends ItemView {
   private renderInitiativeSection(container: HTMLElement) {
     const section = container.createDiv("dm-section");
 
-    if (this.trackerSource === "plugin") {
-      this.renderPluginTracker(section);
+    const ddbActive = this.plugin.settings.ddbEnabled && this.plugin.settings.ddbCobaltSession;
+    if (ddbActive) {
+      const tabBar = section.createDiv("dm-combat-tabs");
+      const initTab = tabBar.createEl("button", {
+        text: "Initiative",
+        cls: this.combatTab === "initiative" ? "dm-tab-active" : "dm-tab",
+      });
+      initTab.addEventListener("click", () => {
+        this.combatTab = "initiative";
+        this.render();
+      });
+      const ddbTab = tabBar.createEl("button", {
+        text: "D&D Beyond",
+        cls: this.combatTab === "dndbeyond" ? "dm-tab-active" : "dm-tab",
+      });
+      ddbTab.addEventListener("click", () => {
+        this.combatTab = "dndbeyond";
+        this.render();
+      });
+    }
+
+    if (ddbActive && this.combatTab === "dndbeyond") {
+      const ddbContainer = section.createDiv("dm-ddb-panel");
+      if (!this.ddbPanel) {
+        this.ddbPanel = new DnDBeyondPanel(this.plugin, ddbContainer);
+        this.ddbPanel.initialize();
+      } else {
+        this.ddbPanel.setContainer(ddbContainer);
+      }
     } else {
-      this.renderManualTracker(section);
+      if (this.trackerSource === "plugin") {
+        this.renderPluginTracker(section);
+      } else {
+        this.renderManualTracker(section);
+      }
     }
   }
 

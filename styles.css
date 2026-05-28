@@ -1393,3 +1393,126 @@
   font-size: 0.85em;
   color: var(--text-muted);
 }
+
+/* ─── D&D Beyond Combat Tabs ─── */
+
+.dm-combat-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 8px;
+}
+
+.dm-tab,
+.dm-tab-active {
+  padding: 4px 12px;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  font-size: 0.85em;
+  border: none;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+
+.dm-tab-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* ─── DDB Panel ─── */
+
+.dm-ddb-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dm-ddb-message {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  padding: 8px 0;
+}
+
+.dm-ddb-search {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 0.85em;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.dm-ddb-encounter-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dm-ddb-encounter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--background-secondary);
+}
+
+.dm-ddb-encounter-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.dm-ddb-encounter-selected {
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.4);
+}
+
+.dm-ddb-check {
+  font-size: 0.9em;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.dm-ddb-encounter-name {
+  flex: 1;
+  color: var(--text-accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.dm-ddb-encounter-name:hover {
+  text-decoration: underline;
+}
+
+.dm-ddb-badge {
+  font-size: 0.7em;
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.dm-ddb-tracking {
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--background-secondary);
+  border-radius: 4px;
+}
+
+.dm-ddb-tracking-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dm-ddb-stop-btn {
+  font-size: 0.8em;
+  padding: 2px 8px;
+}
