@@ -440,10 +440,12 @@ export class DmControlPanel extends ItemView {
     const previewInner = previewArea.createDiv("dm-layer-preview-inner");
     previewInner.style.transform = `translate(${this.dmPanX}%, ${this.dmPanY}%) scale(${this.dmZoom})`;
 
-    // Background preview
+    // Background preview — URL is relative to the plugin server, so prefix with origin
     if (this.activeBackgroundUrl) {
+      const port = this.plugin.settings.serverPort;
+      const fullUrl = `http://localhost:${port}${this.activeBackgroundUrl}`;
       const bgEl = previewInner.createDiv("dm-preview-bg");
-      bgEl.style.backgroundImage = `url(${this.activeBackgroundUrl})`;
+      bgEl.style.backgroundImage = `url(${fullUrl})`;
     }
 
     // Draw image layer rectangles (sorted by zIndex ascending)
