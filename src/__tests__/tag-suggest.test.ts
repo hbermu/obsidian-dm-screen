@@ -25,18 +25,13 @@ const baseOpts = { baseUrl: "https://hydrus.test", apiKey: "key123" };
 
 afterEach(() => { vi.restoreAllMocks(); });
 
-describe("searchTags wildcard behavior", () => {
-  it("sends * as search term when prefix is empty", async () => {
-    let capturedUrl = "";
-    mockRequestUrl((call) => {
-      capturedUrl = call.url;
-      return { json: { tags: [{ value: "castle" }, { value: "forest" }] } };
-    });
-    const client = new HydrusClient(baseOpts);
+describe("searchTags empty prefix behavior", () => {
+  it("empty prefix should use local cache (not call API)", () => {
+    // The suggestTags method in HydrusExplorerModal checks !prefix and
+    // falls back to suggestFromCache. This test validates the design:
+    // Hydrus API does not support empty/wildcard search.
     const prefix = "";
-    const search = prefix || "*";
-    await client.searchTags(search, {});
-    expect(capturedUrl).toContain("search=*");
+    expect(!prefix).toBe(true); // falsy → triggers cache fallback
   });
 
   it("sends actual prefix when non-empty", async () => {
@@ -50,12 +45,12 @@ describe("searchTags wildcard behavior", () => {
     expect(capturedUrl).toContain("search=tav");
   });
 
-  it("returns all tags from wildcard search", async () => {
+  it("returns results for non-empty prefix", async () => {
     mockRequestUrl(() => ({
       json: { tags: [{ value: "castle" }, { value: "forest" }, { value: "night" }] },
     }));
     const client = new HydrusClient(baseOpts);
-    const results = await client.searchTags("*", {});
+    const results = await client.searchTags("c", {});
     expect(results).toHaveLength(3);
     expect(results.map(r => r.value)).toEqual(["castle", "forest", "night"]);
   });

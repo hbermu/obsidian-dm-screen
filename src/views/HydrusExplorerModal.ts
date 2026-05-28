@@ -140,19 +140,21 @@ export class HydrusExplorerModal extends Modal {
 
   private async suggestTags(prefix: string): Promise<string[]> {
     let results: string[];
-    const search = prefix || "*";
-    if (this.client && !this.localOnly && this.mode === "online") {
+    if (!prefix) {
+      // Hydrus API doesn't support empty/wildcard search — use local cache
+      results = await this.suggestFromCache(prefix);
+    } else if (this.client && !this.localOnly && this.mode === "online") {
       try {
         const serviceKeys = this.plugin.settings.hydrusTagServices;
         if (serviceKeys.length > 0) {
           const all: string[] = [];
           for (const key of serviceKeys) {
-            const remote = await this.client.searchTags(search, { tagServiceKey: key });
+            const remote = await this.client.searchTags(prefix, { tagServiceKey: key });
             all.push(...remote.map((s) => s.value));
           }
           results = [...new Set(all)];
         } else {
-          const remote = await this.client.searchTags(search, {});
+          const remote = await this.client.searchTags(prefix, {});
           results = remote.map((s) => s.value);
         }
       } catch {
