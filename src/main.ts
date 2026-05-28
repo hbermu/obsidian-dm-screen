@@ -12,6 +12,7 @@ import { HydrusCache } from "./hydrus/cache";
 import type { VaultAdapterLike } from "./hydrus/cache";
 import { HydrusClient } from "./hydrus/client";
 import { DdbImageCache } from "./dndbeyond/imageCache";
+import { initDebug } from "./debug";
 
 export default class DmScreenPlugin extends Plugin {
   settings: DmScreenSettings = DEFAULT_SETTINGS;
@@ -39,6 +40,7 @@ export default class DmScreenPlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
+    initDebug(this.settings);
     this.initHydrusCache();
 
     // Register views

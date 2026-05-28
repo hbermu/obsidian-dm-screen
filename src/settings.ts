@@ -31,6 +31,8 @@ export interface DmScreenSettings {
   ddbCobaltSession: string;
   // Server limits
   maxClients: number;
+  // Debug
+  debugMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: DmScreenSettings = {
@@ -63,6 +65,7 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   ddbEnabled: false,
   ddbCobaltSession: "",
   maxClients: 10,
+  debugMode: false,
 };
 
 export class DmScreenSettingTab extends PluginSettingTab {
@@ -401,5 +404,18 @@ export class DmScreenSettingTab extends PluginSettingTab {
           }
         })
     );
+
+    // ─── Advanced ───
+    containerEl.createEl("h3", { text: "Advanced" });
+
+    new Setting(containerEl)
+      .setName("Debug mode")
+      .setDesc("Log detailed information to the developer console (Ctrl+Shift+I)")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.debugMode).onChange(async (value) => {
+          this.plugin.settings.debugMode = value;
+          await this.plugin.saveSettings();
+        })
+      );
   }
 }

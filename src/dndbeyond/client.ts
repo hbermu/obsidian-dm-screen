@@ -1,4 +1,5 @@
 import { requestUrl } from "obsidian";
+import { debug } from "../debug";
 import type {
   DdbCobaltTokenResponse,
   DdbEncounterSummary,
@@ -89,25 +90,23 @@ export class DdbClient {
   }
 
   async getMonsterImages(ids: number[]): Promise<Map<number, string>> {
-    if (ids.length === 0) return new Map();
-    const url = `${MONSTER_SERVICE_URL}?ids=${ids.join(",")}`;
-    const token = await this.ensureToken();
-    const res = await requestUrl({
-      url,
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-      throw: false,
-    });
-    if (res.status < 200 || res.status >= 300) {
-      throw new Error(`Monster service request failed (${res.status})`);
-    }
-    const body = res.json as { data?: Array<Record<string, unknown>> };
-    const data = body.data ?? [];
+    const validIds = ids.filter((id) => id > 0);
+    if (validIds.length === 0) return new Map();
+    debug("getMonsterImages: fetching", validIds.length, "monsters:", validIds);
     const result = new Map<number, string>();
-    for (const m of data) {
-      const id = m.id as number;
-      const avatar = (m.largeAvatarUrl as string) || (m.avatarUrl as string) || "";
-      if (id && avatar) result.set(id, avatar);
+    for (const id of validIds) {
+      try {
+        const url = `${MONSTER_SERVICE_URL}/${id}`;
+        debug("getMonsterImages: GET", url);
+        const res = await this.authedGet(url);
+        const body = res.json as { data?: Record<string, unknown> };
+        const m = body.data ?? (body as unknown as Record<string, unknown>);
+        const avatar = (m.largeAvatarUrl as string) || (m.avatarUrl as string) || "";
+        debug("getMonsterImages: id", id, "avatar", avatar ? avatar.slice(0, 60) + "..." : "(none)");
+        if (avatar) result.set(id, avatar);
+      } catch (e) {
+        debug("getMonsterImages: failed for id", id, (e as Error).message);
+      }
     }
     return result;
   }

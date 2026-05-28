@@ -3,6 +3,7 @@ import type DmScreenPlugin from "../main";
 import { DdbClient } from "../dndbeyond/client";
 import { DdbEncounterPoller, type DdbPolledState } from "../dndbeyond/poller";
 import { DdbImageCache } from "../dndbeyond/imageCache";
+import { debug } from "../debug";
 import type { VaultAdapterLike } from "../hydrus/cache";
 import type { DdbEncounter } from "../dndbeyond/types";
 
@@ -285,8 +286,11 @@ export class DnDBeyondPanel {
     const uniqueIds = [...new Set(encounter.monsters.map((m) => m.id))];
     if (uniqueIds.length === 0) return;
 
+    debug("loadMonsterImages: encounter", encounter.name, "uniqueIds", uniqueIds);
+
     try {
       const avatarMap = await this.client.getMonsterImages(uniqueIds);
+      debug("loadMonsterImages: avatarMap entries", avatarMap.size, [...avatarMap.entries()]);
 
       const cacheFolder =
         this.plugin.settings.hydrusCacheFolder.replace(/\/bg\/?$/, "") || ".dm-screen";
@@ -295,15 +299,20 @@ export class DnDBeyondPanel {
       const cache = new DdbImageCache(cacheFolder, adapter, ttlDays);
 
       const dmPanel = await this.plugin.findOpenDmControlPanel();
-      if (!dmPanel) return;
+      if (!dmPanel) {
+        debug("loadMonsterImages: no DM panel open, aborting");
+        return;
+      }
 
       for (const [monsterId, imageUrl] of avatarMap) {
         const monster = encounter.monsters.find((m) => m.id === monsterId);
         const name = monster?.name ?? `Monster ${monsterId}`;
+        debug("loadMonsterImages: downloading", name, "id", monsterId, "url", imageUrl);
         const vaultPath = await cache.getOrDownload(monsterId, imageUrl, name);
         const dataUrl = await this.plugin.imageToDataUrl(vaultPath);
         if (dataUrl) {
           dmPanel.addImageLayer(name, dataUrl, "monster", false);
+          debug("loadMonsterImages: added layer", name);
         }
       }
     } catch (e) {
