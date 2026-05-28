@@ -607,14 +607,17 @@ class PlayerScreen {
       wrapper.style.width = `${layer.width}%`;
       wrapper.style.height = `${layer.height}%`;
       wrapper.style.zIndex = String(layer.zIndex);
+      wrapper.style.display = "flex";
+      wrapper.style.alignItems = "center";
+      wrapper.style.justifyContent = "center";
       if (layer.rotation) {
         wrapper.style.transform = `rotate(${layer.rotation}deg)`;
       }
 
       const img = document.createElement("img");
       img.src = layer.dataUrl;
-      img.style.width = "100%";
-      img.style.height = "100%";
+      img.style.maxWidth = "100%";
+      img.style.maxHeight = "100%";
       img.style.objectFit = "contain";
       img.style.display = "block";
       wrapper.appendChild(img);
