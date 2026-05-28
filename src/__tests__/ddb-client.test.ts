@@ -169,6 +169,34 @@ describe("DdbClient - getEncounters", () => {
     expect(encounters[0].players).toEqual([]);
     expect(encounters[0].monsters).toEqual([]);
   });
+
+  it("parses manualEntries from encounter data", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: [{
+            id: "enc-1", name: "Mixed", inProgress: true, roundNum: 1, turnNum: 2,
+            monsters: [],
+            players: [],
+            manualEntries: [
+              { id: "m1", name: "Bandit Captain", initiative: 16, currentHitPoints: 40, maximumHitPoints: 65 },
+              { id: "m2", name: "Wolf", initiative: 12, currentHitPoints: 11, maximumHitPoints: 11 },
+            ],
+          }],
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const encounters = await client.getEncounters();
+    expect(encounters[0].manualEntries).toHaveLength(2);
+    expect(encounters[0].manualEntries[0].name).toBe("Bandit Captain");
+    expect(encounters[0].manualEntries[0].currentHitPoints).toBe(40);
+    expect(encounters[0].manualEntries[1].initiative).toBe(12);
+  });
 });
 
 describe("DdbClient - getEncounter", () => {
@@ -329,6 +357,40 @@ describe("DdbClient - getCharacter", () => {
     // CON 10 = mod 0. maxHP = 20 + 0 + 0 = 20. current = max(0, 20-30) = 0
     expect(char.maxHitPoints).toBe(20);
     expect(char.currentHitPoints).toBe(0);
+  });
+
+  it("uses CON set modifier (Amulet of Health) when higher than base", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: {
+            name: "Amulet Wearer",
+            baseHitPoints: 50,
+            bonusHitPoints: 0,
+            removedHitPoints: 0,
+            temporaryHitPoints: 0,
+            overrideHitPoints: null,
+            stats: [{ id: 3, value: 10 }],
+            bonusStats: [{ id: 3, value: null }],
+            overrideStats: [{ id: 3, value: null }],
+            classes: [{ level: 10 }],
+            modifiers: {
+              item: [{ subType: "constitution-score", type: "set", fixedValue: 19, value: 19 }],
+            },
+          },
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const char = await client.getCharacter(1);
+
+    // CON set to 19 (higher than base 10), mod = +4. maxHP = 50 + (4*10) = 90
+    expect(char.maxHitPoints).toBe(90);
+    expect(char.currentHitPoints).toBe(90);
   });
 
   it("invalidates token on 401 and throws", async () => {

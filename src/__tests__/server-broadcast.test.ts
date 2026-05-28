@@ -92,4 +92,22 @@ describe("PlayerScreenServer.broadcast", () => {
     (server as any).clients.add(ws);
     expect(server.clientCount).toBe(1);
   });
+
+  it("getConnectedClients returns per-client info", () => {
+    const ws1 = makeWsStub();
+    const ws2 = makeWsStub();
+    (server as any).clients.add(ws1);
+    (server as any).clients.add(ws2);
+    (server as any).clientInfoMap.set(ws1, { width: 1920, height: 1080, devicePixelRatio: 1 });
+    (server as any).clientInfoMap.set(ws2, { width: 1280, height: 800, devicePixelRatio: 2 });
+
+    const clients = server.getConnectedClients();
+    expect(clients).toHaveLength(2);
+    expect(clients).toContainEqual({ width: 1920, height: 1080, devicePixelRatio: 1 });
+    expect(clients).toContainEqual({ width: 1280, height: 800, devicePixelRatio: 2 });
+  });
+
+  it("getConnectedClients returns empty when no clients", () => {
+    expect(server.getConnectedClients()).toEqual([]);
+  });
 });
