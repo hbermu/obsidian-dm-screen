@@ -615,6 +615,15 @@
   padding: 4px 8px;
   border-radius: 4px;
   background: var(--background-secondary);
+  flex-wrap: wrap;
+}
+
+.dm-layer-position-row {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  padding-top: 2px;
+  justify-content: flex-end;
 }
 
 .dm-layer-row:hover {

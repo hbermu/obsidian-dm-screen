@@ -584,7 +584,7 @@ export class DmControlPanel extends ItemView {
 
         const controls = row.createDiv("dm-layer-controls");
 
-        const scaleLabel = controls.createSpan({ text: `${layer.width}%`, cls: "dm-layer-scale-label" });
+        const scaleLabel = controls.createSpan({ text: `${Math.round(layer.width)}%`, cls: "dm-layer-scale-label" });
         const scaleSlider = controls.createEl("input", {
           type: "range",
           cls: "dm-layer-scale-slider",
@@ -628,33 +628,6 @@ export class DmControlPanel extends ItemView {
         });
 
 
-        const fitWBtn = controls.createEl("button", { text: "W", cls: "dm-layer-btn" });
-        fitWBtn.title = "Fit to player width";
-        fitWBtn.addEventListener("click", () => {
-          const vp = this.getPlayerViewport();
-          if (!vp) { new Notice("No player connected"); return; }
-          const aspectRatio = layer.height / layer.width;
-          layer.width = vp.vpW;
-          layer.height = vp.vpW * aspectRatio;
-          layer.x = vp.vpX;
-          layer.y = vp.vpY + (vp.vpH - layer.height) / 2;
-          this.broadcastImageLayers();
-          this.render();
-        });
-
-        const fitHBtn = controls.createEl("button", { text: "H", cls: "dm-layer-btn" });
-        fitHBtn.title = "Fit to player height";
-        fitHBtn.addEventListener("click", () => {
-          const vp = this.getPlayerViewport();
-          if (!vp) { new Notice("No player connected"); return; }
-          const aspectRatio = layer.width / layer.height;
-          layer.height = vp.vpH;
-          layer.width = vp.vpH * aspectRatio;
-          layer.y = vp.vpY;
-          layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
-          this.broadcastImageLayers();
-          this.render();
-        });
         const rotLeftBtn = controls.createEl("button", { text: "\u21BA", cls: "dm-layer-btn" });
         rotLeftBtn.addEventListener("click", () => {
           layer.rotation = (layer.rotation - 15) % 360;
@@ -684,6 +657,66 @@ export class DmControlPanel extends ItemView {
           this.fogCanvases.delete(layer.id);
           if (this.fogEditLayerId === layer.id) this.fogEditLayerId = null;
           this.imageLayers = this.imageLayers.filter(l => l.id !== layer.id);
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const posRow = row.createDiv("dm-layer-position-row");
+
+        const fitWBtn = posRow.createEl("button", { text: "W", cls: "dm-layer-btn" });
+        fitWBtn.title = "Fit to player width";
+        fitWBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          const aspectRatio = layer.height / layer.width;
+          layer.width = vp.vpW;
+          layer.height = vp.vpW * aspectRatio;
+          layer.x = vp.vpX;
+          layer.y = vp.vpY + (vp.vpH - layer.height) / 2;
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const fitHBtn = posRow.createEl("button", { text: "H", cls: "dm-layer-btn" });
+        fitHBtn.title = "Fit to player height";
+        fitHBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          const aspectRatio = layer.width / layer.height;
+          layer.height = vp.vpH;
+          layer.width = vp.vpH * aspectRatio;
+          layer.y = vp.vpY;
+          layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const alignLeftBtn = posRow.createEl("button", { text: "\u25c0", cls: "dm-layer-btn" });
+        alignLeftBtn.title = "Align to left edge";
+        alignLeftBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          layer.x = vp.vpX;
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const centerBtn = posRow.createEl("button", { text: "\u25c6", cls: "dm-layer-btn" });
+        centerBtn.title = "Center horizontally";
+        centerBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const alignRightBtn = posRow.createEl("button", { text: "\u25b6", cls: "dm-layer-btn" });
+        alignRightBtn.title = "Align to right edge";
+        alignRightBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          layer.x = vp.vpX + vp.vpW - layer.width;
           this.broadcastImageLayers();
           this.render();
         });
@@ -1172,7 +1205,7 @@ export class DmControlPanel extends ItemView {
         const controls = row.createDiv("dm-layer-controls");
 
         // Scale slider
-        const scaleLabel = controls.createSpan({ text: `${layer.width}%`, cls: "dm-layer-scale-label" });
+        const scaleLabel = controls.createSpan({ text: `${Math.round(layer.width)}%`, cls: "dm-layer-scale-label" });
         const scaleSlider = controls.createEl("input", {
           type: "range",
           cls: "dm-layer-scale-slider",
@@ -1217,34 +1250,6 @@ export class DmControlPanel extends ItemView {
           }
         });
 
-        const fitWBtn = controls.createEl("button", { text: "W", cls: "dm-layer-btn" });
-        fitWBtn.title = "Fit to player width";
-        fitWBtn.addEventListener("click", () => {
-          const vp = this.getPlayerViewport();
-          if (!vp) { new Notice("No player connected"); return; }
-          const aspectRatio = layer.height / layer.width;
-          layer.width = vp.vpW;
-          layer.height = vp.vpW * aspectRatio;
-          layer.x = vp.vpX;
-          layer.y = vp.vpY + (vp.vpH - layer.height) / 2;
-          this.broadcastImageLayers();
-          this.render();
-        });
-
-        const fitHBtn = controls.createEl("button", { text: "H", cls: "dm-layer-btn" });
-        fitHBtn.title = "Fit to player height";
-        fitHBtn.addEventListener("click", () => {
-          const vp = this.getPlayerViewport();
-          if (!vp) { new Notice("No player connected"); return; }
-          const aspectRatio = layer.width / layer.height;
-          layer.height = vp.vpH;
-          layer.width = vp.vpH * aspectRatio;
-          layer.y = vp.vpY;
-          layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
-          this.broadcastImageLayers();
-          this.render();
-        });
-
         const rotLeftBtn = controls.createEl("button", { text: "↺", cls: "dm-layer-btn" });
         rotLeftBtn.addEventListener("click", () => {
           layer.rotation = (layer.rotation - 15) % 360;
@@ -1272,6 +1277,66 @@ export class DmControlPanel extends ItemView {
         const removeBtn = controls.createEl("button", { text: "✕", cls: "dm-layer-btn dm-layer-remove" });
         removeBtn.addEventListener("click", () => {
           this.imageLayers = this.imageLayers.filter(l => l.id !== layer.id);
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const posRow = row.createDiv("dm-layer-position-row");
+
+        const fitWBtn = posRow.createEl("button", { text: "W", cls: "dm-layer-btn" });
+        fitWBtn.title = "Fit to player width";
+        fitWBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          const aspectRatio = layer.height / layer.width;
+          layer.width = vp.vpW;
+          layer.height = vp.vpW * aspectRatio;
+          layer.x = vp.vpX;
+          layer.y = vp.vpY + (vp.vpH - layer.height) / 2;
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const fitHBtn = posRow.createEl("button", { text: "H", cls: "dm-layer-btn" });
+        fitHBtn.title = "Fit to player height";
+        fitHBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          const aspectRatio = layer.width / layer.height;
+          layer.height = vp.vpH;
+          layer.width = vp.vpH * aspectRatio;
+          layer.y = vp.vpY;
+          layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const alignLeftBtn = posRow.createEl("button", { text: "◀", cls: "dm-layer-btn" });
+        alignLeftBtn.title = "Align to left edge";
+        alignLeftBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          layer.x = vp.vpX;
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const centerBtn = posRow.createEl("button", { text: "◆", cls: "dm-layer-btn" });
+        centerBtn.title = "Center horizontally";
+        centerBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const alignRightBtn = posRow.createEl("button", { text: "▶", cls: "dm-layer-btn" });
+        alignRightBtn.title = "Align to right edge";
+        alignRightBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          layer.x = vp.vpX + vp.vpW - layer.width;
           this.broadcastImageLayers();
           this.render();
         });
