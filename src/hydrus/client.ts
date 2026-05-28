@@ -70,21 +70,27 @@ export class HydrusClient {
   async getServices(): Promise<HydrusService[]> {
     const res = await this.get("/get_services");
     const body = res.json as Record<string, unknown>;
-    const results: HydrusService[] = [];
-    for (const [, value] of Object.entries(body)) {
-      if (Array.isArray(value)) {
-        for (const svc of value) {
-          if (svc && typeof svc === "object" && "name" in svc && "service_key" in svc) {
-            results.push({
-              name: svc.name as string,
-              service_key: svc.service_key as string,
-              type: typeof svc.type === "number" ? svc.type : -1,
-            });
-          }
-        }
-      }
+    // Prefer services_v2 (array with service_key on each object)
+    if (Array.isArray(body.services_v2)) {
+      return (body.services_v2 as Record<string, unknown>[])
+        .filter((s) => s.name && s.service_key)
+        .map((s) => ({
+          name: s.name as string,
+          service_key: s.service_key as string,
+          type: typeof s.type === "number" ? s.type : -1,
+        }));
     }
-    return results;
+    // Fallback: legacy dict where key = service_key
+    if (body.services && typeof body.services === "object" && !Array.isArray(body.services)) {
+      return Object.entries(body.services as Record<string, Record<string, unknown>>).map(
+        ([key, svc]) => ({
+          name: (svc.name as string) ?? "",
+          service_key: key,
+          type: typeof svc.type === "number" ? svc.type : -1,
+        })
+      );
+    }
+    return [];
   }
 
   async searchFiles(tags: string[], limit?: number): Promise<{ hashes: string[] }> {

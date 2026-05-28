@@ -213,13 +213,14 @@ describe("HydrusClient.getFileMetadata - tag extraction", () => {
 });
 
 describe("HydrusClient.getServices", () => {
-  it("returns flattened services array", async () => {
+  it("returns flattened services array from services_v2", async () => {
     mockRequestUrl(() => ({
       json: {
         "local_tags": [
           { name: "all known tags", type: 5, service_key: "abc" },
         ],
-        "tag_repositories": [
+        "services_v2": [
+          { name: "all known tags", type: 5, service_key: "abc" },
           { name: "my tags", type: 0, service_key: "def" },
         ],
       },
@@ -229,6 +230,22 @@ describe("HydrusClient.getServices", () => {
     expect(services).toHaveLength(2);
     expect(services[0].name).toBe("all known tags");
     expect(services[1].service_key).toBe("def");
+  });
+
+  it("falls back to legacy services dict when services_v2 missing", async () => {
+    mockRequestUrl(() => ({
+      json: {
+        "services": {
+          "abc": { name: "local tags", type: 5 },
+          "def": { name: "my repo", type: 0 },
+        },
+      },
+    }));
+    const client = new HydrusClient(baseOpts);
+    const services = await client.getServices();
+    expect(services).toHaveLength(2);
+    expect(services[0].service_key).toBe("abc");
+    expect(services[1].name).toBe("my repo");
   });
 
   it("returns empty array when services field is missing", async () => {
