@@ -9,7 +9,7 @@ export interface DdbPolledState {
 const MIN_REQUEST_GAP_MS = 1000;
 const CIRCUIT_BREAKER_THRESHOLD = 3;
 const CIRCUIT_BREAKER_PAUSE_MS = 30000;
-const MIN_CYCLE_MS = 5000;
+const MIN_CYCLE_PAUSE_MS = 2000;
 
 export class DdbEncounterPoller {
   private running = false;
@@ -77,9 +77,7 @@ export class DdbEncounterPoller {
     }
 
     if (!this.running) return;
-    const elapsed = Date.now() - cycleStart;
-    const nextDelay = Math.max(0, MIN_CYCLE_MS - elapsed);
-    this.schedulePoll(nextDelay);
+    this.schedulePoll(MIN_CYCLE_PAUSE_MS);
   }
 
   private delay(ms: number): Promise<void> {

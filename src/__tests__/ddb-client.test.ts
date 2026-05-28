@@ -229,7 +229,7 @@ describe("DdbClient - getEncounter", () => {
 });
 
 describe("DdbClient - getCharacter", () => {
-  it("computes HP from character data", async () => {
+  it("computes HP with CON modifier and hp-per-level bonuses", async () => {
     mockRequestUrl((call) => {
       if (call.url.includes("cobalt-token")) {
         return { json: { token: "jwt", ttl: 3600 } };
@@ -237,12 +237,20 @@ describe("DdbClient - getCharacter", () => {
       return {
         json: {
           data: {
-            name: "Gandalf",
-            baseHitPoints: 45,
-            bonusHitPoints: 5,
-            removedHitPoints: 10,
-            temporaryHitPoints: 3,
+            name: "Lostafar",
+            baseHitPoints: 93,
+            bonusHitPoints: null,
+            removedHitPoints: 194,
+            temporaryHitPoints: 21,
             overrideHitPoints: null,
+            stats: [{ id: 3, value: 14 }],
+            bonusStats: [{ id: 3, value: 2 }],
+            overrideStats: [{ id: 3, value: null }],
+            classes: [{ level: 18 }],
+            modifiers: {
+              race: [{ subType: "hit-points-per-level", type: "bonus", fixedValue: 1, value: 1 }],
+              feat: [{ subType: "hit-points-per-level", type: "bonus", fixedValue: 2, value: 2 }],
+            },
           },
         },
       };
@@ -251,10 +259,13 @@ describe("DdbClient - getCharacter", () => {
     const client = new DdbClient("session");
     const char = await client.getCharacter(12345);
 
-    expect(char.name).toBe("Gandalf");
-    expect(char.maxHitPoints).toBe(50); // 45 + 5
-    expect(char.currentHitPoints).toBe(40); // 50 - 10
-    expect(char.temporaryHitPoints).toBe(3);
+    expect(char.name).toBe("Lostafar");
+    // CON = 14 + 2 = 16, mod = +3. HP per level = 1+2 = 3.
+    // maxHP = 93 + (3*18) + (3*18) = 93 + 54 + 54 = 201
+    expect(char.maxHitPoints).toBe(201);
+    // currentHP = max(0, 201 - 194) = 7
+    expect(char.currentHitPoints).toBe(7);
+    expect(char.temporaryHitPoints).toBe(21);
   });
 
   it("uses overrideHitPoints when set", async () => {
@@ -265,12 +276,17 @@ describe("DdbClient - getCharacter", () => {
       return {
         json: {
           data: {
-            name: "Buffed",
-            baseHitPoints: 30,
+            name: "Morrigan",
+            baseHitPoints: 98,
             bonusHitPoints: 0,
-            removedHitPoints: 5,
+            removedHitPoints: 78,
             temporaryHitPoints: 0,
-            overrideHitPoints: 100,
+            overrideHitPoints: 192,
+            stats: [{ id: 3, value: 14 }],
+            bonusStats: [{ id: 3, value: 4 }],
+            overrideStats: [],
+            classes: [{ level: 19 }],
+            modifiers: {},
           },
         },
       };
@@ -279,8 +295,40 @@ describe("DdbClient - getCharacter", () => {
     const client = new DdbClient("session");
     const char = await client.getCharacter(1);
 
-    expect(char.maxHitPoints).toBe(100);
-    expect(char.currentHitPoints).toBe(95);
+    expect(char.maxHitPoints).toBe(192);
+    expect(char.currentHitPoints).toBe(114); // 192 - 78
+  });
+
+  it("clamps currentHitPoints to 0 minimum", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: {
+            name: "Downed",
+            baseHitPoints: 20,
+            bonusHitPoints: null,
+            removedHitPoints: 30,
+            temporaryHitPoints: 0,
+            overrideHitPoints: null,
+            stats: [{ id: 3, value: 10 }],
+            bonusStats: [],
+            overrideStats: [],
+            classes: [{ level: 1 }],
+            modifiers: {},
+          },
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const char = await client.getCharacter(1);
+
+    // CON 10 = mod 0. maxHP = 20 + 0 + 0 = 20. current = max(0, 20-30) = 0
+    expect(char.maxHitPoints).toBe(20);
+    expect(char.currentHitPoints).toBe(0);
   });
 
   it("invalidates token on 401 and throws", async () => {

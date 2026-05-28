@@ -17,6 +17,7 @@ export interface DdbEncounter {
   turnNum: number;
   monsters: DdbMonster[];
   players: DdbPlayer[];
+  manualEntries: DdbManualEntry[];
 }
 
 export interface DdbMonster {
@@ -32,6 +33,14 @@ export interface DdbPlayer {
   id: number;
   name: string;
   initiative: number;
+}
+
+export interface DdbManualEntry {
+  id: string;
+  name: string;
+  initiative: number;
+  currentHitPoints: number;
+  maximumHitPoints: number;
 }
 
 export interface DdbCharacterSummary {

@@ -45,6 +45,7 @@ export class DdbClient {
   private parseEncounter(raw: Record<string, unknown>): DdbEncounter {
     const monsters = Array.isArray(raw.monsters) ? raw.monsters : [];
     const players = Array.isArray(raw.players) ? raw.players : [];
+    const manualEntries = Array.isArray(raw.manualEntries) ? raw.manualEntries : [];
     return {
       id: raw.id as string,
       name: (raw.name as string) ?? "Unnamed",
@@ -66,6 +67,13 @@ export class DdbClient {
           name: (p.name as string) ?? (p.userName as string) ?? "Unknown",
           initiative: (p.initiative as number) ?? 0,
         })),
+      manualEntries: manualEntries.map((e: Record<string, unknown>) => ({
+        id: (e.id as string) ?? "",
+        name: (e.name as string) ?? "Unknown",
+        initiative: (e.initiative as number) ?? 0,
+        currentHitPoints: (e.currentHitPoints as number) ?? 0,
+        maximumHitPoints: (e.maximumHitPoints as number) ?? 0,
+      })),
     };
   }
 
@@ -89,8 +97,10 @@ export class DdbClient {
     const tempHp = (data.temporaryHitPoints as number) ?? 0;
     const overrideHp = data.overrideHitPoints as number | null;
 
-    const maxHp = overrideHp != null ? overrideHp : baseHp + bonusHp;
-    const currentHp = maxHp - removedHp;
+    const maxHp = overrideHp != null
+      ? overrideHp
+      : baseHp + bonusHp + this.computeHpBonuses(data);
+    const currentHp = Math.max(0, maxHp - removedHp);
 
     return {
       id: characterId,
@@ -99,6 +109,68 @@ export class DdbClient {
       maxHitPoints: maxHp,
       temporaryHitPoints: tempHp,
     };
+  }
+
+  private computeHpBonuses(data: Record<string, unknown>): number {
+    const totalLevel = this.getTotalLevel(data);
+    const conMod = this.getConModifier(data);
+    const hpPerLevel = this.getHpPerLevelBonuses(data);
+    return (conMod * totalLevel) + (hpPerLevel * totalLevel);
+  }
+
+  private getTotalLevel(data: Record<string, unknown>): number {
+    const classes = data.classes as Array<{ level?: number }> | undefined;
+    if (!Array.isArray(classes)) return 0;
+    return classes.reduce((sum, c) => sum + (c.level ?? 0), 0);
+  }
+
+  private getConModifier(data: Record<string, unknown>): number {
+    const stats = data.stats as Array<{ id: number; value?: number }> | undefined;
+    const overrideStats = data.overrideStats as Array<{ id: number; value?: number | null }> | undefined;
+    const bonusStats = data.bonusStats as Array<{ id: number; value?: number | null }> | undefined;
+
+    // Check override first
+    const conOverride = overrideStats?.find((s) => s.id === 3)?.value;
+    if (conOverride != null) return Math.floor((conOverride - 10) / 2);
+
+    // Base + bonus
+    const conBase = stats?.find((s) => s.id === 3)?.value ?? 10;
+    const conBonus = bonusStats?.find((s) => s.id === 3)?.value ?? 0;
+
+    // Check modifiers for CON set/bonus (items like Amulet of Health)
+    let modBonus = 0;
+    let modSet: number | null = null;
+    const modifiers = data.modifiers as Record<string, Array<Record<string, unknown>>> | undefined;
+    if (modifiers) {
+      for (const modList of Object.values(modifiers)) {
+        for (const m of modList ?? []) {
+          if ((m.subType as string) !== "constitution-score") continue;
+          if (m.type === "set") {
+            const val = (m.fixedValue as number) ?? (m.value as number) ?? 0;
+            if (modSet === null || val > modSet) modSet = val;
+          } else if (m.type === "bonus") {
+            modBonus += (m.value as number) ?? (m.fixedValue as number) ?? 0;
+          }
+        }
+      }
+    }
+
+    const totalCon = modSet != null ? Math.max(modSet, conBase + conBonus + modBonus) : conBase + conBonus + modBonus;
+    return Math.floor((totalCon - 10) / 2);
+  }
+
+  private getHpPerLevelBonuses(data: Record<string, unknown>): number {
+    const modifiers = data.modifiers as Record<string, Array<Record<string, unknown>>> | undefined;
+    if (!modifiers) return 0;
+    let total = 0;
+    for (const modList of Object.values(modifiers)) {
+      for (const m of modList ?? []) {
+        if ((m.subType as string) === "hit-points-per-level") {
+          total += (m.fixedValue as number) ?? (m.value as number) ?? 0;
+        }
+      }
+    }
+    return total;
   }
 
   private async ensureToken(): Promise<string> {

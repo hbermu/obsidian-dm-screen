@@ -15,6 +15,7 @@ function createMockClient(opts?: {
     turnNum: 0,
     monsters: [{ id: 1, name: "Goblin", initiative: 14, currentHitPoints: 7, maximumHitPoints: 7, uniqueId: "g1" }],
     players: [{ id: 100, name: "Thorin", initiative: 18 }],
+    manualEntries: [],
     ...opts?.encounter,
   };
 
@@ -71,10 +72,10 @@ describe("DdbEncounterPoller", () => {
 
     poller.start();
 
-    // 3 failures with MIN_CYCLE_MS between them
+    // 3 failures with MIN_CYCLE_PAUSE_MS between them
     await vi.advanceTimersByTimeAsync(100); // 1st failure
-    await vi.advanceTimersByTimeAsync(5000); // 2nd failure
-    await vi.advanceTimersByTimeAsync(5000); // 3rd failure
+    await vi.advanceTimersByTimeAsync(2500); // 2nd failure
+    await vi.advanceTimersByTimeAsync(2500); // 3rd failure
 
     expect(errors.length).toBeGreaterThanOrEqual(3);
 

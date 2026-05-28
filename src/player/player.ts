@@ -565,7 +565,6 @@ class PlayerScreen {
         : `<span class="init-condition ${conditionClass}">${conditionText}</span>`;
 
       li.innerHTML = `
-        <span class="init-roll">${c.initiative}</span>
         <span class="init-name">${c.name}${c.isPlayer ? '<span class="init-pc-tag">PC</span>' : ""}</span>
         ${statusHtml}
         ${hpDisplay}

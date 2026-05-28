@@ -219,14 +219,16 @@ export class DnDBeyondPanel {
 
     const players = encounter.players ?? [];
     const monsters = encounter.monsters ?? [];
+    const manualEntries = encounter.manualEntries ?? [];
 
-    // Determine current turn by index
     const allParticipants = [
       ...players.map((p) => ({ ...p, kind: "player" as const })),
       ...monsters.map((m) => ({ ...m, kind: "monster" as const })),
+      ...manualEntries.map((e) => ({ ...e, kind: "manual" as const })),
     ].sort((a, b) => b.initiative - a.initiative);
 
-    const currentTurnIdx = encounter.inProgress ? encounter.turnNum : -1;
+    // DDB turnNum is 1-indexed
+    const currentTurnIdx = encounter.inProgress ? encounter.turnNum - 1 : -1;
 
     for (let i = 0; i < allParticipants.length; i++) {
       const p = allParticipants[i];
@@ -250,8 +252,8 @@ export class DnDBeyondPanel {
       } else {
         combatants.push({
           name: p.name,
-          hp: p.currentHitPoints,
-          maxHp: p.maximumHitPoints,
+          hp: (p as { currentHitPoints: number }).currentHitPoints,
+          maxHp: (p as { maximumHitPoints: number }).maximumHitPoints,
           initiative: p.initiative,
           active: isActive,
           friendly: false,
