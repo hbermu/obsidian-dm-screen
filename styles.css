@@ -1336,6 +1336,15 @@
   line-height: 1.2;
 }
 
+.dm-hydrus-tile-menu {
+  max-width: 350px;
+}
+
+.dm-hydrus-tile-menu .menu-item-title {
+  white-space: normal;
+  word-wrap: break-word;
+}
+
 .dm-hydrus-empty {
   grid-column: 1 / -1;
   text-align: center;

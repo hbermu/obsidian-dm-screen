@@ -26,6 +26,7 @@ export interface DmScreenSettings {
   hydrusCacheTtlDays: number;
   hydrusDefaultLoop: boolean;
   hydrusDefaultMuted: boolean;
+  hydrusIgnoredTagPatterns: string[];
 }
 
 export interface FogRegion {
@@ -58,6 +59,11 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   hydrusCacheTtlDays: 30,
   hydrusDefaultLoop: true,
   hydrusDefaultMuted: true,
+  hydrusIgnoredTagPatterns: [
+    "wd eva02-large v3 tagger ai generated tags",
+    "wd v1\\.4 vit v2 tagger ai generated tags",
+    "rating:.*",
+  ],
 };
 
 export class DmScreenSettingTab extends PluginSettingTab {
@@ -286,6 +292,22 @@ export class DmScreenSettingTab extends PluginSettingTab {
           this.plugin.settings.hydrusDefaultMuted = value;
           await this.plugin.saveSettings();
         })
+      );
+
+    new Setting(containerEl)
+      .setName("Ignored tag patterns")
+      .setDesc("Regex patterns (one per line, auto-anchored). Tags matching any pattern are hidden from the tile menu and excluded from Copy tags.")
+      .addTextArea((text) =>
+        text
+          .setValue(this.plugin.settings.hydrusIgnoredTagPatterns.join("\n"))
+          .setPlaceholder("rating:.*\nwd eva02-large v3 tagger ai generated tags")
+          .onChange(async (value) => {
+            this.plugin.settings.hydrusIgnoredTagPatterns = value
+              .split("\n")
+              .map((line) => line.trim())
+              .filter((line) => line.length > 0);
+            await this.plugin.saveSettings();
+          })
       );
 
     new Setting(containerEl)

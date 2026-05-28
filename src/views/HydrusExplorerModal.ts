@@ -3,6 +3,7 @@ import type DmScreenPlugin from "../main";
 import { HydrusClient, type HydrusFile, extFromMime } from "../hydrus/client";
 import type { CachedEntry, HydrusCache } from "../hydrus/cache";
 import { paginate } from "../hydrus/pagination";
+import { filterTags } from "../hydrus/tagFilter";
 import { TagSuggester } from "./HydrusTagSuggester";
 
 interface RemoteTile {
@@ -470,7 +471,9 @@ export class HydrusExplorerModal extends Modal {
 
   private openTileMenu(tile: Tile, evt: MouseEvent) {
     const menu = new Menu();
-    const tags = tile.knownTags.join(", ");
+    (menu as any).dom?.classList.add("dm-hydrus-tile-menu");
+    const filtered = filterTags(tile.knownTags, this.plugin.settings.hydrusIgnoredTagPatterns);
+    const tags = filtered.join(", ");
     menu.addItem((item: any) => item.setTitle(`Tags: ${tags || "(no tags)"}`).setDisabled(true));
     if (tags) {
       menu.addItem((item: any) =>
