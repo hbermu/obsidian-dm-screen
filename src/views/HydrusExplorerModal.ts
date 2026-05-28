@@ -424,6 +424,7 @@ export class HydrusExplorerModal extends Modal {
       if (panel) {
         panel.activeBackgroundUrl = url;
         panel.activeBackgroundMediaType = mediaType;
+        panel.render();
       }
       await this.cache.markUsed(entry.hash);
       this.close();

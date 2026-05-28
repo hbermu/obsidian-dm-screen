@@ -634,6 +634,34 @@ export class DmControlPanel extends ItemView {
           }
         });
 
+
+        const fitWBtn = controls.createEl("button", { text: "W", cls: "dm-layer-btn" });
+        fitWBtn.title = "Fit to player width";
+        fitWBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          const aspectRatio = layer.height / layer.width;
+          layer.width = vp.vpW;
+          layer.height = vp.vpW * aspectRatio;
+          layer.x = vp.vpX;
+          layer.y = vp.vpY + (vp.vpH - layer.height) / 2;
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const fitHBtn = controls.createEl("button", { text: "H", cls: "dm-layer-btn" });
+        fitHBtn.title = "Fit to player height";
+        fitHBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          const aspectRatio = layer.width / layer.height;
+          layer.height = vp.vpH;
+          layer.width = vp.vpH * aspectRatio;
+          layer.y = vp.vpY;
+          layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
+          this.broadcastImageLayers();
+          this.render();
+        });
         const rotLeftBtn = controls.createEl("button", { text: "\u21BA", cls: "dm-layer-btn" });
         rotLeftBtn.addEventListener("click", () => {
           layer.rotation = (layer.rotation - 15) % 360;
