@@ -52,6 +52,16 @@
   background: var(--background-secondary);
   padding: 1px 6px;
   border-radius: 4px;
+  cursor: pointer;
+}
+
+.dm-client-resolution:hover {
+  background: var(--background-modifier-hover);
+}
+
+.dm-client-resolution-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
 }
 
 .dm-server-url {

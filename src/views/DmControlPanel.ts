@@ -57,6 +57,7 @@ export class DmControlPanel extends ItemView {
   // Connected player screens info
   connectedClients: Array<{ width: number; height: number; devicePixelRatio: number }> = [];
   playerConnected = false;
+  private selectedResolution: { width: number; height: number } | null = null;
 
   get playerScreenWidth(): number {
     return this.connectedClients.length === 1 ? this.connectedClients[0].width : 0;
@@ -64,6 +65,20 @@ export class DmControlPanel extends ItemView {
 
   get playerScreenHeight(): number {
     return this.connectedClients.length === 1 ? this.connectedClients[0].height : 0;
+  }
+
+  private getEffectiveResolution(): { width: number; height: number } {
+    if (this.selectedResolution) {
+      const hasMatch = this.connectedClients.some(
+        c => c.width === this.selectedResolution!.width && c.height === this.selectedResolution!.height
+      );
+      if (hasMatch) return this.selectedResolution;
+      this.selectedResolution = null;
+    }
+    if (this.connectedClients.length > 0) {
+      return { width: this.connectedClients[0].width, height: this.connectedClients[0].height };
+    }
+    return { width: this.plugin.settings.tvWidth || 1920, height: this.plugin.settings.tvHeight || 1080 };
   }
 
   // D&D Beyond integration
@@ -115,8 +130,7 @@ export class DmControlPanel extends ItemView {
 
   private getPlayerViewport(): { vpW: number; vpH: number; vpX: number; vpY: number } | null {
     if (!this.playerConnected || this.playerScreenWidth <= 0) return null;
-    const tvW = this.plugin.settings.tvWidth || 1920;
-    const tvH = this.plugin.settings.tvHeight || 1080;
+    const { width: tvW, height: tvH } = this.getEffectiveResolution();
     const browserAspect = this.playerScreenWidth / this.playerScreenHeight;
     const previewAspect = tvW / tvH;
     let vpW: number, vpH: number;
@@ -318,10 +332,25 @@ export class DmControlPanel extends ItemView {
           text: `${this.connectedClients.length} screen${this.connectedClients.length > 1 ? "s" : ""} connected`,
           cls: "dm-status-detail",
         });
+
+        const resMap = new Map<string, { width: number; height: number; count: number }>();
         for (const c of this.connectedClients) {
-          clientInfo.createSpan({
-            text: `${c.width}×${c.height}`,
-            cls: "dm-client-resolution",
+          const key = `${c.width}×${c.height}`;
+          const existing = resMap.get(key);
+          if (existing) existing.count++;
+          else resMap.set(key, { width: c.width, height: c.height, count: 1 });
+        }
+
+        const eff = this.getEffectiveResolution();
+        for (const [key, info] of resMap) {
+          const label = info.count > 1 ? `${key} ×${info.count}` : key;
+          const badge = clientInfo.createSpan({ text: label, cls: "dm-client-resolution" });
+          if (info.width === eff.width && info.height === eff.height) {
+            badge.addClass("dm-client-resolution-active");
+          }
+          badge.addEventListener("click", () => {
+            this.selectedResolution = { width: info.width, height: info.height };
+            this.render();
           });
         }
       }
@@ -400,8 +429,7 @@ export class DmControlPanel extends ItemView {
 
 
     // Preview area with pan/zoom — always use configured TV size for stable layout
-    const tvW = this.plugin.settings.tvWidth || 1920;
-    const tvH = this.plugin.settings.tvHeight || 1080;
+    const { width: tvW, height: tvH } = this.getEffectiveResolution();
     const previewArea = section.createDiv("dm-layer-preview");
     previewArea.style.aspectRatio = `${tvW} / ${tvH}`;
 
@@ -1111,8 +1139,7 @@ export class DmControlPanel extends ItemView {
     });
 
     // Preview area
-    const tvW = this.plugin.settings.tvWidth || 1920;
-    const tvH = this.plugin.settings.tvHeight || 1080;
+    const { width: tvW, height: tvH } = this.getEffectiveResolution();
     const previewArea = section.createDiv("dm-layer-preview");
     previewArea.style.aspectRatio = `${tvW} / ${tvH}`;
 
@@ -1335,8 +1362,7 @@ export class DmControlPanel extends ItemView {
     // Load image to get natural dimensions, then size correctly
     const img = new Image();
     img.onload = () => {
-      const tvW = this.plugin.settings.tvWidth || 1920;
-      const tvH = this.plugin.settings.tvHeight || 1080;
+      const { width: tvW, height: tvH } = this.getEffectiveResolution();
       const isPortrait = noteType === "person" || noteType === "monster";
 
       let x = 0, y = 0, width: number, height: number;
@@ -1667,8 +1693,7 @@ export class DmControlPanel extends ItemView {
 
   private broadcastPlayerViewport() {
     if (!this.plugin.server) return;
-    const tvW = this.plugin.settings.tvWidth || 1920;
-    const tvH = this.plugin.settings.tvHeight || 1080;
+    const { width: tvW, height: tvH } = this.getEffectiveResolution();
     this.plugin.server.broadcast({
       type: "viewport-update",
       payload: {

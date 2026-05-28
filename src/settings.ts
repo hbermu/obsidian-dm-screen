@@ -123,32 +123,6 @@ export class DmScreenSettingTab extends PluginSettingTab {
           })
       );
 
-    containerEl.createEl("h3", { text: "TV/Screen Dimensions" });
-
-    new Setting(containerEl)
-      .setName("TV Width (px)")
-      .setDesc("Width of the player screen display in pixels")
-      .addText((text) =>
-        text
-          .setValue(String(this.plugin.settings.tvWidth))
-          .onChange(async (value) => {
-            this.plugin.settings.tvWidth = parseInt(value) || 1920;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("TV Height (px)")
-      .setDesc("Height of the player screen display in pixels")
-      .addText((text) =>
-        text
-          .setValue(String(this.plugin.settings.tvHeight))
-          .onChange(async (value) => {
-            this.plugin.settings.tvHeight = parseInt(value) || 1080;
-            await this.plugin.saveSettings();
-          })
-      );
-
     containerEl.createEl("h3", { text: "Hydrus Library" });
 
     new Setting(containerEl)
