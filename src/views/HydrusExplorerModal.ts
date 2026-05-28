@@ -1,4 +1,4 @@
-import { App, Modal, Notice } from "obsidian";
+import { App, Menu, Modal, Notice } from "obsidian";
 import type DmScreenPlugin from "../main";
 import { HydrusClient, type HydrusFile, extFromMime } from "../hydrus/client";
 import type { CachedEntry, HydrusCache } from "../hydrus/cache";
@@ -468,28 +468,72 @@ export class HydrusExplorerModal extends Modal {
     return entry;
   }
 
-  private async openTileMenu(tile: Tile, evt: MouseEvent) {
-    const { Menu } = await import("obsidian");
+  private openTileMenu(tile: Tile, evt: MouseEvent) {
     const menu = new Menu();
-    menu.addItem((item: any) =>
-      item.setTitle(`Tags: ${tile.knownTags.join(", ") || "(none)"}`).setDisabled(true)
-    );
-    if (tile.kind === "local") {
+    const tags = tile.knownTags.join(", ");
+    menu.addItem((item: any) => item.setTitle(`Tags: ${tags || "(no tags)"}`).setDisabled(true));
+    if (tags) {
       menu.addItem((item: any) =>
         item
-          .setTitle("Copy vault path")
-          .setIcon("clipboard-copy")
+          .setTitle("Copy tags")
+          .setIcon("tag")
           .onClick(() => {
-            void navigator.clipboard.writeText(tile.vaultPath);
-            new Notice("Vault path copied.");
+            void navigator.clipboard.writeText(tags);
+            new Notice("Tags copied.");
+          })
+      );
+    }
+    menu.addSeparator();
+
+    if (tile.kind === "remote") {
+      menu.addItem((item: any) =>
+        item
+          .setTitle("Download to cache")
+          .setIcon("download")
+          .onClick(async () => {
+            try {
+              await this.ensureCached(tile);
+              new Notice("Downloaded to cache.");
+              await this.runSearch(this.query);
+            } catch (err) {
+              new Notice(`Hydrus: ${(err as Error).message}`, 6000);
+            }
+          })
+      );
+    } else {
+      menu.addItem((item: any) =>
+        item
+          .setTitle("Re-download (overwrite)")
+          .setIcon("refresh-cw")
+          .onClick(async () => {
+            if (!this.client) {
+              new Notice("Hydrus is offline; cannot re-download.", 6000);
+              return;
+            }
+            try {
+              await this.cache.evict(tile.hash);
+              const file: HydrusFile = {
+                hash: tile.hash,
+                mime: tile.mime,
+                ext: tile.ext || extFromMime(tile.mime),
+                size: tile.size,
+                knownTags: tile.knownTags,
+              };
+              await this.cache.fetchAndCache(this.client, file);
+              new Notice("Re-downloaded.");
+              await this.runSearch(this.query);
+            } catch (err) {
+              new Notice(`Hydrus: ${(err as Error).message}`, 6000);
+            }
           })
       );
       menu.addItem((item: any) =>
         item
-          .setTitle("Remove from cache")
+          .setTitle("Delete local copy")
           .setIcon("trash")
           .onClick(async () => {
             await this.cache.evict(tile.hash);
+            new Notice("Local copy deleted.");
             await this.runSearch(this.query);
           })
       );
