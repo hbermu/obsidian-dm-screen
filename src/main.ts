@@ -190,9 +190,12 @@ export default class DmScreenPlugin extends Plugin {
     this.server = new PlayerScreenServer(this);
     this.server.onClientInfo = (info) => this.onPlayerClientInfo(info);
     this.server.onClientCountChanged = () => {
+      const clients = this.server?.getConnectedClients() ?? [];
       const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
       for (const leaf of leaves) {
         const view = leaf.view as DmControlPanel;
+        view.connectedClients = clients;
+        view.playerConnected = clients.length > 0;
         view.debouncedRender?.();
       }
     };
@@ -200,12 +203,12 @@ export default class DmScreenPlugin extends Plugin {
     new Notice(`Player Screen server started on port ${this.settings.serverPort}`);
   }
 
-  private onPlayerClientInfo(info: { width: number; height: number; devicePixelRatio: number }) {
+  private onPlayerClientInfo(_info: { width: number; height: number; devicePixelRatio: number }) {
     const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
     for (const leaf of leaves) {
       const view = leaf.view as DmControlPanel;
       if (view.onPlayerConnected) {
-        view.onPlayerConnected(info);
+        view.onPlayerConnected(this.server?.getConnectedClients() ?? []);
       }
     }
   }

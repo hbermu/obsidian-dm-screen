@@ -61,10 +61,17 @@ export class DmControlPanel extends ItemView {
   private dmPanX = 0;
   private dmPanY = 0;
 
-  // Connected player screen info
-  playerScreenWidth = 0;
-  playerScreenHeight = 0;
+  // Connected player screens info
+  connectedClients: Array<{ width: number; height: number; devicePixelRatio: number }> = [];
   playerConnected = false;
+
+  get playerScreenWidth(): number {
+    return this.connectedClients.length === 1 ? this.connectedClients[0].width : 0;
+  }
+
+  get playerScreenHeight(): number {
+    return this.connectedClients.length === 1 ? this.connectedClients[0].height : 0;
+  }
 
   // D&D Beyond integration
   private combatTab: "initiative" | "dndbeyond" = "initiative";
@@ -135,8 +142,7 @@ export class DmControlPanel extends ItemView {
   private restoreState() {
     const s = this.plugin.settings;
     if (s.lastPlayerScreenWidth > 0) {
-      this.playerScreenWidth = s.lastPlayerScreenWidth;
-      this.playerScreenHeight = s.lastPlayerScreenHeight;
+      this.connectedClients = [{ width: s.lastPlayerScreenWidth, height: s.lastPlayerScreenHeight, devicePixelRatio: 1 }];
       this.playerConnected = true;
     }
     try {
@@ -164,8 +170,8 @@ export class DmControlPanel extends ItemView {
 
   saveState() {
     const s = this.plugin.settings;
-    s.lastPlayerScreenWidth = this.playerScreenWidth;
-    s.lastPlayerScreenHeight = this.playerScreenHeight;
+    s.lastPlayerScreenWidth = this.connectedClients[0]?.width ?? 0;
+    s.lastPlayerScreenHeight = this.connectedClients[0]?.height ?? 0;
     s.lastImageLayers = JSON.stringify(this.imageLayers);
     // Save broadcast cache
     if (this.plugin.server) {
@@ -179,13 +185,11 @@ export class DmControlPanel extends ItemView {
   }
 
   // Called from main.ts when a player screen browser connects or resizes
-  onPlayerConnected(info: { width: number; height: number; devicePixelRatio: number }) {
+  onPlayerConnected(clients: Array<{ width: number; height: number; devicePixelRatio: number }>) {
     const wasConnected = this.playerConnected;
-    this.playerScreenWidth = info.width;
-    this.playerScreenHeight = info.height;
-    this.playerConnected = true;
-    // Full re-render only on first connect; resize just updates the viewport rect
-    if (!wasConnected) {
+    this.connectedClients = clients;
+    this.playerConnected = clients.length > 0;
+    if (!wasConnected && this.playerConnected) {
       this.debouncedRender();
     } else {
       this.updateViewportRect();
@@ -326,12 +330,18 @@ export class DmControlPanel extends ItemView {
         });
       }
 
-      if (this.playerConnected) {
+      if (this.connectedClients.length > 0) {
         const clientInfo = section.createDiv("dm-client-info");
         clientInfo.createSpan({
-          text: `Player screen: ${this.playerScreenWidth}x${this.playerScreenHeight}`,
+          text: `${this.connectedClients.length} screen${this.connectedClients.length > 1 ? "s" : ""} connected`,
           cls: "dm-status-detail",
         });
+        for (const c of this.connectedClients) {
+          clientInfo.createSpan({
+            text: `${c.width}×${c.height}`,
+            cls: "dm-client-resolution",
+          });
+        }
       }
     }
 
@@ -502,14 +512,11 @@ export class DmControlPanel extends ItemView {
     }
 
     // Player viewport indicator (green rectangle)
-    // Represents the actual browser window aspect ratio, centered in the content.
-    if (this.playerConnected && this.playerScreenWidth > 0 && this.playerScreenHeight > 0) {
+    // When exactly one screen is connected, show its viewport. Multiple screens: skip.
+    const singleClient = this.connectedClients.length === 1 ? this.connectedClients[0] : null;
+    if (singleClient && singleClient.width > 0 && singleClient.height > 0) {
       const vpRect = previewInner.createDiv("dm-player-viewport-rect");
-      // The browser shows the content fitted — we need to show what portion
-      // of the content space the browser can see based on its aspect ratio.
-      // The content is 100%x100% in preview coords. The browser fits this
-      // maintaining aspect, so one axis fills and the other may have black bars.
-      const browserAspect = this.playerScreenWidth / this.playerScreenHeight;
+      const browserAspect = singleClient.width / singleClient.height;
       const previewAspect = tvW / tvH;
 
       let vpW: number, vpH: number;

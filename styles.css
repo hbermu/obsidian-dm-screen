@@ -125,6 +125,21 @@
   font-size: 0.85em;
 }
 
+.dm-client-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dm-client-resolution {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
 .dm-server-url {
   display: flex;
   align-items: center;

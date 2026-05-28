@@ -19,11 +19,18 @@ export interface PlayerMessage {
   payload: Record<string, unknown>;
 }
 
+export interface ClientInfo {
+  width: number;
+  height: number;
+  devicePixelRatio: number;
+}
+
 export class PlayerScreenServer {
   private plugin: DmScreenPlugin;
   private httpServer: Server | null = null;
   private clients: Set<WebSocketLike> = new Set();
-  onClientInfo: ((info: { width: number; height: number; devicePixelRatio: number }) => void) | null = null;
+  private clientInfoMap: Map<WebSocketLike, ClientInfo> = new Map();
+  onClientInfo: ((info: ClientInfo) => void) | null = null;
   onClientCountChanged: (() => void) | null = null;
   // Cache last broadcast per message type for late-joining clients
   private lastState = new Map<string, string>();
@@ -34,6 +41,10 @@ export class PlayerScreenServer {
 
   get clientCount(): number {
     return this.clients.size;
+  }
+
+  getConnectedClients(): ClientInfo[] {
+    return [...this.clientInfoMap.values()];
   }
 
   start(port: number) {
@@ -60,6 +71,7 @@ export class PlayerScreenServer {
 
         ws.on("close", () => {
           this.clients.delete(ws);
+          this.clientInfoMap.delete(ws);
           console.log(`[DM Screen] Player disconnected. Total: ${this.clients.size}`);
           if (this.onClientCountChanged) this.onClientCountChanged();
         });
@@ -67,8 +79,9 @@ export class PlayerScreenServer {
         ws.on("message", (data: unknown) => {
           try {
             const msg = JSON.parse(String(data));
-            if (msg.type === "client-info" && this.onClientInfo) {
-              this.onClientInfo(msg.payload);
+            if (msg.type === "client-info") {
+              this.clientInfoMap.set(ws, msg.payload);
+              if (this.onClientInfo) this.onClientInfo(msg.payload);
             }
           } catch (e) {
             console.log("[DM Screen] Message from player:", data);
@@ -209,6 +222,7 @@ export class PlayerScreenServer {
       <h2>Initiative</h2>
       <ul id="initiative-list"></ul>
     </div>
+    <button id="fullscreen-btn" aria-label="Toggle fullscreen">⛶</button>
   </div>
   <script src="/player.js"></script>
 </body>

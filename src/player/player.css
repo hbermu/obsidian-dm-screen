@@ -376,3 +376,28 @@ body {
 #image-layers-container img {
   pointer-events: none;
 }
+
+/* Fullscreen toggle button */
+#fullscreen-btn {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 9999;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #c9aa71;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #c9aa71;
+  font-size: 1.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+#fullscreen-btn:hover, #fullscreen-btn:active {
+  opacity: 1;
+}
