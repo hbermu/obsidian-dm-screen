@@ -272,9 +272,12 @@ export class DmScreenSettingTab extends PluginSettingTab {
           })
       );
 
-    if (this.plugin.settings.hydrusAvailableTagServices.length > 0) {
+    const validServices = this.plugin.settings.hydrusAvailableTagServices.filter(
+      (s) => s.key && s.name
+    );
+    if (validServices.length > 0) {
       const checkContainer = containerEl.createDiv({ cls: "dm-hydrus-service-checks" });
-      for (const svc of this.plugin.settings.hydrusAvailableTagServices) {
+      for (const svc of validServices) {
         const row = checkContainer.createDiv({ cls: "dm-hydrus-service-row" });
         const checkbox = row.createEl("input", { type: "checkbox" }) as HTMLInputElement;
         checkbox.checked = this.plugin.settings.hydrusTagServices.includes(svc.key);

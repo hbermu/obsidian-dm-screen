@@ -216,10 +216,12 @@ describe("HydrusClient.getServices", () => {
   it("returns flattened services array", async () => {
     mockRequestUrl(() => ({
       json: {
-        services: {
-          "abc": { name: "all known tags", type: 5, service_key: "abc" },
-          "def": { name: "my tags", type: 6, service_key: "def" },
-        },
+        "local_tags": [
+          { name: "all known tags", type: 5, service_key: "abc" },
+        ],
+        "tag_repositories": [
+          { name: "my tags", type: 0, service_key: "def" },
+        ],
       },
     }));
     const client = new HydrusClient(baseOpts);

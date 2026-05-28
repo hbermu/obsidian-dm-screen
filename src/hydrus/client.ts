@@ -69,8 +69,22 @@ export class HydrusClient {
 
   async getServices(): Promise<HydrusService[]> {
     const res = await this.get("/get_services");
-    const body = res.json as { services?: Record<string, HydrusService> };
-    return Object.values(body.services ?? {});
+    const body = res.json as Record<string, unknown>;
+    const results: HydrusService[] = [];
+    for (const [, value] of Object.entries(body)) {
+      if (Array.isArray(value)) {
+        for (const svc of value) {
+          if (svc && typeof svc === "object" && "name" in svc && "service_key" in svc) {
+            results.push({
+              name: svc.name as string,
+              service_key: svc.service_key as string,
+              type: typeof svc.type === "number" ? svc.type : -1,
+            });
+          }
+        }
+      }
+    }
+    return results;
   }
 
   async searchFiles(tags: string[], limit?: number): Promise<{ hashes: string[] }> {
