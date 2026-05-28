@@ -21,7 +21,9 @@ export interface DmScreenSettings {
   hydrusEnabled: boolean;
   hydrusApiUrl: string;
   hydrusApiKey: string;
-  hydrusTagService: string;
+  hydrusTagService: string; // deprecated — kept for migration
+  hydrusAvailableTagServices: { name: string; key: string }[];
+  hydrusTagServices: string[]; // selected service keys
   hydrusCacheFolder: string;
   hydrusCacheTtlDays: number;
   hydrusDefaultLoop: boolean;
@@ -54,7 +56,9 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   hydrusEnabled: false,
   hydrusApiUrl: "",
   hydrusApiKey: "",
-  hydrusTagService: "A.I. Tags",
+  hydrusTagService: "",
+  hydrusAvailableTagServices: [],
+  hydrusTagServices: [],
   hydrusCacheFolder: ".hydrus-cache",
   hydrusCacheTtlDays: 30,
   hydrusDefaultLoop: true,
@@ -233,16 +237,63 @@ export class DmScreenSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Tag service")
-      .setDesc('Name of the Hydrus tag service to search (typically "A.I. Tags")')
-      .addText((text) =>
-        text
-          .setValue(this.plugin.settings.hydrusTagService)
-          .onChange(async (value) => {
-            this.plugin.settings.hydrusTagService = value;
-            await this.plugin.saveSettings();
+      .setName("Tag services")
+      .setDesc("Select which Hydrus tag services to search. Click Fetch to discover available services.")
+      .addButton((btn) =>
+        btn
+          .setButtonText("Fetch services")
+          .onClick(async () => {
+            try {
+              const { HydrusClient } = await import("./hydrus/client");
+              const client = new HydrusClient({
+                baseUrl: this.plugin.settings.hydrusApiUrl,
+                apiKey: this.plugin.settings.hydrusApiKey,
+              });
+              const services = await client.getServices();
+              const tagServices = services.filter((s) => s.type === 0 || s.type === 5);
+              this.plugin.settings.hydrusAvailableTagServices = tagServices.map((s) => ({
+                name: s.name,
+                key: s.service_key,
+              }));
+              // Migrate old setting if needed
+              if (this.plugin.settings.hydrusTagService && this.plugin.settings.hydrusTagServices.length === 0) {
+                const match = tagServices.find((s) => s.name === this.plugin.settings.hydrusTagService);
+                if (match) {
+                  this.plugin.settings.hydrusTagServices = [match.service_key];
+                }
+                this.plugin.settings.hydrusTagService = "";
+              }
+              await this.plugin.saveSettings();
+              new Notice(`Found ${tagServices.length} tag service(s)`);
+              this.display();
+            } catch (err) {
+              new Notice(`Failed to fetch services: ${(err as Error).message}`, 6000);
+            }
           })
       );
+
+    if (this.plugin.settings.hydrusAvailableTagServices.length > 0) {
+      const checkContainer = containerEl.createDiv({ cls: "dm-hydrus-service-checks" });
+      for (const svc of this.plugin.settings.hydrusAvailableTagServices) {
+        const row = checkContainer.createDiv({ cls: "dm-hydrus-service-row" });
+        const checkbox = row.createEl("input", { type: "checkbox" }) as HTMLInputElement;
+        checkbox.checked = this.plugin.settings.hydrusTagServices.includes(svc.key);
+        checkbox.id = `hydrus-svc-${svc.key.slice(0, 8)}`;
+        row.createEl("label", { text: svc.name, attr: { for: checkbox.id } });
+        checkbox.addEventListener("change", async () => {
+          if (checkbox.checked) {
+            if (!this.plugin.settings.hydrusTagServices.includes(svc.key)) {
+              this.plugin.settings.hydrusTagServices.push(svc.key);
+            }
+          } else {
+            this.plugin.settings.hydrusTagServices = this.plugin.settings.hydrusTagServices.filter(
+              (k) => k !== svc.key
+            );
+          }
+          await this.plugin.saveSettings();
+        });
+      }
+    }
 
     new Setting(containerEl)
       .setName("Cache folder")

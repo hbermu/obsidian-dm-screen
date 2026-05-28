@@ -53,7 +53,6 @@ export class HydrusExplorerModal extends Modal {
   private localOnly = false;
   private filterImages = true;
   private filterVideos = true;
-  private tagServiceKey: string | null = null;
   private tagSuggester: TagSuggester | null = null;
 
   constructor(app: App, plugin: DmScreenPlugin) {
@@ -139,33 +138,29 @@ export class HydrusExplorerModal extends Modal {
     this.contentEl.empty();
   }
 
-  private async resolveTagServiceKey(): Promise<string | null> {
-    if (this.tagServiceKey) return this.tagServiceKey;
-    if (!this.client) return null;
-    try {
-      const services = await this.client.getServices();
-      const target = this.plugin.settings.hydrusTagService;
-      const hit = services.find((s) => s.name === target);
-      this.tagServiceKey = hit?.service_key ?? null;
-    } catch {
-      this.tagServiceKey = null;
-    }
-    return this.tagServiceKey;
-  }
-
   private async suggestTags(prefix: string): Promise<string[]> {
+    let results: string[];
     if (this.client && !this.localOnly && this.mode === "online") {
       try {
-        const tagServiceKey = (await this.resolveTagServiceKey()) ?? undefined;
-        const remote = await this.client.searchTags(prefix, { tagServiceKey, limit: 50 });
-        if (remote.length > 0 || prefix.length > 0) {
-          return remote.map((s) => s.value);
+        const serviceKeys = this.plugin.settings.hydrusTagServices;
+        if (serviceKeys.length > 0) {
+          const all: string[] = [];
+          for (const key of serviceKeys) {
+            const remote = await this.client.searchTags(prefix, { tagServiceKey: key });
+            all.push(...remote.map((s) => s.value));
+          }
+          results = [...new Set(all)];
+        } else {
+          const remote = await this.client.searchTags(prefix, {});
+          results = remote.map((s) => s.value);
         }
       } catch {
-        // fall through to local fallback
+        results = await this.suggestFromCache(prefix);
       }
+    } else {
+      results = await this.suggestFromCache(prefix);
     }
-    return this.suggestFromCache(prefix);
+    return filterTags(results, this.plugin.settings.hydrusIgnoredTagPatterns);
   }
 
   private async suggestFromCache(prefix: string): Promise<string[]> {
@@ -338,7 +333,7 @@ export class HydrusExplorerModal extends Modal {
   private async searchMerged(client: HydrusClient, tags: string[]): Promise<Tile[]> {
     const search = await client.searchFiles(tags, HARD_CAP);
     if (search.hashes.length === 0) return [];
-    const meta = await client.getFileMetadata(search.hashes, this.plugin.settings.hydrusTagService);
+    const meta = await client.getFileMetadata(search.hashes);
     const cached = new Map((await this.cache.listCached()).map((e) => [e.hash, e]));
     return meta.map<Tile>((file) => {
       const local = cached.get(file.hash);
@@ -415,10 +410,8 @@ export class HydrusExplorerModal extends Modal {
   private async loadThumb(tile: Tile, img: HTMLImageElement) {
     try {
       if (tile.kind === "local" && tile.thumbVaultPath) {
-        // The DM modal runs inside Electron on the same machine as the plugin
-        // server, so localhost is fine here.
-        const url = `http://localhost:${this.plugin.settings.serverPort}/vault/${encodeForVaultUrl(tile.thumbVaultPath)}`;
-        img.src = url;
+        const resourcePath = this.plugin.app.vault.adapter.getResourcePath(tile.thumbVaultPath);
+        img.src = resourcePath;
         return;
       }
       if (tile.kind === "remote" && this.client) {
