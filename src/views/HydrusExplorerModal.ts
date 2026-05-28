@@ -423,7 +423,6 @@ export class HydrusExplorerModal extends Modal {
       const panel = await this.plugin.findOpenDmControlPanel();
       if (panel) {
         panel.activeBackgroundUrl = url;
-        panel.activeBackgroundMediaType = mediaType;
         panel.render();
       }
       await this.cache.markUsed(entry.hash);

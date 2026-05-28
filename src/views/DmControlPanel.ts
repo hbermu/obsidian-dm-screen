@@ -33,7 +33,6 @@ export class DmControlPanel extends ItemView {
   private nextZIndex = 1;
   private activeVideoPath: string | null = null;
   activeBackgroundUrl: string | null = null;
-  activeBackgroundMediaType: "image" | "video" = "image";
   private static LAYER_COLORS = [
     "#e74c3c", "#3498db", "#2ecc71", "#f39c12",
     "#9b59b6", "#1abc9c", "#e67e22", "#34495e",
@@ -145,13 +144,11 @@ export class DmControlPanel extends ItemView {
         (this.plugin.server as any).lastState?.set(type, data);
       }
     }
-    // Restore active background for DM preview
     const bgCache = s.lastBroadcastCache?.["show-background-media"];
     if (bgCache) {
       try {
         const msg = JSON.parse(bgCache);
         this.activeBackgroundUrl = msg.payload?.url ?? null;
-        this.activeBackgroundMediaType = msg.payload?.mediaType ?? "image";
       } catch { /* ignore */ }
     }
   }
@@ -395,7 +392,6 @@ export class DmControlPanel extends ItemView {
               // plugin server's own origin, not the DM machine's localhost.
               const videoUrl = `/vault/${encodeURIComponent(file.path)}`;
               this.activeBackgroundUrl = videoUrl;
-              this.activeBackgroundMediaType = "video";
               if (this.plugin.server) {
                 this.plugin.server.broadcast({
                   type: "show-background-media",
@@ -425,6 +421,17 @@ export class DmControlPanel extends ItemView {
       });
     }
 
+    const removeBgBtn = btnRow.createEl("button", { text: "Remove BG" });
+    removeBgBtn.disabled = !this.activeBackgroundUrl;
+    removeBgBtn.addEventListener("click", () => {
+      if (this.plugin.server) {
+        this.plugin.server.broadcast({ type: "hide-background-media", payload: {} });
+      }
+      this.activeBackgroundUrl = null;
+      this.activeVideoPath = null;
+      this.render();
+    });
+
     const pushNoteBtn = btnRow.createEl("button", { text: "Push Note" });
     pushNoteBtn.addEventListener("click", () => {
       this.plugin.pushCurrentNoteToPlayerScreen();
@@ -439,14 +446,6 @@ export class DmControlPanel extends ItemView {
     // Inner container for pan/zoom transform (DM local view)
     const previewInner = previewArea.createDiv("dm-layer-preview-inner");
     previewInner.style.transform = `translate(${this.dmPanX}%, ${this.dmPanY}%) scale(${this.dmZoom})`;
-
-    // Background preview — URL is relative to the plugin server, so prefix with origin
-    if (this.activeBackgroundUrl) {
-      const port = this.plugin.settings.serverPort;
-      const fullUrl = `http://localhost:${port}${this.activeBackgroundUrl}`;
-      const bgEl = previewInner.createDiv("dm-preview-bg");
-      bgEl.style.backgroundImage = `url(${fullUrl})`;
-    }
 
     // Draw image layer rectangles (sorted by zIndex ascending)
     const sorted = [...this.imageLayers].sort((a, b) => a.zIndex - b.zIndex);
@@ -1231,7 +1230,6 @@ export class DmControlPanel extends ItemView {
               this.activeVideoPath = file.path;
               const videoUrl = `/vault/${encodeURIComponent(file.path)}`;
               this.activeBackgroundUrl = videoUrl;
-              this.activeBackgroundMediaType = "video";
               if (this.plugin.server) {
                 this.plugin.server.broadcast({
                   type: "show-background-media",
@@ -1260,6 +1258,17 @@ export class DmControlPanel extends ItemView {
         }
       });
     }
+
+    const removeBgBtn = btnRow.createEl("button", { text: "Remove BG" });
+    removeBgBtn.disabled = !this.activeBackgroundUrl;
+    removeBgBtn.addEventListener("click", () => {
+      if (this.plugin.server) {
+        this.plugin.server.broadcast({ type: "hide-background-media", payload: {} });
+      }
+      this.activeBackgroundUrl = null;
+      this.activeVideoPath = null;
+      this.render();
+    });
 
     // Preview area
     const tvW = this.plugin.settings.tvWidth || 1920;
