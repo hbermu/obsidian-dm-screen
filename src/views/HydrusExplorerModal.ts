@@ -51,6 +51,8 @@ export class HydrusExplorerModal extends Modal {
   private statusEl: HTMLElement | null = null;
   private bannerEl: HTMLElement | null = null;
   private localOnly = false;
+  private filterImages = true;
+  private filterVideos = true;
   private tagServiceKey: string | null = null;
   private tagSuggester: TagSuggester | null = null;
 
@@ -96,6 +98,24 @@ export class HydrusExplorerModal extends Modal {
     sourceSel.createEl("option", { text: "Local only", value: "local" });
     sourceSel.addEventListener("change", () => {
       this.localOnly = sourceSel.value === "local";
+      void this.runSearch(input.value);
+    });
+
+    const filterWrap = controls.createDiv({ cls: "dm-hydrus-filter-toggle" });
+    const imgCheck = filterWrap.createEl("input", { type: "checkbox" }) as HTMLInputElement;
+    imgCheck.checked = this.filterImages;
+    imgCheck.id = "dm-hydrus-filter-images";
+    filterWrap.createEl("label", { text: "Images", attr: { for: "dm-hydrus-filter-images" } });
+    const vidCheck = filterWrap.createEl("input", { type: "checkbox" }) as HTMLInputElement;
+    vidCheck.checked = this.filterVideos;
+    vidCheck.id = "dm-hydrus-filter-videos";
+    filterWrap.createEl("label", { text: "Videos", attr: { for: "dm-hydrus-filter-videos" } });
+    imgCheck.addEventListener("change", () => {
+      this.filterImages = imgCheck.checked;
+      void this.runSearch(input.value);
+    });
+    vidCheck.addEventListener("change", () => {
+      this.filterVideos = vidCheck.checked;
       void this.runSearch(input.value);
     });
 
@@ -211,6 +231,17 @@ export class HydrusExplorerModal extends Modal {
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
+
+    if (this.filterImages && !this.filterVideos) {
+      tags.push("system:filetype is image");
+    } else if (this.filterVideos && !this.filterImages) {
+      tags.push("system:filetype is video");
+    } else if (!this.filterImages && !this.filterVideos) {
+      this.tiles = [];
+      this.renderPage();
+      this.busy = false;
+      return;
+    }
 
     try {
       if (this.localOnly || this.mode === "offline" || !this.client) {

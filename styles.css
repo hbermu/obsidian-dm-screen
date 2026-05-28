@@ -1260,6 +1260,18 @@
   margin-left: auto;
 }
 
+.dm-hydrus-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  margin-left: 1em;
+}
+
+.dm-hydrus-filter-toggle label {
+  margin-right: 0.5em;
+  font-size: 0.85em;
+}
+
 .dm-hydrus-status {
   font-size: 0.85em;
   color: var(--text-muted);
