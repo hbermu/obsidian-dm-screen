@@ -32,6 +32,8 @@ export class DmControlPanel extends ItemView {
   imageLayers: ImageLayer[] = [];
   private nextZIndex = 1;
   private activeVideoPath: string | null = null;
+  activeBackgroundUrl: string | null = null;
+  activeBackgroundMediaType: "image" | "video" = "image";
   private static LAYER_COLORS = [
     "#e74c3c", "#3498db", "#2ecc71", "#f39c12",
     "#9b59b6", "#1abc9c", "#e67e22", "#34495e",
@@ -103,6 +105,25 @@ export class DmControlPanel extends ItemView {
     this.saveState();
   }
 
+  private getPlayerViewport(): { vpW: number; vpH: number; vpX: number; vpY: number } | null {
+    if (!this.playerConnected || this.playerScreenWidth <= 0) return null;
+    const tvW = this.plugin.settings.tvWidth || 1920;
+    const tvH = this.plugin.settings.tvHeight || 1080;
+    const browserAspect = this.playerScreenWidth / this.playerScreenHeight;
+    const previewAspect = tvW / tvH;
+    let vpW: number, vpH: number;
+    if (browserAspect > previewAspect) {
+      vpW = 100 / this.playerZoom;
+      vpH = (100 / this.playerZoom) * (previewAspect / browserAspect);
+    } else {
+      vpW = (100 / this.playerZoom) * (browserAspect / previewAspect);
+      vpH = 100 / this.playerZoom;
+    }
+    const vpX = -this.playerPanX + (100 - vpW) / 2;
+    const vpY = -this.playerPanY + (100 - vpH) / 2;
+    return { vpW, vpH, vpX, vpY };
+  }
+
   private restoreState() {
     const s = this.plugin.settings;
     if (s.lastPlayerScreenWidth > 0) {
@@ -123,6 +144,15 @@ export class DmControlPanel extends ItemView {
       for (const [type, data] of Object.entries(s.lastBroadcastCache)) {
         (this.plugin.server as any).lastState?.set(type, data);
       }
+    }
+    // Restore active background for DM preview
+    const bgCache = s.lastBroadcastCache?.["show-background-media"];
+    if (bgCache) {
+      try {
+        const msg = JSON.parse(bgCache);
+        this.activeBackgroundUrl = msg.payload?.url ?? null;
+        this.activeBackgroundMediaType = msg.payload?.mediaType ?? "image";
+      } catch { /* ignore */ }
     }
   }
 
@@ -344,6 +374,7 @@ export class DmControlPanel extends ItemView {
     videoBtn.addEventListener("click", (evt: MouseEvent) => {
       if (this.activeVideoPath) {
         this.activeVideoPath = null;
+        this.activeBackgroundUrl = null;
         if (this.plugin.server) {
           this.plugin.server.broadcast({ type: "hide-background-media", payload: {} });
         }
@@ -363,6 +394,8 @@ export class DmControlPanel extends ItemView {
               // Relative URL — the player browser resolves it against the
               // plugin server's own origin, not the DM machine's localhost.
               const videoUrl = `/vault/${encodeURIComponent(file.path)}`;
+              this.activeBackgroundUrl = videoUrl;
+              this.activeBackgroundMediaType = "video";
               if (this.plugin.server) {
                 this.plugin.server.broadcast({
                   type: "show-background-media",
@@ -407,6 +440,12 @@ export class DmControlPanel extends ItemView {
     const previewInner = previewArea.createDiv("dm-layer-preview-inner");
     previewInner.style.transform = `translate(${this.dmPanX}%, ${this.dmPanY}%) scale(${this.dmZoom})`;
 
+    // Background preview
+    if (this.activeBackgroundUrl) {
+      const bgEl = previewInner.createDiv("dm-preview-bg");
+      bgEl.style.backgroundImage = `url(${this.activeBackgroundUrl})`;
+    }
+
     // Draw image layer rectangles (sorted by zIndex ascending)
     const sorted = [...this.imageLayers].sort((a, b) => a.zIndex - b.zIndex);
     for (const layer of sorted) {
@@ -419,8 +458,9 @@ export class DmControlPanel extends ItemView {
       rect.style.width = `${layer.width}%`;
       rect.style.height = `${layer.height}%`;
       rect.style.backgroundImage = `url(${layer.dataUrl})`;
-      rect.style.backgroundSize = "cover";
+      rect.style.backgroundSize = "contain";
       rect.style.backgroundPosition = "center";
+      rect.style.backgroundRepeat = "no-repeat";
       rect.style.borderColor = color;
       rect.style.zIndex = String(layer.zIndex);
       if (layer.rotation) {
@@ -677,6 +717,8 @@ export class DmControlPanel extends ItemView {
           this.plugin.server.broadcast({ type: "clear", payload: {} });
           this.imageLayers = [];
           this.nextZIndex = 1;
+          this.activeBackgroundUrl = null;
+          this.activeVideoPath = null;
           new Notice("Player screen cleared");
           this.render();
         }
@@ -1139,6 +1181,7 @@ export class DmControlPanel extends ItemView {
       if (this.activeVideoPath) {
         // Stop video
         this.activeVideoPath = null;
+        this.activeBackgroundUrl = null;
         if (this.plugin.server) {
           this.plugin.server.broadcast({ type: "hide-background-media", payload: {} });
         }
@@ -1157,6 +1200,8 @@ export class DmControlPanel extends ItemView {
             item.onClick(() => {
               this.activeVideoPath = file.path;
               const videoUrl = `/vault/${encodeURIComponent(file.path)}`;
+              this.activeBackgroundUrl = videoUrl;
+              this.activeBackgroundMediaType = "video";
               if (this.plugin.server) {
                 this.plugin.server.broadcast({
                   type: "show-background-media",
@@ -1204,8 +1249,9 @@ export class DmControlPanel extends ItemView {
       rect.style.width = `${layer.width}%`;
       rect.style.height = `${layer.height}%`;
       rect.style.backgroundImage = `url(${layer.dataUrl})`;
-      rect.style.backgroundSize = "cover";
+      rect.style.backgroundSize = "contain";
       rect.style.backgroundPosition = "center";
+      rect.style.backgroundRepeat = "no-repeat";
       rect.style.borderColor = color;
       rect.style.zIndex = String(layer.zIndex);
       if (layer.rotation) {
@@ -1296,6 +1342,34 @@ export class DmControlPanel extends ItemView {
             previewRect.style.width = `${layer.width}%`;
             previewRect.style.height = `${layer.height}%`;
           }
+        });
+
+        const fitWBtn = controls.createEl("button", { text: "W", cls: "dm-layer-btn" });
+        fitWBtn.title = "Fit to player width";
+        fitWBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          const aspectRatio = layer.height / layer.width;
+          layer.width = vp.vpW;
+          layer.height = vp.vpW * aspectRatio;
+          layer.x = vp.vpX;
+          layer.y = vp.vpY + (vp.vpH - layer.height) / 2;
+          this.broadcastImageLayers();
+          this.render();
+        });
+
+        const fitHBtn = controls.createEl("button", { text: "H", cls: "dm-layer-btn" });
+        fitHBtn.title = "Fit to player height";
+        fitHBtn.addEventListener("click", () => {
+          const vp = this.getPlayerViewport();
+          if (!vp) { new Notice("No player connected"); return; }
+          const aspectRatio = layer.width / layer.height;
+          layer.height = vp.vpH;
+          layer.width = vp.vpH * aspectRatio;
+          layer.y = vp.vpY;
+          layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
+          this.broadcastImageLayers();
+          this.render();
         });
 
         const rotLeftBtn = controls.createEl("button", { text: "↺", cls: "dm-layer-btn" });

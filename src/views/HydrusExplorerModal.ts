@@ -420,6 +420,11 @@ export class HydrusExplorerModal extends Modal {
           muted: this.plugin.settings.hydrusDefaultMuted,
         },
       });
+      const panel = await this.plugin.findOpenDmControlPanel();
+      if (panel) {
+        panel.activeBackgroundUrl = url;
+        panel.activeBackgroundMediaType = mediaType;
+      }
       await this.cache.markUsed(entry.hash);
       this.close();
     } catch (err) {
