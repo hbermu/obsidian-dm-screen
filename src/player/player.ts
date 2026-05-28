@@ -25,6 +25,7 @@ interface Combatant {
   friendly?: boolean;
   isPlayer?: boolean;
   hidden?: boolean;
+  hideHp?: boolean;
   statuses?: string[];
 }
 
@@ -558,11 +559,13 @@ class PlayerScreen {
         conditionClass = "init-condition-well";
       }
 
-      // Players/friendly show exact HP, enemies show condition word
       const isAlly = c.friendly || c.isPlayer;
-      const hpDisplay = isAlly
-        ? `<span class="init-hp-text">${c.hp}/${c.maxHp}</span>`
-        : `<span class="init-condition ${conditionClass}">${conditionText}</span>`;
+      let hpDisplay: string;
+      if (isAlly && !c.hideHp) {
+        hpDisplay = `<span class="init-hp-text">${c.hp}/${c.maxHp}</span><span class="init-condition ${conditionClass}">${conditionText}</span>`;
+      } else {
+        hpDisplay = `<span class="init-condition ${conditionClass}">${conditionText}</span>`;
+      }
 
       li.innerHTML = `
         <span class="init-name">${c.name}${c.isPlayer ? '<span class="init-pc-tag">PC</span>' : ""}</span>

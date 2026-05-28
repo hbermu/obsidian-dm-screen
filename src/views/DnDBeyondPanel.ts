@@ -214,7 +214,7 @@ export class DnDBeyondPanel {
     const combatants: Array<{
       name: string; hp: number; maxHp: number; initiative: number;
       active: boolean; friendly?: boolean; isPlayer?: boolean;
-      hidden?: boolean; statuses?: string[];
+      hidden?: boolean; hideHp?: boolean; statuses?: string[];
     }> = [];
 
     const players = encounter.players ?? [];
@@ -236,17 +236,16 @@ export class DnDBeyondPanel {
 
       if (p.kind === "player") {
         const char = characters.get(p.id);
-        const hp = this.showPcHp ? (char?.currentHitPoints ?? 0) : 0;
-        const maxHp = this.showPcHp ? (char?.maxHitPoints ?? 0) : 0;
         combatants.push({
           name: char?.name ?? p.name,
-          hp,
-          maxHp,
+          hp: char?.currentHitPoints ?? 0,
+          maxHp: char?.maxHitPoints ?? 0,
           initiative: p.initiative,
           active: isActive,
           friendly: true,
           isPlayer: true,
           hidden: false,
+          hideHp: !this.showPcHp,
           statuses: [],
         });
       } else {
