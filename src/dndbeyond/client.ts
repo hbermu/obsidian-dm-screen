@@ -90,12 +90,16 @@ export class DdbClient {
 
   async getMonsterImages(ids: number[]): Promise<Map<number, string>> {
     if (ids.length === 0) return new Map();
-    const url = `${MONSTER_SERVICE_URL}?ids=${ids.join(",")}`;
     const token = await this.ensureToken();
     const res = await requestUrl({
-      url,
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      url: MONSTER_SERVICE_URL,
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ids }),
       throw: false,
     });
     if (res.status < 200 || res.status >= 300) {
