@@ -60,11 +60,11 @@ export class DmControlPanel extends ItemView {
   private selectedResolution: { width: number; height: number } | null = null;
 
   get playerScreenWidth(): number {
-    return this.connectedClients.length === 1 ? this.connectedClients[0].width : 0;
+    return this.connectedClients.length > 0 ? this.connectedClients[0].width : 0;
   }
 
   get playerScreenHeight(): number {
-    return this.connectedClients.length === 1 ? this.connectedClients[0].height : 0;
+    return this.connectedClients.length > 0 ? this.connectedClients[0].height : 0;
   }
 
   private getEffectiveResolution(): { width: number; height: number } {
@@ -129,9 +129,13 @@ export class DmControlPanel extends ItemView {
   }
 
   private getPlayerViewport(): { vpW: number; vpH: number; vpX: number; vpY: number } | null {
-    if (!this.playerConnected || this.playerScreenWidth <= 0) return null;
-    const { width: tvW, height: tvH } = this.getEffectiveResolution();
-    const browserAspect = this.playerScreenWidth / this.playerScreenHeight;
+    const eff = this.getEffectiveResolution();
+    if (eff.width <= 0 || eff.height <= 0) return null;
+    const tvW = eff.width;
+    const tvH = eff.height;
+    const browserW = this.playerScreenWidth || tvW;
+    const browserH = this.playerScreenHeight || tvH;
+    const browserAspect = browserW / browserH;
     const previewAspect = tvW / tvH;
     let vpW: number, vpH: number;
     if (browserAspect > previewAspect) {
