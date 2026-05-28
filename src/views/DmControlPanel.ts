@@ -367,46 +367,21 @@ export class DmControlPanel extends ItemView {
     });
     addLayerBtn.addEventListener("click", (evt: MouseEvent) => this.showImagePicker(evt));
 
-    const videoBtnLabel = this.activeVideoPath ? "Stop Video BG" : "Video BG";
-    const videoBtn = btnRow.createEl("button", { text: videoBtnLabel });
-    videoBtn.addEventListener("click", (evt: MouseEvent) => {
-      if (this.activeVideoPath) {
-        this.activeVideoPath = null;
+    const addBgBtnLabel = this.activeBackgroundUrl ? "Stop BG" : "Add BG";
+    const addBgBtn = btnRow.createEl("button", {
+      text: addBgBtnLabel,
+      cls: this.activeBackgroundUrl ? "" : "mod-cta",
+    });
+    addBgBtn.addEventListener("click", (evt: MouseEvent) => {
+      if (this.activeBackgroundUrl) {
         this.activeBackgroundUrl = null;
+        this.activeVideoPath = null;
         if (this.plugin.server) {
           this.plugin.server.broadcast({ type: "hide-background-media", payload: {} });
         }
         this.render();
       } else {
-        const files = this.plugin.app.vault.getFiles()
-          .filter(f => /\.(webm|mp4)$/i.test(f.path))
-          .sort((a, b) => a.path.localeCompare(b.path));
-
-        const { Menu } = require("obsidian");
-        const menu = new Menu();
-        for (const file of files) {
-          menu.addItem((item: any) => {
-            item.setTitle(file.path);
-            item.onClick(() => {
-              this.activeVideoPath = file.path;
-              // Relative URL — the player browser resolves it against the
-              // plugin server's own origin, not the DM machine's localhost.
-              const videoUrl = `/vault/${encodeURIComponent(file.path)}`;
-              this.activeBackgroundUrl = videoUrl;
-              if (this.plugin.server) {
-                this.plugin.server.broadcast({
-                  type: "show-background-media",
-                  payload: { url: videoUrl, mediaType: "video", loop: true, muted: true },
-                });
-              }
-              this.render();
-            });
-          });
-        }
-        if (files.length === 0) {
-          menu.addItem((item: any) => item.setTitle("No .webm or .mp4 files found").setDisabled(true));
-        }
-        menu.showAtMouseEvent(evt);
+        this.showBackgroundPicker(evt);
       }
     });
 
@@ -422,16 +397,6 @@ export class DmControlPanel extends ItemView {
       });
     }
 
-    const removeBgBtn = btnRow.createEl("button", { text: "Remove BG" });
-    removeBgBtn.disabled = !this.activeBackgroundUrl;
-    removeBgBtn.addEventListener("click", () => {
-      if (this.plugin.server) {
-        this.plugin.server.broadcast({ type: "hide-background-media", payload: {} });
-      }
-      this.activeBackgroundUrl = null;
-      this.activeVideoPath = null;
-      this.render();
-    });
 
 
     // Preview area with pan/zoom — always use configured TV size for stable layout
@@ -546,7 +511,10 @@ export class DmControlPanel extends ItemView {
         const row = list.createDiv("dm-layer-row");
         if (!layer.visible) row.addClass("dm-layer-hidden");
 
-        const visBtn = row.createEl("button", {
+        // Left column: vis + fog stacked
+        const leftCol = row.createDiv("dm-layer-left-col");
+
+        const visBtn = leftCol.createEl("button", {
           text: layer.visible ? "\u{1F441}" : "\u{1F441}\u200D\u{1F5E8}",
           cls: `dm-layer-btn dm-layer-vis-toggle ${layer.visible ? "dm-layer-vis-on" : "dm-layer-vis-off"}`,
         });
@@ -556,8 +524,7 @@ export class DmControlPanel extends ItemView {
           this.render();
         });
 
-        // Fog of war toggle (cloud icon)
-        const fogBtn = row.createEl("button", {
+        const fogBtn = leftCol.createEl("button", {
           cls: `dm-layer-btn dm-fog-toggle ${layer.fogEnabled ? "dm-fog-active" : ""}`,
         });
         fogBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="${layer.fogEnabled ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>`;
@@ -577,15 +544,17 @@ export class DmControlPanel extends ItemView {
           this.render();
         });
 
-        const swatch = row.createDiv("dm-layer-swatch");
+        // Middle column: name row + slider row
+        const midCol = row.createDiv("dm-layer-mid-col");
+
+        const nameRow = midCol.createDiv("dm-layer-name-row");
+        const swatch = nameRow.createDiv("dm-layer-swatch");
         swatch.style.backgroundColor = color;
+        nameRow.createSpan({ text: layer.label, cls: "dm-layer-label" });
 
-        row.createSpan({ text: layer.label, cls: "dm-layer-label" });
-
-        const controls = row.createDiv("dm-layer-controls");
-
-        const scaleLabel = controls.createSpan({ text: `${Math.round(layer.width)}%`, cls: "dm-layer-scale-label" });
-        const scaleSlider = controls.createEl("input", {
+        const sliderRow = midCol.createDiv("dm-layer-slider-row");
+        const scaleLabel = sliderRow.createSpan({ text: `${Math.round(layer.width)}%`, cls: "dm-layer-scale-label" });
+        const scaleSlider = sliderRow.createEl("input", {
           type: "range",
           cls: "dm-layer-scale-slider",
         });
@@ -627,6 +596,10 @@ export class DmControlPanel extends ItemView {
           }
         });
 
+        // Right column: two button rows
+        const rightCol = row.createDiv("dm-layer-right-col");
+
+        const controls = rightCol.createDiv("dm-layer-controls");
 
         const rotLeftBtn = controls.createEl("button", { text: "\u21BA", cls: "dm-layer-btn" });
         rotLeftBtn.addEventListener("click", () => {
@@ -661,7 +634,7 @@ export class DmControlPanel extends ItemView {
           this.render();
         });
 
-        const posRow = row.createDiv("dm-layer-position-row");
+        const posRow = rightCol.createDiv("dm-layer-position-row");
 
         const fitWBtn = posRow.createEl("button", { text: "W", cls: "dm-layer-btn" });
         fitWBtn.title = "Fit to player width";
@@ -1186,8 +1159,10 @@ export class DmControlPanel extends ItemView {
         const row = list.createDiv("dm-layer-row");
         if (!layer.visible) row.addClass("dm-layer-hidden");
 
-        // Visibility toggle
-        const visBtn = row.createEl("button", {
+        // Left column: vis stacked
+        const leftCol = row.createDiv("dm-layer-left-col");
+
+        const visBtn = leftCol.createEl("button", {
           text: layer.visible ? "👁" : "👁‍🗨",
           cls: `dm-layer-btn dm-layer-vis-toggle ${layer.visible ? "dm-layer-vis-on" : "dm-layer-vis-off"}`,
         });
@@ -1197,16 +1172,17 @@ export class DmControlPanel extends ItemView {
           this.render();
         });
 
-        const swatch = row.createDiv("dm-layer-swatch");
+        // Middle column: name row + slider row
+        const midCol = row.createDiv("dm-layer-mid-col");
+
+        const nameRow = midCol.createDiv("dm-layer-name-row");
+        const swatch = nameRow.createDiv("dm-layer-swatch");
         swatch.style.backgroundColor = color;
+        nameRow.createSpan({ text: layer.label, cls: "dm-layer-label" });
 
-        row.createSpan({ text: layer.label, cls: "dm-layer-label" });
-
-        const controls = row.createDiv("dm-layer-controls");
-
-        // Scale slider
-        const scaleLabel = controls.createSpan({ text: `${Math.round(layer.width)}%`, cls: "dm-layer-scale-label" });
-        const scaleSlider = controls.createEl("input", {
+        const sliderRow = midCol.createDiv("dm-layer-slider-row");
+        const scaleLabel = sliderRow.createSpan({ text: `${Math.round(layer.width)}%`, cls: "dm-layer-scale-label" });
+        const scaleSlider = sliderRow.createEl("input", {
           type: "range",
           cls: "dm-layer-scale-slider",
         });
@@ -1230,7 +1206,6 @@ export class DmControlPanel extends ItemView {
         });
         scaleSlider.addEventListener("input", () => {
           const scale = parseInt(scaleSlider.value);
-          // Keep the image centered when scaling
           const centerX = layer.x + layer.width / 2;
           const centerY = layer.y + layer.height / 2;
           const aspectRatio = layer.height / layer.width;
@@ -1240,7 +1215,6 @@ export class DmControlPanel extends ItemView {
           layer.y = centerY - layer.height / 2;
           scaleLabel.textContent = `${scale}%`;
           this.broadcastImageLayers();
-          // Update preview rectangles without full re-render
           const previewRect = this.contentEl.querySelector(`.dm-layer-rect[data-id="${layer.id}"]`) as HTMLElement;
           if (previewRect) {
             previewRect.style.left = `${layer.x}%`;
@@ -1249,6 +1223,11 @@ export class DmControlPanel extends ItemView {
             previewRect.style.height = `${layer.height}%`;
           }
         });
+
+        // Right column: two button rows
+        const rightCol = row.createDiv("dm-layer-right-col");
+
+        const controls = rightCol.createDiv("dm-layer-controls");
 
         const rotLeftBtn = controls.createEl("button", { text: "↺", cls: "dm-layer-btn" });
         rotLeftBtn.addEventListener("click", () => {
@@ -1281,7 +1260,7 @@ export class DmControlPanel extends ItemView {
           this.render();
         });
 
-        const posRow = row.createDiv("dm-layer-position-row");
+        const posRow = rightCol.createDiv("dm-layer-position-row");
 
         const fitWBtn = posRow.createEl("button", { text: "W", cls: "dm-layer-btn" });
         fitWBtn.title = "Fit to player width";
@@ -1965,6 +1944,87 @@ export class DmControlPanel extends ItemView {
     }
 
     menu.showAtMouseEvent(evt);
+  }
+
+  private showBackgroundPicker(evt: MouseEvent): void {
+    const activeFile = this.plugin.app.workspace.getActiveFile();
+    if (!activeFile) {
+      new Notice("No active note");
+      return;
+    }
+
+    const images = this.getImagesFromNote(activeFile);
+    if (images.length === 0) {
+      new Notice("No images found in note");
+      return;
+    }
+
+    if (images.length === 1) {
+      this.setImageAsBackground(images[0]);
+      return;
+    }
+
+    const { Menu } = require("obsidian");
+    const menu = new Menu();
+    for (const img of images) {
+      menu.addItem((item: any) => {
+        item.setTitle(img.label);
+        item.onClick(() => this.setImageAsBackground(img));
+      });
+    }
+    menu.showAtMouseEvent(evt);
+  }
+
+  private setImageAsBackground(img: { path: string; label: string }): void {
+    const url = `/vault/${encodeURIComponent(img.path)}`;
+    this.activeBackgroundUrl = url;
+    this.activeVideoPath = null;
+    if (this.plugin.server) {
+      this.plugin.server.broadcast({
+        type: "show-background-media",
+        payload: { url, mediaType: "image" },
+      });
+    }
+    this.render();
+  }
+
+  private getImagesFromNote(file: TFile): Array<{ path: string; label: string }> {
+    const imageExts = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
+    const results: Array<{ path: string; label: string }> = [];
+
+    const cache = this.plugin.app.metadataCache.getFileCache(file);
+    const fm = cache?.frontmatter;
+
+    if (fm) {
+      for (const key of ["map-image", "battlemap", "image"]) {
+        if (fm[key]) {
+          const resolved = this.plugin.app.metadataCache.getFirstLinkpathDest(fm[key], file.path);
+          if (resolved && imageExts.some(ext => resolved.path.toLowerCase().endsWith(ext))) {
+            results.push({ path: resolved.path, label: `${key}: ${resolved.name}` });
+          }
+        }
+      }
+      if (fm["portrait"]) {
+        const portraitStr = String(fm["portrait"]).replace(/^\[\[/, "").replace(/\]\]$/, "");
+        const resolved = this.plugin.app.metadataCache.getFirstLinkpathDest(portraitStr, file.path);
+        if (resolved && imageExts.some(ext => resolved.path.toLowerCase().endsWith(ext))) {
+          results.push({ path: resolved.path, label: `portrait: ${resolved.name}` });
+        }
+      }
+    }
+
+    if (cache?.embeds) {
+      for (const embed of cache.embeds) {
+        if (/\.(png|jpg|jpeg|webp|gif)$/i.test(embed.link)) {
+          const resolved = this.plugin.app.metadataCache.getFirstLinkpathDest(embed.link, file.path);
+          if (resolved && !results.some(r => r.path === resolved.path)) {
+            results.push({ path: resolved.path, label: resolved.name });
+          }
+        }
+      }
+    }
+
+    return results;
   }
 
   private makeDraggable(rect: HTMLElement, layer: ImageLayer, preview: HTMLElement) {

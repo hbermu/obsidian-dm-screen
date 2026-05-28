@@ -610,29 +610,67 @@
 
 .dm-layer-row {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 6px;
   padding: 4px 8px;
   border-radius: 4px;
   background: var(--background-secondary);
-  flex-wrap: wrap;
-}
-
-.dm-layer-position-row {
-  display: flex;
-  gap: 2px;
-  width: 100%;
-  padding-top: 2px;
-  justify-content: flex-end;
 }
 
 .dm-layer-row:hover {
   background: var(--background-modifier-hover);
 }
 
+.dm-layer-left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+}
+
+.dm-layer-mid-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+}
+
+.dm-layer-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dm-layer-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dm-layer-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+}
+
+.dm-layer-controls {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.dm-layer-position-row {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
 .dm-layer-swatch {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 3px;
   flex-shrink: 0;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -640,22 +678,15 @@
 
 .dm-layer-label {
   flex: 1;
-  font-size: 0.85em;
+  font-size: 0.82em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dm-layer-controls {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-  align-items: center;
-}
-
 .dm-layer-scale-slider {
   width: 60px;
-  height: 16px;
+  height: 14px;
   cursor: pointer;
 }
 
@@ -663,7 +694,6 @@
   font-size: 0.7em;
   color: var(--text-muted);
   min-width: 32px;
-  text-align: right;
 }
 
 .dm-layer-btn {
@@ -672,9 +702,9 @@
   border-radius: 3px;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 1px 5px;
+  padding: 2px 5px;
   font-size: 0.75em;
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .dm-layer-btn:hover {
@@ -692,8 +722,8 @@
 }
 
 .dm-layer-vis-toggle {
-  font-size: 0.85em !important;
-  padding: 0 3px !important;
+  font-size: 0.8em !important;
+  padding: 1px 3px !important;
   border: none !important;
 }
 
