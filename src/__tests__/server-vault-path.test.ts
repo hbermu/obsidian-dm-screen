@@ -33,7 +33,7 @@ describe("readVaultBytes - path handling", () => {
 
   it("returns null when adapter.exists returns false", async () => {
     const app = makeApp({ adapterExists: async () => false });
-    expect(await readVaultBytes(app, ".hydrus-cache/missing.png")).toBeNull();
+    expect(await readVaultBytes(app, ".dm-screen/bg/missing.png")).toBeNull();
   });
 
   it("handles paths with spaces", async () => {
@@ -52,7 +52,7 @@ describe("readVaultBytes - path handling", () => {
       adapterExists: async () => true,
       adapterReadBinary: async () => buf,
     });
-    const result = await readVaultBytes(app, ".hydrus-cache/ab/cd/ef.png");
+    const result = await readVaultBytes(app, ".dm-screen/bg/ab/cd/ef.png");
     expect(new TextDecoder().decode(result!)).toBe("deep");
   });
 

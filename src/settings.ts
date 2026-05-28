@@ -51,7 +51,7 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   hydrusTagService: "",
   hydrusAvailableTagServices: [],
   hydrusTagServices: [],
-  hydrusCacheFolder: ".hydrus-cache",
+  hydrusCacheFolder: ".dm-screen/bg",
   hydrusCacheTtlDays: 30,
   hydrusDefaultLoop: true,
   hydrusDefaultMuted: true,
@@ -267,7 +267,7 @@ export class DmScreenSettingTab extends PluginSettingTab {
               new Notice('Cache folder must be relative to the vault, no ".." segments', 6000);
               return;
             }
-            this.plugin.settings.hydrusCacheFolder = normalized || ".hydrus-cache";
+            this.plugin.settings.hydrusCacheFolder = normalized || ".dm-screen/bg";
             await this.plugin.saveSettings();
           })
       );

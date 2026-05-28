@@ -32,10 +32,10 @@ function fakeClient(overrides: Partial<HydrusClient> = {}): HydrusClient {
 describe("HydrusCache - paths", () => {
   it("generates correct vault paths", () => {
     const adapter = new MemoryAdapter();
-    const cache = new HydrusCache(null, { folder: ".hydrus-cache", ttlDays: 30, adapter });
+    const cache = new HydrusCache(null, { folder: ".dm-screen/bg", ttlDays: 30, adapter });
     const paths = cache.paths("abcdef123", "webp");
-    expect(paths.vaultPath).toBe(".hydrus-cache/abcdef123.webp");
-    expect(paths.thumbVaultPath).toBe(".hydrus-cache/abcdef123.thumb.jpg");
+    expect(paths.vaultPath).toBe(".dm-screen/bg/abcdef123.webp");
+    expect(paths.thumbVaultPath).toBe(".dm-screen/bg/abcdef123.thumb.jpg");
   });
 
   it("strips leading/trailing slashes from folder", () => {
@@ -49,7 +49,7 @@ describe("HydrusCache - paths", () => {
     const adapter = new MemoryAdapter();
     const cache = new HydrusCache(null, { folder: "", ttlDays: 30, adapter });
     const paths = cache.paths("abc", "png");
-    expect(paths.vaultPath).toBe(".hydrus-cache/abc.png");
+    expect(paths.vaultPath).toBe(".dm-screen/bg/abc.png");
   });
 });
 
@@ -59,7 +59,7 @@ describe("HydrusCache - concurrent operations", () => {
 
   beforeEach(() => {
     adapter = new MemoryAdapter();
-    cache = new HydrusCache(null, { folder: ".hydrus-cache", ttlDays: 30, adapter });
+    cache = new HydrusCache(null, { folder: ".dm-screen/bg", ttlDays: 30, adapter });
   });
 
   it("handles concurrent markUsed calls without corruption", async () => {
@@ -95,18 +95,18 @@ describe("HydrusCache - concurrent operations", () => {
 describe("HydrusCache - index resilience", () => {
   it("recovers from corrupted index JSON", async () => {
     const adapter = new MemoryAdapter();
-    adapter.text.set(".hydrus-cache/index.json", "not valid json {{{");
+    adapter.text.set(".dm-screen/bg/index.json", "not valid json {{{");
 
-    const cache = new HydrusCache(null, { folder: ".hydrus-cache", ttlDays: 30, adapter });
+    const cache = new HydrusCache(null, { folder: ".dm-screen/bg", ttlDays: 30, adapter });
     const entries = await cache.listCached();
     expect(entries).toEqual([]);
   });
 
   it("recovers from wrong version index", async () => {
     const adapter = new MemoryAdapter();
-    adapter.text.set(".hydrus-cache/index.json", JSON.stringify({ version: 99, entries: { x: {} } }));
+    adapter.text.set(".dm-screen/bg/index.json", JSON.stringify({ version: 99, entries: { x: {} } }));
 
-    const cache = new HydrusCache(null, { folder: ".hydrus-cache", ttlDays: 30, adapter });
+    const cache = new HydrusCache(null, { folder: ".dm-screen/bg", ttlDays: 30, adapter });
     const entries = await cache.listCached();
     expect(entries).toEqual([]);
   });
@@ -114,35 +114,35 @@ describe("HydrusCache - index resilience", () => {
   it("creates folder on first write if it doesn't exist", async () => {
     const adapter = new MemoryAdapter();
     const mkdirSpy = vi.spyOn(adapter, "mkdir");
-    const cache = new HydrusCache(null, { folder: ".hydrus-cache", ttlDays: 30, adapter });
+    const cache = new HydrusCache(null, { folder: ".dm-screen/bg", ttlDays: 30, adapter });
 
     await cache.fetchAndCache(fakeClient(), fakeFile());
-    expect(mkdirSpy).toHaveBeenCalledWith(".hydrus-cache");
+    expect(mkdirSpy).toHaveBeenCalledWith(".dm-screen/bg");
   });
 });
 
 describe("HydrusCache - TTL edge cases", () => {
   it("ttlDays minimum is 1 day", () => {
     const adapter = new MemoryAdapter();
-    const cache = new HydrusCache(null, { folder: ".hydrus-cache", ttlDays: 0, adapter });
+    const cache = new HydrusCache(null, { folder: ".dm-screen/bg", ttlDays: 0, adapter });
     // Internal ttlMs should be at least 1 day
     expect((cache as any).ttlMs).toBe(24 * 60 * 60 * 1000);
   });
 
   it("sweep does not remove entries that are exactly at the TTL boundary", async () => {
     const adapter = new MemoryAdapter();
-    const cache = new HydrusCache(null, { folder: ".hydrus-cache", ttlDays: 30, adapter });
+    const cache = new HydrusCache(null, { folder: ".dm-screen/bg", ttlDays: 30, adapter });
     const client = fakeClient();
     await cache.fetchAndCache(client, fakeFile());
     await cache.markUsed("h1");
 
     // Set lastUsedAt to exactly the TTL boundary (not past it)
-    const idx = JSON.parse(adapter.text.get(".hydrus-cache/index.json")!);
+    const idx = JSON.parse(adapter.text.get(".dm-screen/bg/index.json")!);
     const ttlMs = 30 * 24 * 60 * 60 * 1000;
     idx.entries["h1"].lastUsedAt = Date.now() - ttlMs + 1000; // just within TTL
-    adapter.text.set(".hydrus-cache/index.json", JSON.stringify(idx));
+    adapter.text.set(".dm-screen/bg/index.json", JSON.stringify(idx));
 
-    const fresh = new HydrusCache(null, { folder: ".hydrus-cache", ttlDays: 30, adapter });
+    const fresh = new HydrusCache(null, { folder: ".dm-screen/bg", ttlDays: 30, adapter });
     expect(await fresh.sweep()).toBe(0);
   });
 });
@@ -150,7 +150,7 @@ describe("HydrusCache - TTL edge cases", () => {
 describe("HydrusCache - knownTags preservation", () => {
   it("stores and returns knownTags from the original file", async () => {
     const adapter = new MemoryAdapter();
-    const cache = new HydrusCache(null, { folder: ".hydrus-cache", ttlDays: 30, adapter });
+    const cache = new HydrusCache(null, { folder: ".dm-screen/bg", ttlDays: 30, adapter });
     const client = fakeClient();
 
     await cache.fetchAndCache(client, fakeFile({

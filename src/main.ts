@@ -9,7 +9,9 @@ import { PlayerScreenServer } from "./server";
 import { DmScreenSettingTab, DmScreenSettings, DEFAULT_SETTINGS } from "./settings";
 import type { InitiativeViewState, TrackerCombatant } from "./types";
 import { HydrusCache } from "./hydrus/cache";
+import type { VaultAdapterLike } from "./hydrus/cache";
 import { HydrusClient } from "./hydrus/client";
+import { DdbImageCache } from "./dndbeyond/imageCache";
 
 export default class DmScreenPlugin extends Plugin {
   settings: DmScreenSettings = DEFAULT_SETTINGS;
@@ -130,6 +132,17 @@ export default class DmScreenPlugin extends Plugin {
         }, 24 * 60 * 60 * 1000);
       }
     }
+
+    // Sweep stale DDB monster images
+    const imgCacheFolder = this.settings.hydrusCacheFolder.replace(/\/bg\/?$/, "") || ".dm-screen";
+    const imgCache = new DdbImageCache(
+      imgCacheFolder,
+      this.app.vault.adapter as unknown as VaultAdapterLike,
+      this.settings.hydrusCacheTtlDays
+    );
+    void imgCache.sweep().then((n) => {
+      if (n > 0) console.log(`[DM Screen] Swept ${n} stale monster image(s)`);
+    }).catch(() => {});
   }
 
   startServer() {

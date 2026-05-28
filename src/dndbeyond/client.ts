@@ -9,6 +9,7 @@ import type {
 const AUTH_URL = "https://auth-service.dndbeyond.com/v1/cobalt-token";
 const ENCOUNTER_URL = "https://encounter-service.dndbeyond.com/v1/encounters";
 const CHARACTER_URL = "https://character-service.dndbeyond.com/character/v5/character";
+const MONSTER_SERVICE_URL = "https://monster-service.dndbeyond.com/v1/Monster";
 
 export class DdbClient {
   private token: string | null = null;
@@ -59,6 +60,7 @@ export class DdbClient {
         currentHitPoints: (m.currentHitPoints as number) ?? 0,
         maximumHitPoints: (m.maximumHitPoints as number) ?? 0,
         uniqueId: (m.uniqueId as string) ?? "",
+        avatarUrl: "",
       })),
       players: players
         .filter((p: Record<string, unknown>) => p.type !== "CHARACTER_TYPE_ABSTRACT")
@@ -84,6 +86,30 @@ export class DdbClient {
       return isNaN(n) ? 0 : n;
     }
     return 0;
+  }
+
+  async getMonsterImages(ids: number[]): Promise<Map<number, string>> {
+    if (ids.length === 0) return new Map();
+    const url = `${MONSTER_SERVICE_URL}?ids=${ids.join(",")}`;
+    const token = await this.ensureToken();
+    const res = await requestUrl({
+      url,
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      throw: false,
+    });
+    if (res.status < 200 || res.status >= 300) {
+      throw new Error(`Monster service request failed (${res.status})`);
+    }
+    const body = res.json as { data?: Array<Record<string, unknown>> };
+    const data = body.data ?? [];
+    const result = new Map<number, string>();
+    for (const m of data) {
+      const id = m.id as number;
+      const avatar = (m.largeAvatarUrl as string) || (m.avatarUrl as string) || "";
+      if (id && avatar) result.set(id, avatar);
+    }
+    return result;
   }
 
   async getCharacter(characterId: number): Promise<DdbCharacterSummary> {

@@ -245,7 +245,7 @@ interface AppLike {
 
 /**
  * Reads bytes from the vault, falling back to the raw DataAdapter for paths
- * that the vault index doesn't surface — dotfolders like `.hydrus-cache/` are
+ * that the vault index doesn't surface — dotfolders like `.dm-screen/` are
  * the canonical case, since Obsidian skips them on indexing but they are real
  * files on disk.
  */

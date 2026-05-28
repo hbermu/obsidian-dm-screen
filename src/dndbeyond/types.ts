@@ -27,6 +27,7 @@ export interface DdbMonster {
   currentHitPoints: number;
   maximumHitPoints: number;
   uniqueId: string;
+  avatarUrl: string;
 }
 
 export interface DdbPlayer {

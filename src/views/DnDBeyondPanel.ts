@@ -2,6 +2,8 @@ import { Notice } from "obsidian";
 import type DmScreenPlugin from "../main";
 import { DdbClient } from "../dndbeyond/client";
 import { DdbEncounterPoller, type DdbPolledState } from "../dndbeyond/poller";
+import { DdbImageCache } from "../dndbeyond/imageCache";
+import type { VaultAdapterLike } from "../hydrus/cache";
 import type { DdbEncounter } from "../dndbeyond/types";
 
 export class DnDBeyondPanel {
@@ -179,6 +181,11 @@ export class DnDBeyondPanel {
     this.startTracking(id);
     this.renderList();
     this.renderTrackingStatus();
+
+    // Load monster images in the background
+    if (this.client) {
+      this.client.getEncounter(id).then((enc) => this.loadMonsterImages(enc)).catch(() => {});
+    }
   }
 
   private startTracking(encounterId: string): void {
@@ -270,5 +277,37 @@ export class DnDBeyondPanel {
     }
 
     this.plugin.sendInitiativeUpdate(combatants, encounter.roundNum);
+  }
+
+  private async loadMonsterImages(encounter: DdbEncounter): Promise<void> {
+    if (!this.client) return;
+
+    const uniqueIds = [...new Set(encounter.monsters.map((m) => m.id))];
+    if (uniqueIds.length === 0) return;
+
+    try {
+      const avatarMap = await this.client.getMonsterImages(uniqueIds);
+
+      const cacheFolder =
+        this.plugin.settings.hydrusCacheFolder.replace(/\/bg\/?$/, "") || ".dm-screen";
+      const adapter = this.plugin.app.vault.adapter as unknown as VaultAdapterLike;
+      const ttlDays = this.plugin.settings.hydrusCacheTtlDays || 30;
+      const cache = new DdbImageCache(cacheFolder, adapter, ttlDays);
+
+      const dmPanel = await this.plugin.findOpenDmControlPanel();
+      if (!dmPanel) return;
+
+      for (const [monsterId, imageUrl] of avatarMap) {
+        const monster = encounter.monsters.find((m) => m.id === monsterId);
+        const name = monster?.name ?? `Monster ${monsterId}`;
+        const vaultPath = await cache.getOrDownload(monsterId, imageUrl, name);
+        const dataUrl = await this.plugin.imageToDataUrl(vaultPath);
+        if (dataUrl) {
+          dmPanel.addImageLayer(name, dataUrl, "monster", false);
+        }
+      }
+    } catch (e) {
+      console.warn("[DDB] Failed to load monster images:", (e as Error).message);
+    }
   }
 }

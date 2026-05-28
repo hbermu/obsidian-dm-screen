@@ -13,7 +13,7 @@ function createMockClient(opts?: {
     inProgress: true,
     roundNum: 2,
     turnNum: 0,
-    monsters: [{ id: 1, name: "Goblin", initiative: 14, currentHitPoints: 7, maximumHitPoints: 7, uniqueId: "g1" }],
+    monsters: [{ id: 1, name: "Goblin", initiative: 14, currentHitPoints: 7, maximumHitPoints: 7, uniqueId: "g1", avatarUrl: "" }],
     players: [{ id: 100, name: "Thorin", initiative: 18 }],
     manualEntries: [],
     ...opts?.encounter,

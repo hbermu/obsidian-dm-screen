@@ -49,7 +49,7 @@ export class HydrusCache {
   private writeQueue: Promise<void> = Promise.resolve();
 
   constructor(app: App | null, opts: HydrusCacheOptions) {
-    this.folder = opts.folder.replace(/^\/+|\/+$/g, "") || ".hydrus-cache";
+    this.folder = opts.folder.replace(/^\/+|\/+$/g, "") || ".dm-screen/bg";
     this.ttlMs = Math.max(1, opts.ttlDays) * 24 * 60 * 60 * 1000;
     if (opts.adapter) {
       this.adapter = opts.adapter;
