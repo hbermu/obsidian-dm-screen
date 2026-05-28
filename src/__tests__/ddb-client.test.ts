@@ -91,8 +91,8 @@ describe("DdbClient - getEncounters", () => {
       return {
         json: {
           data: [
-            { id: "enc-1", name: "Goblin Ambush", inProgress: true },
-            { id: "enc-2", name: "Dragon Fight", inProgress: false },
+            { id: "enc-1", name: "Goblin Ambush", inProgress: true, roundNum: 1, turnNum: 0, monsters: [], players: [] },
+            { id: "enc-2", name: "Dragon Fight", inProgress: false, roundNum: 0, turnNum: 0, monsters: [], players: [] },
           ],
         },
       };
@@ -102,7 +102,8 @@ describe("DdbClient - getEncounters", () => {
     const encounters = await client.getEncounters();
 
     expect(encounters).toHaveLength(2);
-    expect(encounters[0]).toEqual({ id: "enc-1", name: "Goblin Ambush", inProgress: true });
+    expect(encounters[0].name).toBe("Goblin Ambush");
+    expect(encounters[0].inProgress).toBe(true);
     expect(calls[1].headers?.Authorization).toBe("Bearer jwt-123");
     expect(calls[1].url).toContain("encounter-service.dndbeyond.com");
   });
@@ -114,7 +115,7 @@ describe("DdbClient - getEncounters", () => {
       }
       return {
         json: [
-          { id: "enc-1", name: "Fight", inProgress: false },
+          { id: "enc-1", name: "Fight", inProgress: false, roundNum: 0, turnNum: 0, monsters: [], players: [] },
         ],
       };
     });
@@ -123,6 +124,50 @@ describe("DdbClient - getEncounters", () => {
     const encounters = await client.getEncounters();
     expect(encounters).toHaveLength(1);
     expect(encounters[0].name).toBe("Fight");
+  });
+
+  it("filters out abstract preset players", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: [{
+            id: "enc-1", name: "Test", inProgress: false, roundNum: 0, turnNum: 0,
+            monsters: [],
+            players: [
+              { id: "preset-player-4-0-1", type: "CHARACTER_TYPE_ABSTRACT", name: null },
+              { id: "12345", type: "CHARACTER_TYPE_REAL", name: "Thorin", initiative: 18 },
+            ],
+          }],
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const encounters = await client.getEncounters();
+    expect(encounters[0].players).toHaveLength(1);
+    expect(encounters[0].players[0].name).toBe("Thorin");
+    expect(encounters[0].players[0].id).toBe(12345);
+  });
+
+  it("handles null/missing players and monsters gracefully", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: [{ id: "enc-1", name: "Empty", inProgress: false, roundNum: 0, turnNum: 0 }],
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const encounters = await client.getEncounters();
+    expect(encounters[0].players).toEqual([]);
+    expect(encounters[0].monsters).toEqual([]);
   });
 });
 
@@ -142,7 +187,7 @@ describe("DdbClient - getEncounter", () => {
           roundNum: 3,
           turnNum: 1,
           monsters: [{ id: 1, name: "Dragon", initiative: 20, currentHitPoints: 100, maximumHitPoints: 200, uniqueId: "u1" }],
-          players: [{ id: 999, name: "Thorin", initiative: 15 }],
+          players: [{ id: 999, name: "Thorin", initiative: 15, type: "CHARACTER_TYPE_REAL" }],
         },
       };
     });
@@ -155,6 +200,31 @@ describe("DdbClient - getEncounter", () => {
     expect(enc.monsters).toHaveLength(1);
     expect(enc.players).toHaveLength(1);
     expect(enc.roundNum).toBe(3);
+  });
+
+  it("handles data-wrapped response", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: {
+            id: "enc-99",
+            name: "Wrapped",
+            inProgress: false,
+            roundNum: 0,
+            turnNum: 0,
+            monsters: [],
+            players: [],
+          },
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const enc = await client.getEncounter("enc-99");
+    expect(enc.name).toBe("Wrapped");
   });
 });
 

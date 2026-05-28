@@ -1434,14 +1434,28 @@
   padding: 8px 0;
 }
 
+.dm-ddb-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .dm-ddb-search {
-  width: 100%;
+  flex: 1;
   padding: 4px 8px;
   font-size: 0.85em;
   border: 1px solid var(--background-modifier-border);
   border-radius: 4px;
   background: var(--background-primary);
   color: var(--text-normal);
+}
+
+.dm-ddb-hp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8em;
+  white-space: nowrap;
 }
 
 .dm-ddb-encounter-list {

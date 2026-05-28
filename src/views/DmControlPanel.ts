@@ -806,7 +806,7 @@ export class DmControlPanel extends ItemView {
     if (ddbActive) {
       const tabBar = section.createDiv("dm-combat-tabs");
       const initTab = tabBar.createEl("button", {
-        text: "Initiative",
+        text: "Local Track",
         cls: this.combatTab === "initiative" ? "dm-tab-active" : "dm-tab",
       });
       initTab.addEventListener("click", () => {

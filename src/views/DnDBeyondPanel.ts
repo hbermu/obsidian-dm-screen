@@ -2,14 +2,15 @@ import { Notice } from "obsidian";
 import type DmScreenPlugin from "../main";
 import { DdbClient } from "../dndbeyond/client";
 import { DdbEncounterPoller, type DdbPolledState } from "../dndbeyond/poller";
-import type { DdbEncounterSummary } from "../dndbeyond/types";
+import type { DdbEncounter } from "../dndbeyond/types";
 
 export class DnDBeyondPanel {
   private client: DdbClient | null = null;
   private poller: DdbEncounterPoller | null = null;
-  private encounters: DdbEncounterSummary[] = [];
+  private encounters: DdbEncounter[] = [];
   private selectedEncounterId: string | null = null;
   private searchFilter = "";
+  private showPcHp = true;
   private polledState: DdbPolledState | null = null;
   private container: HTMLElement;
 
@@ -56,8 +57,10 @@ export class DnDBeyondPanel {
       return;
     }
 
-    // Search input
-    const searchInput = this.container.createEl("input", {
+    // Controls row: search + show PC HP toggle
+    const controlsRow = this.container.createDiv({ cls: "dm-ddb-controls" });
+
+    const searchInput = controlsRow.createEl("input", {
       cls: "dm-ddb-search",
       attr: { type: "text", placeholder: "Search encounters..." },
     });
@@ -66,6 +69,16 @@ export class DnDBeyondPanel {
       this.searchFilter = searchInput.value;
       this.renderList();
     });
+
+    const hpToggle = controlsRow.createDiv({ cls: "dm-ddb-hp-toggle" });
+    const hpCheck = hpToggle.createEl("input", { type: "checkbox" }) as HTMLInputElement;
+    hpCheck.checked = this.showPcHp;
+    hpCheck.id = "dm-ddb-show-pc-hp";
+    hpCheck.addEventListener("change", () => {
+      this.showPcHp = hpCheck.checked;
+      if (this.polledState) this.broadcastToPlayerScreen(this.polledState);
+    });
+    hpToggle.createEl("label", { text: "Show PC HP", attr: { for: "dm-ddb-show-pc-hp" } });
 
     // Encounter list container
     this.container.createDiv({ cls: "dm-ddb-encounter-list" });
@@ -97,30 +110,32 @@ export class DnDBeyondPanel {
         row.addClass("dm-ddb-encounter-selected");
       }
 
-      // Checkbox indicator
-      const check = row.createEl("span", { cls: "dm-ddb-check" });
-      check.setText(enc.id === this.selectedEncounterId ? "✓" : "○");
-
-      // Encounter name (clicking opens in browser)
-      const nameEl = row.createEl("a", { cls: "dm-ddb-encounter-name", text: enc.name });
-      nameEl.addEventListener("click", (e) => {
-        e.stopPropagation();
-        window.open(`https://www.dndbeyond.com/encounters/${enc.id}`);
+      // Select/deselect button
+      const selectBtn = row.createEl("button", {
+        cls: "dm-ddb-check",
+        text: enc.id === this.selectedEncounterId ? "✓" : "○",
       });
-
-      // In progress badge
-      if (enc.inProgress) {
-        row.createEl("span", { cls: "dm-ddb-badge", text: "In Progress" });
-      }
-
-      // Row click to select/deselect
-      row.addEventListener("click", () => {
+      selectBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
         if (this.selectedEncounterId === enc.id) {
           this.stopTracking();
         } else {
           this.selectEncounter(enc.id);
         }
       });
+
+      // Encounter name (clicking opens in external browser)
+      const nameEl = row.createEl("span", { cls: "dm-ddb-encounter-name", text: enc.name });
+      nameEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        window.open(`https://www.dndbeyond.com/encounters/${enc.id}`, "_blank");
+      });
+
+      // In progress badge
+      if (enc.inProgress) {
+        row.createEl("span", { cls: "dm-ddb-badge", text: "In Progress" });
+      }
     }
   }
 
@@ -150,10 +165,14 @@ export class DnDBeyondPanel {
   }
 
   private selectEncounter(id: string): void {
-    this.stopTracking();
+    if (this.poller) {
+      this.poller.stop();
+      this.poller = null;
+    }
     this.selectedEncounterId = id;
     this.startTracking(id);
-    this.render();
+    this.renderList();
+    this.renderTrackingStatus();
   }
 
   private startTracking(encounterId: string): void {
@@ -175,14 +194,15 @@ export class DnDBeyondPanel {
     this.selectedEncounterId = null;
     this.polledState = null;
     this.plugin.sendInitiativeUpdate([], 0);
-    this.render();
+    this.renderList();
+    const trackingEl = this.container.querySelector(".dm-ddb-tracking");
+    if (trackingEl) trackingEl.remove();
   }
 
   private onPollUpdate(state: DdbPolledState): void {
     this.polledState = state;
     this.broadcastToPlayerScreen(state);
     this.renderTrackingStatus();
-    this.renderList();
   }
 
   private onPollError(err: Error): void {
@@ -197,10 +217,13 @@ export class DnDBeyondPanel {
       hidden?: boolean; statuses?: string[];
     }> = [];
 
+    const players = encounter.players ?? [];
+    const monsters = encounter.monsters ?? [];
+
     // Determine current turn by index
     const allParticipants = [
-      ...encounter.players.map((p) => ({ ...p, kind: "player" as const })),
-      ...encounter.monsters.map((m) => ({ ...m, kind: "monster" as const })),
+      ...players.map((p) => ({ ...p, kind: "player" as const })),
+      ...monsters.map((m) => ({ ...m, kind: "monster" as const })),
     ].sort((a, b) => b.initiative - a.initiative);
 
     const currentTurnIdx = encounter.inProgress ? encounter.turnNum : -1;
@@ -211,10 +234,12 @@ export class DnDBeyondPanel {
 
       if (p.kind === "player") {
         const char = characters.get(p.id);
+        const hp = this.showPcHp ? (char?.currentHitPoints ?? 0) : 0;
+        const maxHp = this.showPcHp ? (char?.maxHitPoints ?? 0) : 0;
         combatants.push({
           name: char?.name ?? p.name,
-          hp: char?.currentHitPoints ?? 0,
-          maxHp: char?.maxHitPoints ?? 0,
+          hp,
+          maxHp,
           initiative: p.initiative,
           active: isActive,
           friendly: true,

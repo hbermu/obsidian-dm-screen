@@ -41,8 +41,8 @@ describe("DdbEncounterPoller", () => {
 
     poller.start();
     await vi.advanceTimersByTimeAsync(100);
-    // Allow the delay(500) + poll to complete
-    await vi.advanceTimersByTimeAsync(600);
+    // Allow the delay(1000) + poll to complete
+    await vi.advanceTimersByTimeAsync(1200);
 
     expect(updates).toHaveLength(1);
     expect(updates[0].encounter.name).toBe("Test Fight");
@@ -56,7 +56,7 @@ describe("DdbEncounterPoller", () => {
     const poller = new DdbEncounterPoller(client, "enc-1", (state) => updates.push(state));
 
     poller.start();
-    await vi.advanceTimersByTimeAsync(700);
+    await vi.advanceTimersByTimeAsync(1200);
     poller.stop();
 
     const countAfterStop = updates.length;
@@ -73,8 +73,8 @@ describe("DdbEncounterPoller", () => {
 
     // 3 failures with MIN_CYCLE_MS between them
     await vi.advanceTimersByTimeAsync(100); // 1st failure
-    await vi.advanceTimersByTimeAsync(2500); // 2nd failure
-    await vi.advanceTimersByTimeAsync(2500); // 3rd failure
+    await vi.advanceTimersByTimeAsync(5000); // 2nd failure
+    await vi.advanceTimersByTimeAsync(5000); // 3rd failure
 
     expect(errors.length).toBeGreaterThanOrEqual(3);
 
@@ -92,7 +92,7 @@ describe("DdbEncounterPoller", () => {
     const poller = new DdbEncounterPoller(client, "enc-1", (state) => updates.push(state));
 
     poller.start();
-    await vi.advanceTimersByTimeAsync(700);
+    await vi.advanceTimersByTimeAsync(1200);
 
     expect(updates).toHaveLength(1);
     expect(updates[0].encounter.name).toBe("Test Fight");
@@ -107,7 +107,7 @@ describe("DdbEncounterPoller", () => {
 
     poller.start();
     poller.start(); // no-op
-    await vi.advanceTimersByTimeAsync(700);
+    await vi.advanceTimersByTimeAsync(1200);
 
     expect(updates).toHaveLength(1);
     poller.stop();

@@ -6,10 +6,10 @@ export interface DdbPolledState {
   characters: Map<number, DdbCharacterSummary>;
 }
 
-const MIN_REQUEST_GAP_MS = 500;
+const MIN_REQUEST_GAP_MS = 1000;
 const CIRCUIT_BREAKER_THRESHOLD = 3;
 const CIRCUIT_BREAKER_PAUSE_MS = 30000;
-const MIN_CYCLE_MS = 2500;
+const MIN_CYCLE_MS = 5000;
 
 export class DdbEncounterPoller {
   private running = false;
@@ -50,9 +50,11 @@ export class DdbEncounterPoller {
     try {
       const encounter = await this.client.getEncounter(this.encounterId);
       const characters = new Map<number, DdbCharacterSummary>();
+      const players = encounter.players ?? [];
 
-      for (const player of encounter.players) {
+      for (const player of players) {
         if (!this.running) return;
+        if (!player.id || player.id === 0) continue;
         await this.delay(MIN_REQUEST_GAP_MS);
         try {
           const char = await this.client.getCharacter(player.id);

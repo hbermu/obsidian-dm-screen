@@ -27,20 +27,55 @@ export class DdbClient {
     }
   }
 
-  async getEncounters(): Promise<DdbEncounterSummary[]> {
+  async getEncounters(): Promise<DdbEncounter[]> {
     const res = await this.authedGet(`${ENCOUNTER_URL}?skip=0&take=100`);
-    const body = res.json as { data?: DdbEncounterSummary[] } | DdbEncounterSummary[];
-    const list = Array.isArray(body) ? body : (body.data ?? []);
-    return list.map((e) => ({
-      id: e.id,
-      name: e.name,
-      inProgress: e.inProgress ?? false,
-    }));
+    const body = res.json as { data?: Record<string, unknown>[] } | Record<string, unknown>[];
+    const raw = Array.isArray(body) ? body : (body.data ?? []);
+    return raw.map((e) => this.parseEncounter(e));
   }
 
   async getEncounter(id: string): Promise<DdbEncounter> {
     const res = await this.authedGet(`${ENCOUNTER_URL}/${id}`);
-    return res.json as DdbEncounter;
+    const body = res.json as Record<string, unknown>;
+    const enc = body.data ? (body.data as Record<string, unknown>) : body;
+    if (!enc.id) throw new Error("Invalid encounter response");
+    return this.parseEncounter(enc);
+  }
+
+  private parseEncounter(raw: Record<string, unknown>): DdbEncounter {
+    const monsters = Array.isArray(raw.monsters) ? raw.monsters : [];
+    const players = Array.isArray(raw.players) ? raw.players : [];
+    return {
+      id: raw.id as string,
+      name: (raw.name as string) ?? "Unnamed",
+      inProgress: (raw.inProgress as boolean) ?? false,
+      roundNum: (raw.roundNum as number) ?? 0,
+      turnNum: (raw.turnNum as number) ?? 0,
+      monsters: monsters.map((m: Record<string, unknown>) => ({
+        id: (m.id as number) ?? 0,
+        name: (m.name as string) ?? "Unknown",
+        initiative: (m.initiative as number) ?? 0,
+        currentHitPoints: (m.currentHitPoints as number) ?? 0,
+        maximumHitPoints: (m.maximumHitPoints as number) ?? 0,
+        uniqueId: (m.uniqueId as string) ?? "",
+      })),
+      players: players
+        .filter((p: Record<string, unknown>) => p.type !== "CHARACTER_TYPE_ABSTRACT")
+        .map((p: Record<string, unknown>) => ({
+          id: this.parsePlayerId(p.id),
+          name: (p.name as string) ?? (p.userName as string) ?? "Unknown",
+          initiative: (p.initiative as number) ?? 0,
+        })),
+    };
+  }
+
+  private parsePlayerId(id: unknown): number {
+    if (typeof id === "number") return id;
+    if (typeof id === "string") {
+      const n = parseInt(id, 10);
+      return isNaN(n) ? 0 : n;
+    }
+    return 0;
   }
 
   async getCharacter(characterId: number): Promise<DdbCharacterSummary> {
