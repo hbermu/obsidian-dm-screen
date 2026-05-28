@@ -1,7 +1,6 @@
 import { ItemView, WorkspaceLeaf, Notice, TFile } from "obsidian";
 import type DmScreenPlugin from "../main";
 import type { TrackerCombatant, ImageLayer } from "../types";
-import type { FogRegion } from "../settings";
 import { renderStatblock } from "./StatblockPanel";
 import { DnDBeyondPanel } from "./DnDBeyondPanel";
 
@@ -38,12 +37,6 @@ export class DmControlPanel extends ItemView {
     "#e74c3c", "#3498db", "#2ecc71", "#f39c12",
     "#9b59b6", "#1abc9c", "#e67e22", "#34495e",
   ];
-
-  // Fog of War state (map-level, legacy)
-  fogMapName: string | null = null;
-  fogBounds: number[] = [0, 0, 1000, 1000];
-  fogRevealed: FogRegion[] = [];
-  private fogDrawing = false;
 
   // Per-layer fog drawing state
   private fogEditLayerId: string | null = null;
@@ -205,14 +198,6 @@ export class DmControlPanel extends ItemView {
     }
   }
 
-  // Called from main.ts when a fog-of-war map is pushed
-  setFogOfWarState(mapName: string, bounds: number[], revealed: FogRegion[]) {
-    this.fogMapName = mapName;
-    this.fogBounds = bounds;
-    this.fogRevealed = [...revealed];
-    this.render();
-  }
-
   // Called from main.ts when Initiative Tracker fires save-state
   syncFromInitiativeTracker(combatants: TrackerCombatant[], round: number, encounterName: string) {
     this.trackerSource = "plugin";
@@ -256,9 +241,6 @@ export class DmControlPanel extends ItemView {
 
     this.renderServerSection(container);
     this.renderPlayerScreenSection(container);
-    if (this.fogMapName) {
-      this.renderFogOfWarSection(container);
-    }
     this.renderModeSection(container);
 
     if (this.mode === "combat") {
@@ -451,10 +433,6 @@ export class DmControlPanel extends ItemView {
       this.render();
     });
 
-    const pushNoteBtn = btnRow.createEl("button", { text: "Push Note" });
-    pushNoteBtn.addEventListener("click", () => {
-      this.plugin.pushCurrentNoteToPlayerScreen();
-    });
 
     // Preview area with pan/zoom — always use configured TV size for stable layout
     const tvW = this.plugin.settings.tvWidth || 1920;
@@ -1042,197 +1020,6 @@ export class DmControlPanel extends ItemView {
         this.render();
       });
     }
-  }
-
-  // ─── Fog of War Section ──────────────────────────────────────────
-
-  private renderFogOfWarSection(container: HTMLElement) {
-    const section = container.createDiv("dm-section");
-    const headerRow = section.createDiv("dm-fog-header");
-    headerRow.createEl("h3", { text: `Fog of War — ${this.fogMapName}` });
-
-    const [y0, x0, y1, x1] = this.fogBounds;
-    const mapW = x1 - x0;
-    const mapH = y1 - y0;
-
-    // Preview canvas where DM can draw reveal rectangles
-    const previewWrapper = section.createDiv("dm-fog-preview-wrapper");
-    const preview = previewWrapper.createEl("canvas", { cls: "dm-fog-preview" });
-    preview.style.aspectRatio = `${mapW} / ${mapH}`;
-    preview.width = 400;
-    preview.height = Math.round(400 * (mapH / mapW));
-
-    // Draw fog preview after DOM attachment
-    setTimeout(() => this.drawFogPreview(preview), 0);
-
-    // Draw-to-reveal interaction
-    this.setupFogDrawing(preview, mapW, mapH, x0, y0);
-
-    // Revealed regions list
-    if (this.fogRevealed.length > 0) {
-      const listEl = section.createDiv("dm-fog-list");
-      listEl.createEl("h4", { text: `Revealed Regions (${this.fogRevealed.length})` });
-
-      for (let i = 0; i < this.fogRevealed.length; i++) {
-        const r = this.fogRevealed[i];
-        const row = listEl.createDiv("dm-fog-region-row");
-        row.createSpan({
-          text: `Region ${i + 1}: (${Math.round(r.x)}, ${Math.round(r.y)}) ${Math.round(r.w)}x${Math.round(r.h)}`,
-          cls: "dm-fog-region-text",
-        });
-        const removeBtn = row.createEl("button", { text: "x", cls: "dm-remove-btn" });
-        removeBtn.addEventListener("click", () => {
-          this.fogRevealed.splice(i, 1);
-          this.plugin.broadcastFogUpdate(this.fogMapName!, this.fogRevealed);
-          this.render();
-        });
-      }
-    }
-
-    // Buttons
-    const btnRow = section.createDiv("dm-fog-btn-row");
-
-    const undoBtn = btnRow.createEl("button", { text: "Undo Last Reveal" });
-    undoBtn.addEventListener("click", () => {
-      if (this.fogRevealed.length > 0) {
-        this.fogRevealed.pop();
-        this.plugin.broadcastFogUpdate(this.fogMapName!, this.fogRevealed);
-        this.render();
-      }
-    });
-
-    const revealAllBtn = btnRow.createEl("button", { text: "Reveal All" });
-    revealAllBtn.addEventListener("click", () => {
-      this.fogRevealed = [{ x: x0, y: y0, w: mapW, h: mapH }];
-      this.plugin.broadcastFogUpdate(this.fogMapName!, this.fogRevealed);
-      this.render();
-    });
-
-    const resetBtn = btnRow.createEl("button", { text: "Reset Fog", cls: "dm-fog-reset-btn" });
-    resetBtn.addEventListener("click", () => {
-      this.fogRevealed = [];
-      this.plugin.broadcastFogUpdate(this.fogMapName!, this.fogRevealed);
-      this.render();
-    });
-
-    const closeFogBtn = btnRow.createEl("button", { text: "Close Fog Panel" });
-    closeFogBtn.addEventListener("click", () => {
-      this.fogMapName = null;
-      this.render();
-    });
-  }
-
-  private drawFogPreview(canvas: HTMLCanvasElement) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const [y0, x0, y1, x1] = this.fogBounds;
-    const mapW = x1 - x0;
-    const mapH = y1 - y0;
-    const cw = canvas.width;
-    const ch = canvas.height;
-
-    // Draw fog (dark background)
-    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-    ctx.fillRect(0, 0, cw, ch);
-
-    // Cut out revealed regions
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.fillStyle = "rgba(0, 0, 0, 1)";
-
-    for (const r of this.fogRevealed) {
-      const rx = ((r.x - x0) / mapW) * cw;
-      const ry = ((r.y - y0) / mapH) * ch;
-      const rw = (r.w / mapW) * cw;
-      const rh = (r.h / mapH) * ch;
-      ctx.fillRect(rx, ry, rw, rh);
-    }
-
-    ctx.globalCompositeOperation = "source-over";
-
-    // Draw region outlines
-    ctx.strokeStyle = "rgba(0, 255, 0, 0.5)";
-    ctx.lineWidth = 1;
-    for (const r of this.fogRevealed) {
-      const rx = ((r.x - x0) / mapW) * cw;
-      const ry = ((r.y - y0) / mapH) * ch;
-      const rw = (r.w / mapW) * cw;
-      const rh = (r.h / mapH) * ch;
-      ctx.strokeRect(rx, ry, rw, rh);
-    }
-  }
-
-  private setupFogDrawing(
-    canvas: HTMLCanvasElement,
-    mapW: number,
-    mapH: number,
-    x0: number,
-    y0: number
-  ) {
-    let startX = 0;
-    let startY = 0;
-    let drawing = false;
-
-    const onMouseDown = (e: MouseEvent) => {
-      drawing = true;
-      const rect = canvas.getBoundingClientRect();
-      startX = e.clientX - rect.left;
-      startY = e.clientY - rect.top;
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!drawing) return;
-      const rect = canvas.getBoundingClientRect();
-      const curX = e.clientX - rect.left;
-      const curY = e.clientY - rect.top;
-
-      // Redraw preview with selection rectangle
-      this.drawFogPreview(canvas);
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.strokeStyle = "rgba(0, 255, 0, 0.9)";
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 3]);
-        ctx.strokeRect(startX, startY, curX - startX, curY - startY);
-        ctx.setLineDash([]);
-      }
-    };
-
-    const onMouseUp = (e: MouseEvent) => {
-      if (!drawing) return;
-      drawing = false;
-
-      const rect = canvas.getBoundingClientRect();
-      const endX = e.clientX - rect.left;
-      const endY = e.clientY - rect.top;
-
-      // Convert canvas pixels to map coordinates
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-
-      const sx = Math.min(startX, endX) * scaleX;
-      const sy = Math.min(startY, endY) * scaleY;
-      const sw = Math.abs(endX - startX) * scaleX;
-      const sh = Math.abs(endY - startY) * scaleY;
-
-      // Skip tiny drags (accidental clicks)
-      if (sw < 5 || sh < 5) return;
-
-      const region: FogRegion = {
-        x: x0 + (sx / canvas.width) * mapW,
-        y: y0 + (sy / canvas.height) * mapH,
-        w: (sw / canvas.width) * mapW,
-        h: (sh / canvas.height) * mapH,
-      };
-
-      this.fogRevealed.push(region);
-      this.plugin.broadcastFogUpdate(this.fogMapName!, this.fogRevealed);
-      this.render();
-    };
-
-    canvas.addEventListener("mousedown", onMouseDown);
-    canvas.addEventListener("mousemove", onMouseMove);
-    canvas.addEventListener("mouseup", onMouseUp);
   }
 
   // ─── Image Layers Section (merged into renderPlayerScreenSection) ──

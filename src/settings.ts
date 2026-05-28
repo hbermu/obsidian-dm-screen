@@ -8,10 +8,7 @@ export interface DmScreenSettings {
   gridOpacity: number;
   tvWidth: number;
   tvHeight: number;
-  factionZoneOpacity: number;
-  showFactionZonesByDefault: boolean;
   encounterBattlemaps: Record<string, string>; // encounter name → battlemap vault path
-  fogOfWarState: Record<string, FogRegion[]>; // map name → revealed regions
   // Persisted player screen state
   lastPlayerScreenWidth: number;
   lastPlayerScreenHeight: number;
@@ -34,13 +31,6 @@ export interface DmScreenSettings {
   ddbCobaltSession: string;
 }
 
-export interface FogRegion {
-  x: number;      // map coordinate
-  y: number;      // map coordinate
-  w: number;      // width in map coordinates
-  h: number;      // height in map coordinates
-}
-
 export const DEFAULT_SETTINGS: DmScreenSettings = {
   serverPort: 3000,
   autoStartServer: false,
@@ -48,10 +38,7 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   gridOpacity: 0.3,
   tvWidth: 1920,
   tvHeight: 1080,
-  factionZoneOpacity: 0.2,
-  showFactionZonesByDefault: true,
   encounterBattlemaps: {},
-  fogOfWarState: {},
   lastPlayerScreenWidth: 0,
   lastPlayerScreenHeight: 0,
   lastImageLayers: "[]",
@@ -160,30 +147,6 @@ export class DmScreenSettingTab extends PluginSettingTab {
             this.plugin.settings.tvHeight = parseInt(value) || 1080;
             await this.plugin.saveSettings();
           })
-      );
-
-    containerEl.createEl("h3", { text: "Faction Zones" });
-
-    new Setting(containerEl)
-      .setName("Zone Opacity")
-      .setDesc("Fill opacity of faction zone overlays (0-1)")
-      .addText((text) =>
-        text
-          .setValue(String(this.plugin.settings.factionZoneOpacity))
-          .onChange(async (value) => {
-            this.plugin.settings.factionZoneOpacity = parseFloat(value) || 0.2;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Show Faction Zones by Default")
-      .setDesc("Whether faction zones are visible when a map first loads")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.showFactionZonesByDefault).onChange(async (value) => {
-          this.plugin.settings.showFactionZonesByDefault = value;
-          await this.plugin.saveSettings();
-        })
       );
 
     containerEl.createEl("h3", { text: "Hydrus Library" });

@@ -1,21 +1,6 @@
 // Player Screen - WebSocket client and rendering logic
 // This runs in the browser on the player's TV/screen
 
-import {
-  createVoronoiFactionLayer,
-  createFactionLegend,
-  type FactionZone,
-} from "./VoronoiFactionLayer";
-
-declare const L: typeof import("leaflet");
-
-interface MapMarker {
-  name: string;
-  location: number[];
-  type: string;
-  link: string;
-}
-
 interface Combatant {
   name: string;
   hp: number;
@@ -27,25 +12,6 @@ interface Combatant {
   hidden?: boolean;
   hideHp?: boolean;
   statuses?: string[];
-}
-
-interface FogRegion {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-interface ShowMapPayload {
-  name: string;
-  image: string;
-  bounds: number[];
-  markers: MapMarker[];
-  factionZones?: FactionZone[];
-  factionZoneOpacity?: number;
-  showFactionZones?: boolean;
-  fogOfWar?: boolean;
-  fogRevealed?: FogRegion[];
 }
 
 interface ShowBattlemapPayload {
@@ -83,15 +49,8 @@ interface PlayerMessage {
 
 class PlayerScreen {
   private ws: WebSocket | null = null;
-  private map: L.Map | null = null;
-  private mode: "waiting" | "exploration" | "combat" = "waiting";
+  private mode: "waiting" | "combat" = "waiting";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private factionLayer: L.LayerGroup | null = null;
-  private factionLegend: L.Control | null = null;
-  private fogLayer: L.SVGOverlay | null = null;
-  private fogActive = false;
-  private fogBounds: number[] = [];
-  private fogRevealed: FogRegion[] = [];
 
   constructor() {
     this.connect();
@@ -163,9 +122,6 @@ class PlayerScreen {
 
   private handleMessage(msg: PlayerMessage) {
     switch (msg.type) {
-      case "show-map":
-        this.showMap(msg.payload as unknown as ShowMapPayload);
-        break;
       case "show-battlemap":
         this.showBattlemap(msg.payload as unknown as ShowBattlemapPayload);
         break;
@@ -179,7 +135,6 @@ class PlayerScreen {
         this.syncImageLayers((msg.payload as { layers: ImageLayer[] }).layers);
         break;
       case "show-video-bg": {
-        // Deprecated alias — keep handling old senders.
         const { url } = msg.payload as { url: string };
         this.showBackgroundMedia({ url, mediaType: "video", loop: true, muted: true });
         break;
@@ -194,9 +149,6 @@ class PlayerScreen {
         break;
       case "hide-background-media":
         this.hideBackgroundMedia();
-        break;
-      case "fog-update":
-        this.updateFog((msg.payload as { revealed: FogRegion[] }).revealed);
         break;
       case "viewport-update":
         this.updateViewport(msg.payload as { panX: number; panY: number; zoom: number });
@@ -213,7 +165,6 @@ class PlayerScreen {
 
   private hideAll() {
     document.getElementById("waiting-screen")!.style.display = "none";
-    document.getElementById("map-container")!.style.display = "none";
     document.getElementById("battlemap-container")!.style.display = "none";
     document.getElementById("initiative-tracker")!.style.display = "none";
   }
@@ -222,119 +173,12 @@ class PlayerScreen {
     this.mode = "waiting";
     this.hideAll();
     document.getElementById("waiting-screen")!.style.display = "flex";
-    if (this.map) {
-      this.map.remove();
-      this.map = null;
-    }
   }
 
   private setMode(mode: string) {
-    if (mode === "exploration" || mode === "combat") {
-      // Don't change display, just track mode for future pushes
-      this.mode = mode as "exploration" | "combat";
+    if (mode === "combat") {
+      this.mode = "combat";
     }
-  }
-
-  private showMap(payload: ShowMapPayload) {
-    this.hideAll();
-    this.mode = "exploration";
-
-    const container = document.getElementById("map-container")!;
-    container.style.display = "block";
-    container.innerHTML = "";
-
-    // Create map div
-    const mapDiv = document.createElement("div");
-    mapDiv.id = "leaflet-map";
-    mapDiv.style.width = "100vw";
-    mapDiv.style.height = "100vh";
-    container.appendChild(mapDiv);
-
-    // Title overlay
-    const titleEl = document.createElement("div");
-    titleEl.className = "map-title";
-    titleEl.textContent = payload.name;
-    container.appendChild(titleEl);
-
-    // Initialize Leaflet
-    if (this.map) {
-      this.map.remove();
-    }
-
-    const bounds: L.LatLngBoundsExpression = [
-      [payload.bounds[0], payload.bounds[1]],
-      [payload.bounds[2], payload.bounds[3]],
-    ];
-
-    this.map = L.map(mapDiv, {
-      crs: L.CRS.Simple,
-      minZoom: -5,
-      maxZoom: 3,
-      zoomControl: false,
-      attributionControl: false,
-    });
-
-    if (payload.image) {
-      L.imageOverlay(payload.image, bounds).addTo(this.map);
-    }
-
-    this.map.fitBounds(bounds);
-
-    // Add faction zones (rendered below markers)
-    this.factionLayer = null;
-    this.factionLegend = null;
-
-    if (payload.factionZones && payload.factionZones.length > 0) {
-      const opacity = payload.factionZoneOpacity ?? 0.2;
-      this.factionLayer = createVoronoiFactionLayer(
-        payload.factionZones,
-        payload.bounds,
-        opacity
-      );
-
-      if (this.factionLayer) {
-        const showByDefault = payload.showFactionZones !== false;
-        if (showByDefault) {
-          this.factionLayer.addTo(this.map);
-        }
-
-        // Layer control toggle
-        L.control.layers(
-          {},
-          { "Faction Zones": this.factionLayer },
-          { position: "topright", collapsed: false }
-        ).addTo(this.map);
-
-        // Legend
-        this.factionLegend = createFactionLegend(payload.factionZones);
-        this.factionLegend.addTo(this.map);
-      }
-    }
-
-    // Fog of war overlay (above factions, below markers)
-    this.fogActive = payload.fogOfWar ?? false;
-    this.fogBounds = payload.bounds;
-    this.fogRevealed = payload.fogRevealed ?? [];
-    this.fogLayer = null;
-    if (this.fogActive) {
-      this.renderFog();
-    }
-
-    // Add markers (on top of faction zones)
-    payload.markers.forEach((marker) => {
-      if (!marker.location || marker.location.length < 2) return;
-
-      const icon = L.divIcon({
-        className: `poi-marker poi-marker-${marker.type}`,
-        html: `<div class="poi-marker-inner">${this.getMarkerEmoji(marker.type)}</div><div class="poi-marker-label">${marker.name}</div>`,
-        iconSize: [40, 40],
-        iconAnchor: [20, 40],
-      });
-
-      L.marker([marker.location[0], marker.location[1]], { icon })
-        .addTo(this.map!)
-        .bindPopup(`<strong>${marker.name}</strong><br><em>${marker.type}</em>`);
-    });
   }
 
   private showBattlemap(payload: ShowBattlemapPayload) {
@@ -379,80 +223,6 @@ class PlayerScreen {
 
         this.drawGrid(canvas, displayW, displayH, imgW, imgH, payload.gridType);
       };
-    }
-  }
-
-  private renderFog() {
-    if (!this.map || !this.fogActive) return;
-
-    // Remove existing fog layer
-    if (this.fogLayer) {
-      this.map.removeLayer(this.fogLayer);
-      this.fogLayer = null;
-    }
-
-    const [y0, x0, y1, x1] = this.fogBounds;
-    const w = x1 - x0;
-    const h = y1 - y0;
-
-    // Create SVG element with fog
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("xmlns", svgNS);
-    svg.setAttribute("viewBox", `${x0} ${y0} ${w} ${h}`);
-
-    // Define clip path — fog is everywhere except revealed regions
-    const defs = document.createElementNS(svgNS, "defs");
-    const mask = document.createElementNS(svgNS, "mask");
-    mask.setAttribute("id", "fog-mask");
-
-    // White = visible fog, black = revealed (inverted for mask)
-    const maskBg = document.createElementNS(svgNS, "rect");
-    maskBg.setAttribute("x", String(x0));
-    maskBg.setAttribute("y", String(y0));
-    maskBg.setAttribute("width", String(w));
-    maskBg.setAttribute("height", String(h));
-    maskBg.setAttribute("fill", "white");
-    mask.appendChild(maskBg);
-
-    // Cut out revealed regions (black in mask = transparent)
-    for (const region of this.fogRevealed) {
-      const rect = document.createElementNS(svgNS, "rect");
-      rect.setAttribute("x", String(region.x));
-      rect.setAttribute("y", String(region.y));
-      rect.setAttribute("width", String(region.w));
-      rect.setAttribute("height", String(region.h));
-      rect.setAttribute("fill", "black");
-      rect.setAttribute("rx", "2");
-      mask.appendChild(rect);
-    }
-
-    defs.appendChild(mask);
-    svg.appendChild(defs);
-
-    // Fog rectangle with mask applied
-    const fogRect = document.createElementNS(svgNS, "rect");
-    fogRect.setAttribute("x", String(x0));
-    fogRect.setAttribute("y", String(y0));
-    fogRect.setAttribute("width", String(w));
-    fogRect.setAttribute("height", String(h));
-    fogRect.setAttribute("fill", "black");
-    fogRect.setAttribute("mask", "url(#fog-mask)");
-    svg.appendChild(fogRect);
-
-    const svgBounds: L.LatLngBoundsExpression = [[y0, x0], [y1, x1]];
-    this.fogLayer = L.svgOverlay(svg, svgBounds, { interactive: false, pane: "overlayPane" });
-    this.fogLayer.addTo(this.map);
-
-    // Ensure fog is on top of other overlays
-    const el = this.fogLayer.getElement();
-    if (el) el.style.zIndex = "1000";
-  }
-
-  private updateFog(revealed: FogRegion[]) {
-    this.fogRevealed = revealed;
-    if (this.fogActive) {
-      this.renderFog();
     }
   }
 
@@ -702,19 +472,6 @@ class PlayerScreen {
     if (container) container.innerHTML = "";
   }
 
-  private getMarkerEmoji(type: string): string {
-    const map: Record<string, string> = {
-      city: "\u{1F3F0}",
-      town: "\u{1F3D8}",
-      village: "\u{1F3E0}",
-      building: "\u{1F3DB}",
-      dungeon: "\u{1F573}",
-      npc: "\u{1F9D9}",
-      quest: "\u{2757}",
-      poi: "\u{1F4CD}",
-    };
-    return map[type] || "\u{1F4CD}";
-  }
 }
 
 // Initialize

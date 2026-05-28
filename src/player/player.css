@@ -54,57 +54,6 @@ body {
   50% { opacity: 1; transform: scale(1.2); }
 }
 
-/* Map Container */
-#map-container {
-  width: 100vw;
-  height: 100vh;
-  position: relative;
-}
-
-#leaflet-map {
-  width: 100%;
-  height: 100%;
-  background: #1a1a2e;
-}
-
-.map-title {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.7);
-  color: #c9aa71;
-  padding: 10px 30px;
-  border-radius: 8px;
-  font-size: 1.5rem;
-  font-weight: bold;
-  z-index: 1000;
-  pointer-events: none;
-  border: 1px solid rgba(201, 170, 113, 0.3);
-}
-
-/* POI Markers */
-.poi-marker {
-  background: none;
-  border: none;
-}
-
-.poi-marker-inner {
-  font-size: 24px;
-  text-align: center;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
-}
-
-.poi-marker-label {
-  text-align: center;
-  color: #fff;
-  font-size: 11px;
-  font-weight: bold;
-  text-shadow: 0 0 4px #000, 0 0 8px #000;
-  white-space: nowrap;
-  margin-top: 2px;
-}
-
 /* Battlemap Container */
 #battlemap-container {
   width: 100vw;
@@ -261,77 +210,6 @@ body {
   padding: 1px 5px;
   border-radius: 4px;
   white-space: nowrap;
-}
-
-/* Faction Zone Legend */
-.faction-legend {
-  background: rgba(10, 10, 10, 0.85);
-  border: 1px solid rgba(201, 170, 113, 0.3);
-  border-radius: 8px;
-  padding: 12px 16px;
-  backdrop-filter: blur(10px);
-}
-
-.faction-legend-title {
-  color: #c9aa71;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid rgba(201, 170, 113, 0.2);
-  padding-bottom: 6px;
-}
-
-.faction-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0;
-  font-size: 0.85rem;
-  color: #e0e0e0;
-}
-
-.faction-legend-swatch {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.faction-legend-label {
-  white-space: nowrap;
-}
-
-/* Dark theme for Leaflet layer control */
-.leaflet-control-layers {
-  background: rgba(10, 10, 10, 0.85) !important;
-  border: 1px solid rgba(201, 170, 113, 0.3) !important;
-  border-radius: 8px !important;
-  color: #e0e0e0 !important;
-  backdrop-filter: blur(10px);
-}
-
-.leaflet-control-layers label {
-  color: #e0e0e0;
-  font-size: 0.85rem;
-}
-
-/* Leaflet popup styling */
-.leaflet-popup-content-wrapper {
-  background: rgba(20, 20, 30, 0.95);
-  color: #e0e0e0;
-  border: 1px solid rgba(201, 170, 113, 0.3);
-  border-radius: 8px;
-}
-
-.leaflet-popup-tip {
-  background: rgba(20, 20, 30, 0.95);
-}
-
-.leaflet-popup-content strong {
-  color: #c9aa71;
 }
 
 /* Background media (video or image) */

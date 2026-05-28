@@ -199,8 +199,6 @@ export class PlayerScreenServer {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DM Screen - Player View</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="/player.css">
 </head>
 <body>
@@ -210,7 +208,6 @@ export class PlayerScreenServer {
       <p>Waiting for DM to push content...</p>
       <div class="pulse-dot"></div>
     </div>
-    <div id="map-container" style="display:none;"></div>
     <div id="battlemap-container" style="display:none;">
       <canvas id="grid-overlay"></canvas>
       <img id="battlemap-image" />

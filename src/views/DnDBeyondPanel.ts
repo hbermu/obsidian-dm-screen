@@ -21,6 +21,7 @@ export class DnDBeyondPanel {
   setContainer(el: HTMLElement): void {
     this.container = el;
     this.render();
+    this.loadEncounters().then(() => this.render());
   }
 
   async initialize(): Promise<void> {
