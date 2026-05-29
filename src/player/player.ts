@@ -51,10 +51,16 @@ class PlayerScreen {
   private ws: WebSocket | null = null;
   private mode: "waiting" | "combat" = "waiting";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastImageLayers: ImageLayer[] = [];
 
   constructor() {
     this.connect();
-    window.addEventListener("resize", () => this.sendClientInfo());
+    window.addEventListener("resize", () => {
+      this.sendClientInfo();
+      if (this.lastImageLayers.length > 0) {
+        this.syncImageLayers(this.lastImageLayers);
+      }
+    });
     this.initFullscreenButton();
   }
 
@@ -364,6 +370,7 @@ class PlayerScreen {
   }
 
   private syncImageLayers(layers: ImageLayer[]) {
+    this.lastImageLayers = layers;
     const container = document.getElementById("image-layers-container")!;
 
     // Create or reuse inner div for pan/zoom
@@ -468,6 +475,7 @@ class PlayerScreen {
   }
 
   private clearImageLayers() {
+    this.lastImageLayers = [];
     const container = document.getElementById("image-layers-container");
     if (container) container.innerHTML = "";
   }
