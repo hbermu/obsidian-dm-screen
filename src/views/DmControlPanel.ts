@@ -552,7 +552,7 @@ export class DmControlPanel extends ItemView {
         const row = list.createDiv("dm-layer-row");
         if (!layer.visible) row.addClass("dm-layer-hidden");
 
-        // Left column: vis + fog stacked
+        // Left column: eye on top (full width), fog + border side-by-side below
         const leftCol = row.createDiv("dm-layer-left-col");
 
         const visBtn = leftCol.createEl("button", {
@@ -565,7 +565,9 @@ export class DmControlPanel extends ItemView {
           this.render();
         });
 
-        const fogBtn = leftCol.createEl("button", {
+        const bottomRow = leftCol.createDiv("dm-layer-left-bottom");
+
+        const fogBtn = bottomRow.createEl("button", {
           cls: `dm-layer-btn dm-fog-toggle ${layer.fogEnabled ? "dm-fog-active" : ""}`,
         });
         fogBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="${layer.fogEnabled ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>`;
@@ -586,7 +588,7 @@ export class DmControlPanel extends ItemView {
         });
 
         const bordered = layer.bordered !== false;
-        const borderBtn = leftCol.createEl("button", {
+        const borderBtn = bottomRow.createEl("button", {
           cls: `dm-layer-btn dm-border-toggle ${bordered ? "dm-border-active" : ""}`,
         });
         borderBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${bordered ? "2.5" : "1.5"}"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>`;
@@ -1211,7 +1213,7 @@ export class DmControlPanel extends ItemView {
         const row = list.createDiv("dm-layer-row");
         if (!layer.visible) row.addClass("dm-layer-hidden");
 
-        // Left column: vis stacked
+        // Left column: eye on top (full width), border below
         const leftCol = row.createDiv("dm-layer-left-col");
 
         const visBtn = leftCol.createEl("button", {

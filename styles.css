@@ -735,8 +735,9 @@
 
 .dm-layer-vis-toggle {
   font-size: 0.8em !important;
-  padding: 1px 3px !important;
+  padding: 3px 4px !important;
   border: none !important;
+  width: 100%;
 }
 
 .dm-layer-vis-on {
@@ -745,6 +746,11 @@
 
 .dm-layer-vis-off {
   opacity: 0.4;
+}
+
+.dm-layer-left-bottom {
+  display: flex;
+  gap: 2px;
 }
 
 /* ─── Preview Pan/Zoom ─── */
