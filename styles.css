@@ -778,6 +778,12 @@
   padding: 4px 0;
 }
 
+.dm-preview-view-controls .dm-layer-btn {
+  width: auto;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
 .dm-zoom-label {
   font-size: 0.8em;
   color: var(--text-muted);
