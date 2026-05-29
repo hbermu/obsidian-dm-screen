@@ -251,6 +251,11 @@ body {
   box-sizing: border-box;
 }
 
+#image-layers-inner > div > img.no-border:first-child {
+  border: none;
+  border-radius: 0;
+}
+
 #image-layers-container img {
   pointer-events: none;
 }

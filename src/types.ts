@@ -103,6 +103,7 @@ export interface ImageLayer {
   visible: boolean;
   fogEnabled: boolean;
   fogDataUrl: string; // data URL of the fog canvas (black = fogged, transparent = revealed)
+  bordered: boolean;
 }
 
 // Window API augmentations

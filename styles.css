@@ -841,6 +841,16 @@
   background: var(--background-modifier-hover);
 }
 
+.dm-border-toggle {
+  padding: 2px 4px;
+  opacity: 0.5;
+}
+
+.dm-border-toggle.dm-border-active {
+  opacity: 1;
+  color: #c9aa71;
+}
+
 .dm-fog-editor {
   margin: 4px 0 8px 0;
   padding: 8px;

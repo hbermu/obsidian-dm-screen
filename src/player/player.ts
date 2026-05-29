@@ -40,6 +40,7 @@ interface ImageLayer {
   visible: boolean;
   fogEnabled: boolean;
   fogDataUrl: string;
+  bordered?: boolean;
 }
 
 interface PlayerMessage {
@@ -413,6 +414,9 @@ class PlayerScreen {
       img.style.height = "100%";
       img.style.objectFit = "contain";
       img.style.display = "block";
+      if (layer.bordered === false) {
+        img.classList.add("no-border");
+      }
       wrapper.appendChild(img);
 
       // Fog overlay
