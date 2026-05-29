@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { resolve } from "path";
 
 export default defineConfig({
   test: {
@@ -11,8 +12,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      obsidian: new URL("./test/stubs/obsidian.ts", import.meta.url).pathname,
-      "player-screen-bundle": new URL("./test/stubs/player-screen-bundle.ts", import.meta.url).pathname,
+      obsidian: resolve(__dirname, "test/stubs/obsidian.ts"),
+      "player-screen-bundle": resolve(__dirname, "test/stubs/player-screen-bundle.ts"),
     },
   },
 });
