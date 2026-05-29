@@ -784,6 +784,12 @@
   min-width: 40px;
 }
 
+.dm-zoom-slider {
+  flex: 1;
+  height: 4px;
+  cursor: pointer;
+}
+
 .dm-layer-fog-overlay {
   position: absolute;
   top: 0;

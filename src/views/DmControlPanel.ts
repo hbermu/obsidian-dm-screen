@@ -524,13 +524,21 @@ export class DmControlPanel extends ItemView {
     // Pan/zoom via scroll wheel on preview
     this.setupPreviewPanZoom(previewArea, previewInner);
 
-    // DM view controls (only show when zoomed/panned)
-    if (this.dmZoom !== 1 || this.dmPanX !== 0 || this.dmPanY !== 0) {
-      const viewControls = section.createDiv("dm-preview-view-controls");
-      viewControls.createSpan({ text: `${Math.round(this.dmZoom * 100)}%`, cls: "dm-zoom-label" });
-      const resetBtn = viewControls.createEl("button", { text: "Reset View", cls: "dm-layer-btn" });
-      resetBtn.addEventListener("click", () => this.resetDmView());
-    }
+    // DM view controls (always visible)
+    const viewControls = section.createDiv("dm-preview-view-controls");
+    const zoomLabel = viewControls.createSpan({ text: `${Math.round(this.dmZoom * 100)}%`, cls: "dm-zoom-label" });
+    const zoomSlider = viewControls.createEl("input", { cls: "dm-zoom-slider" });
+    zoomSlider.type = "range";
+    zoomSlider.min = "10";
+    zoomSlider.max = "500";
+    zoomSlider.value = String(Math.round(this.dmZoom * 100));
+    zoomSlider.addEventListener("input", () => {
+      this.dmZoom = parseInt(zoomSlider.value) / 100;
+      zoomLabel.textContent = `${zoomSlider.value}%`;
+      previewInner.style.transform = `translate(${this.dmPanX}%, ${this.dmPanY}%) scale(${this.dmZoom})`;
+    });
+    const resetBtn = viewControls.createEl("button", { text: "Reset View", cls: "dm-layer-btn" });
+    resetBtn.addEventListener("click", () => this.resetDmView());
 
     // ── Layer list ──
     if (this.imageLayers.length > 0) {
@@ -1690,8 +1698,8 @@ export class DmControlPanel extends ItemView {
 
   private resetDmView() {
     this.dmZoom = 1;
-    this.dmPanX = this.playerPanX;
-    this.dmPanY = this.playerPanY;
+    this.dmPanX = 0;
+    this.dmPanY = 0;
     this.render();
   }
 

@@ -409,8 +409,8 @@ class PlayerScreen {
 
       const img = document.createElement("img");
       img.src = layer.dataUrl;
-      img.style.maxWidth = "100%";
-      img.style.maxHeight = "100%";
+      img.style.width = "100%";
+      img.style.height = "100%";
       img.style.objectFit = "contain";
       img.style.display = "block";
       wrapper.appendChild(img);
