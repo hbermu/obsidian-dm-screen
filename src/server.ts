@@ -1,6 +1,7 @@
 import { createServer, IncomingMessage, ServerResponse, Server } from "http";
 import { TFile } from "obsidian";
 import type DmScreenPlugin from "./main";
+import { debug, debugWarn, debugError } from "./debug";
 
 // Player screen HTML/CSS/JS are inlined at build time
 declare const PLAYER_HTML: string;
@@ -66,7 +67,7 @@ export class PlayerScreenServer {
           return;
         }
         this.clients.add(ws);
-        console.log(`[DM Screen] Player connected. Total: ${this.clients.size}`);
+        debug("WS client connected. Total:", this.clients.size);
         if (this.onClientCountChanged) this.onClientCountChanged();
 
         // Replay last state to late-joining client
@@ -77,7 +78,7 @@ export class PlayerScreenServer {
         ws.on("close", () => {
           this.clients.delete(ws);
           this.clientInfoMap.delete(ws);
-          console.log(`[DM Screen] Player disconnected. Total: ${this.clients.size}`);
+          debug("WS client disconnected. Total:", this.clients.size);
           if (this.onClientCountChanged) this.onClientCountChanged();
         });
 
@@ -85,25 +86,29 @@ export class PlayerScreenServer {
           try {
             const msg = JSON.parse(String(data));
             if (msg.type === "client-info") {
+              debug("WS client-info received:", msg.payload);
               this.clientInfoMap.set(ws, msg.payload);
               if (this.onClientInfo) this.onClientInfo(msg.payload);
+            } else {
+              debug("WS message from player:", msg.type);
             }
           } catch (e) {
-            console.log("[DM Screen] Message from player:", data);
+            debugWarn("WS unparseable message from player:", data);
           }
         });
       });
     } catch (e) {
-      console.error("[DM Screen] Failed to create WebSocket server:", e);
+      debugError("Failed to create WebSocket server:", e);
     }
 
     this.httpServer.listen(port, "0.0.0.0", () => {
-      console.log(`[DM Screen] Player Screen server running on port ${port}`);
+      debug("Player Screen server listening on port", port);
     });
   }
 
   stop() {
     if (this.httpServer) {
+      debug("Server stopping. Disconnecting", this.clients.size, "client(s)");
       for (const client of this.clients) {
         client.close();
       }
@@ -115,8 +120,8 @@ export class PlayerScreenServer {
 
   broadcast(message: PlayerMessage) {
     const data = JSON.stringify(message);
+    debug("broadcast:", message.type, "→", this.clients.size, "client(s)", `(${data.length} bytes)`);
 
-    // Cache state per message type for late-joining clients
     if (message.type === "clear") {
       this.lastState.clear();
     } else {
@@ -159,9 +164,8 @@ export class PlayerScreenServer {
   private async serveVaultFile(vaultPath: string, res: ServerResponse) {
     try {
       const decodedPath = decodeURIComponent(vaultPath);
-      // Guard against path traversal — paths are vault-relative, never absolute,
-      // never escape the vault root.
       if (decodedPath.includes("..") || decodedPath.startsWith("/")) {
+        debugWarn("serveVaultFile: rejected path traversal attempt:", decodedPath);
         res.writeHead(400);
         res.end("Bad path");
         return;
@@ -169,6 +173,7 @@ export class PlayerScreenServer {
 
       const data = await readVaultBytes(this.plugin.app, decodedPath);
       if (!data) {
+        debug("serveVaultFile: 404 for", decodedPath);
         res.writeHead(404);
         res.end("Not found");
         return;
@@ -184,6 +189,7 @@ export class PlayerScreenServer {
         gif: "image/gif",
       };
       const mime = mimeMap[ext] || "application/octet-stream";
+      debug("serveVaultFile:", decodedPath, `(${mime}, ${data.byteLength} bytes)`);
       res.writeHead(200, {
         "Content-Type": mime,
         "Content-Length": data.byteLength,
@@ -191,7 +197,7 @@ export class PlayerScreenServer {
       });
       res.end(Buffer.from(data));
     } catch (e) {
-      console.error("[DM Screen] serveVaultFile failed:", e);
+      debugError("serveVaultFile failed:", vaultPath, e);
       res.writeHead(500);
       res.end("Server error");
     }

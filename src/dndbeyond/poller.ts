@@ -1,5 +1,6 @@
 import type { DdbClient } from "./client";
 import type { DdbEncounter, DdbCharacterSummary } from "./types";
+import { debug, debugWarn } from "../debug";
 
 export interface DdbPolledState {
   encounter: DdbEncounter;
@@ -25,12 +26,14 @@ export class DdbEncounterPoller {
 
   start(): void {
     if (this.running) return;
+    debug("DDB Poller: starting for encounter", this.encounterId);
     this.running = true;
     this.consecutiveFailures = 0;
     this.schedulePoll(0);
   }
 
   stop(): void {
+    debug("DDB Poller: stopping");
     this.running = false;
     if (this.timer) {
       clearTimeout(this.timer);
@@ -51,6 +54,7 @@ export class DdbEncounterPoller {
       const encounter = await this.client.getEncounter(this.encounterId);
       const characters = new Map<number, DdbCharacterSummary>();
       const players = encounter.players ?? [];
+      debug("DDB Poller: fetched encounter. Players:", players.length, "Monsters:", encounter.monsters.length);
 
       for (const player of players) {
         if (!this.running) return;
@@ -59,8 +63,8 @@ export class DdbEncounterPoller {
         try {
           const char = await this.client.getCharacter(player.id);
           characters.set(player.id, char);
-        } catch {
-          // Individual character fetch failure is non-fatal
+        } catch (e) {
+          debugWarn("DDB Poller: character fetch failed for player", player.id, (e as Error).message);
         }
       }
 
@@ -68,9 +72,11 @@ export class DdbEncounterPoller {
       this.onUpdate({ encounter, characters });
     } catch (e) {
       this.consecutiveFailures++;
+      debugWarn("DDB Poller: poll failed (", this.consecutiveFailures, "/", CIRCUIT_BREAKER_THRESHOLD, "):", (e as Error).message);
       if (this.onError) this.onError(e instanceof Error ? e : new Error(String(e)));
 
       if (this.consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+        debug("DDB Poller: circuit breaker open, pausing", CIRCUIT_BREAKER_PAUSE_MS, "ms");
         this.schedulePoll(CIRCUIT_BREAKER_PAUSE_MS);
         return;
       }

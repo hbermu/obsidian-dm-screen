@@ -3,7 +3,7 @@ import type DmScreenPlugin from "../main";
 import { DdbClient } from "../dndbeyond/client";
 import { DdbEncounterPoller, type DdbPolledState } from "../dndbeyond/poller";
 import { DdbImageCache } from "../dndbeyond/imageCache";
-import { debug } from "../debug";
+import { debug, debugWarn } from "../debug";
 import type { VaultAdapterLike } from "../hydrus/cache";
 import type { DdbEncounter } from "../dndbeyond/types";
 
@@ -220,7 +220,7 @@ export class DnDBeyondPanel {
   }
 
   private onPollError(err: Error): void {
-    console.warn("[DDB Poller]", err.message);
+    debugWarn("DDB Poller error:", err.message);
   }
 
   private broadcastToPlayerScreen(state: DdbPolledState): void {
@@ -316,7 +316,7 @@ export class DnDBeyondPanel {
         }
       }
     } catch (e) {
-      console.warn("[DDB] Failed to load monster images:", (e as Error).message);
+      debugWarn("DDB: failed to load monster images:", (e as Error).message);
     }
   }
 }

@@ -1,5 +1,6 @@
 import { requestUrl } from "obsidian";
 import type { RequestUrlResponse } from "obsidian";
+import { debug, debugError } from "../debug";
 
 export interface HydrusClientOptions {
   baseUrl: string;
@@ -63,6 +64,7 @@ export class HydrusClient {
   }
 
   async verifyAccess(): Promise<HydrusAccessInfo> {
+    debug("Hydrus: verifyAccess");
     const res = await this.get("/verify_access_key");
     return res.json as HydrusAccessInfo;
   }
@@ -95,6 +97,7 @@ export class HydrusClient {
 
   async searchFiles(tags: string[], limit?: number): Promise<{ hashes: string[] }> {
     const effective = limit && limit > 0 ? [...tags, `system:limit=${limit}`] : tags;
+    debug("Hydrus: searchFiles tags=", effective);
     const qs = new URLSearchParams({
       tags: JSON.stringify(effective),
       return_hashes: "true",
@@ -102,6 +105,7 @@ export class HydrusClient {
     });
     const res = await this.get(`/get_files/search_files?${qs.toString()}`);
     const body = res.json as { hashes?: string[] };
+    debug("Hydrus: searchFiles returned", body.hashes?.length ?? 0, "hashes");
     return { hashes: body.hashes ?? [] };
   }
 
@@ -120,6 +124,7 @@ export class HydrusClient {
 
   async getFileMetadata(hashes: string[], tagService?: string): Promise<HydrusFile[]> {
     if (hashes.length === 0) return [];
+    debug("Hydrus: getFileMetadata for", hashes.length, "hashes");
     const qs = new URLSearchParams({
       hashes: JSON.stringify(hashes),
       include_mimes: "true",
@@ -129,7 +134,7 @@ export class HydrusClient {
     });
     const res = await this.get(`/get_files/file_metadata?${qs.toString()}`);
     const body = res.json as { metadata?: HydrusMetadataRow[] };
-    return (body.metadata ?? []).map((row) => ({
+    const files = (body.metadata ?? []).map((row) => ({
       hash: row.hash,
       mime: row.mime ?? "application/octet-stream",
       ext: row.ext?.replace(/^\./, "") || extFromMime(row.mime ?? ""),
@@ -138,6 +143,8 @@ export class HydrusClient {
       size: row.size ?? 0,
       knownTags: extractKnownTags(row, tagService),
     }));
+    debug("Hydrus: getFileMetadata returned", files.length, "files");
+    return files;
   }
 
   async getFileBytes(hash: string): Promise<ArrayBuffer> {
@@ -163,6 +170,7 @@ export class HydrusClient {
     });
     if (res.status < 200 || res.status >= 300) {
       const detail = res.text?.slice(0, 200) ?? "";
+      debugError("Hydrus HTTP error:", res.status, path, detail);
       throw new Error(`Hydrus ${res.status} on ${path}: ${detail}`);
     }
     return res;

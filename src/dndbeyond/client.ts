@@ -1,5 +1,5 @@
 import { requestUrl } from "obsidian";
-import { debug } from "../debug";
+import { debug, debugWarn, debugError } from "../debug";
 import type {
   DdbCobaltTokenResponse,
   DdbEncounterSummary,
@@ -21,22 +21,27 @@ export class DdbClient {
   }
 
   async validateSession(): Promise<boolean> {
+    debug("DDB: validateSession");
     try {
       await this.refreshToken();
       return true;
-    } catch {
+    } catch (e) {
+      debugWarn("DDB: session validation failed:", (e as Error).message);
       return false;
     }
   }
 
   async getEncounters(): Promise<DdbEncounter[]> {
+    debug("DDB: getEncounters");
     const res = await this.authedGet(`${ENCOUNTER_URL}?skip=0&take=100`);
     const body = res.json as { data?: Record<string, unknown>[] } | Record<string, unknown>[];
     const raw = Array.isArray(body) ? body : (body.data ?? []);
+    debug("DDB: getEncounters returned", raw.length, "encounter(s)");
     return raw.map((e) => this.parseEncounter(e));
   }
 
   async getEncounter(id: string): Promise<DdbEncounter> {
+    debug("DDB: getEncounter", id);
     const res = await this.authedGet(`${ENCOUNTER_URL}/${id}`);
     const body = res.json as Record<string, unknown>;
     const enc = body.data ? (body.data as Record<string, unknown>) : body;
@@ -112,6 +117,7 @@ export class DdbClient {
   }
 
   async getCharacter(characterId: number): Promise<DdbCharacterSummary> {
+    debug("DDB: getCharacter", characterId);
     const res = await this.authedGet(`${CHARACTER_URL}/${characterId}`);
     const body = res.json as { data?: Record<string, unknown> };
     const data = body.data ?? (body as unknown as Record<string, unknown>);
@@ -207,6 +213,7 @@ export class DdbClient {
   }
 
   private async refreshToken(): Promise<void> {
+    debug("DDB: refreshing cobalt token");
     const res = await requestUrl({
       url: AUTH_URL,
       method: "POST",
@@ -220,12 +227,14 @@ export class DdbClient {
     if (res.status < 200 || res.status >= 300) {
       this.token = null;
       this.tokenExpiry = 0;
+      debugError("DDB: auth failed with status", res.status);
       throw new Error(`DDB auth failed (${res.status})`);
     }
     const data = res.json as DdbCobaltTokenResponse;
     if (!data.token) throw new Error("DDB auth response missing token");
     this.token = data.token;
     this.tokenExpiry = Date.now() + data.ttl * 1000;
+    debug("DDB: token refreshed, expires in", data.ttl, "seconds");
   }
 
   private async authedGet(url: string) {
@@ -242,9 +251,11 @@ export class DdbClient {
     if (res.status === 401) {
       this.token = null;
       this.tokenExpiry = 0;
+      debugWarn("DDB: 401 — session expired for", url);
       throw new Error("DDB session expired");
     }
     if (res.status < 200 || res.status >= 300) {
+      debugError("DDB: HTTP", res.status, "for", url);
       throw new Error(`DDB request failed (${res.status}): ${url}`);
     }
     return res;

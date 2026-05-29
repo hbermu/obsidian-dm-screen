@@ -12,7 +12,7 @@ import { HydrusCache } from "./hydrus/cache";
 import type { VaultAdapterLike } from "./hydrus/cache";
 import { HydrusClient } from "./hydrus/client";
 import { DdbImageCache } from "./dndbeyond/imageCache";
-import { initDebug, debug } from "./debug";
+import { initDebug, debug, debugWarn, debugError } from "./debug";
 
 export default class DmScreenPlugin extends Plugin {
   settings: DmScreenSettings = DEFAULT_SETTINGS;
@@ -27,13 +27,17 @@ export default class DmScreenPlugin extends Plugin {
     return leaves[0].view as DmControlPanel;
   }
 
-  /** Build a HydrusClient from current settings. Returns null when not configured. */
   buildHydrusClient(): HydrusClient | null {
     const { hydrusEnabled, hydrusApiUrl, hydrusApiKey } = this.settings;
-    if (!hydrusEnabled || !hydrusApiUrl || !hydrusApiKey) return null;
+    if (!hydrusEnabled || !hydrusApiUrl || !hydrusApiKey) {
+      debug("buildHydrusClient: skipped (enabled=", hydrusEnabled, "url=", !!hydrusApiUrl, "key=", !!hydrusApiKey, ")");
+      return null;
+    }
     try {
+      debug("buildHydrusClient: creating client for", hydrusApiUrl);
       return new HydrusClient({ baseUrl: hydrusApiUrl, apiKey: hydrusApiKey });
-    } catch {
+    } catch (e) {
+      debugWarn("buildHydrusClient: constructor failed:", e);
       return null;
     }
   }
@@ -41,6 +45,7 @@ export default class DmScreenPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     initDebug(this.settings);
+    debug("Plugin loading. Version:", this.manifest?.version ?? "unknown");
     this.initHydrusCache();
 
     // Register views
@@ -69,8 +74,8 @@ export default class DmScreenPlugin extends Plugin {
     // Settings tab
     this.addSettingTab(new DmScreenSettingTab(this.app, this));
 
-    // Start server if auto-start is enabled
     if (this.settings.autoStartServer) {
+      debug("Auto-starting server on port", this.settings.serverPort);
       this.startServer();
     }
 
@@ -101,6 +106,7 @@ export default class DmScreenPlugin extends Plugin {
   }
 
   async onunload() {
+    debug("Plugin unloading");
     this.stopServer();
     if (this.hydrusSweepInterval !== null) {
       window.clearInterval(this.hydrusSweepInterval);
@@ -119,14 +125,16 @@ export default class DmScreenPlugin extends Plugin {
   }
 
   private initHydrusCache() {
+    debug("initHydrusCache: folder=", this.settings.hydrusCacheFolder, "ttl=", this.settings.hydrusCacheTtlDays, "days");
     this.hydrusCache = new HydrusCache(this.app, {
       folder: this.settings.hydrusCacheFolder,
       ttlDays: this.settings.hydrusCacheTtlDays,
     });
     if (this.settings.hydrusEnabled) {
-      // Don't await — startup must not block on a sweep.
-      void this.hydrusCache.sweep().catch((e) =>
-        console.error("[DM Screen] Hydrus cache sweep failed:", e)
+      void this.hydrusCache.sweep().then((n) => {
+        if (n > 0) debug("Hydrus cache sweep removed", n, "stale entries");
+      }).catch((e) =>
+        debugError("Hydrus cache sweep failed:", e)
       );
       if (this.hydrusSweepInterval === null) {
         this.hydrusSweepInterval = window.setInterval(() => {
@@ -135,7 +143,6 @@ export default class DmScreenPlugin extends Plugin {
       }
     }
 
-    // Sweep stale DDB monster images
     const imgCacheFolder = this.settings.hydrusCacheFolder.replace(/\/bg\/?$/, "") || ".dm-screen";
     const imgCache = new DdbImageCache(
       imgCacheFolder,
@@ -143,12 +150,13 @@ export default class DmScreenPlugin extends Plugin {
       this.settings.hydrusCacheTtlDays
     );
     void imgCache.sweep().then((n) => {
-      if (n > 0) console.log(`[DM Screen] Swept ${n} stale monster image(s)`);
+      if (n > 0) debug("DDB image cache sweep removed", n, "stale image(s)");
     }).catch(() => {});
   }
 
   startServer() {
     if (this.server) return;
+    debug("startServer: port=", this.settings.serverPort, "maxClients=", this.settings.maxClients);
     this.server = new PlayerScreenServer(this);
     this.server.maxClients = this.settings.maxClients;
     this.server.onClientInfo = (info) => this.onPlayerClientInfo(info);
@@ -178,6 +186,7 @@ export default class DmScreenPlugin extends Plugin {
 
   stopServer() {
     if (this.server) {
+      debug("stopServer");
       this.server.stop();
       this.server = null;
       new Notice("Player Screen server stopped");
@@ -252,8 +261,8 @@ export default class DmScreenPlugin extends Plugin {
     hidden?: boolean; statuses?: string[];
   }>, round?: number) {
     if (!this.server) return;
-    // Filter hidden creatures from player screen
     const visible = combatants.filter(c => !c.hidden);
+    debug("sendInitiativeUpdate: round=", round ?? 0, "total=", combatants.length, "visible=", visible.length);
     this.server.broadcast({
       type: "initiative-update",
       payload: { combatants: visible, round: round ?? 0 },
@@ -263,7 +272,7 @@ export default class DmScreenPlugin extends Plugin {
   // ─── Initiative Tracker Plugin Integration ──────────────────────────
 
   private onInitiativeStateChange(state: InitiativeViewState) {
-    // Resolve statblocks and build TrackerCombatant list
+    debug("onInitiativeStateChange: encounter=", state.name || "(unnamed)", "round=", state.round, "creatures=", state.creatures.length);
     const combatants: TrackerCombatant[] = state.creatures.map(c => {
       const baseName = (c.name || "").replace(/\s+\d+$/, ""); // "Goblin 1" → "Goblin"
       const statblock = this.lookupStatblock(c.display || c.name || "", baseName);
@@ -286,10 +295,10 @@ export default class DmScreenPlugin extends Plugin {
       };
     });
 
-    // Auto-push battlemap if mapped for this encounter
     if (state.name && state.round <= 1) {
       const battlemapPath = this.settings.encounterBattlemaps[state.name];
       if (battlemapPath && this.server) {
+        debug("Auto-pushing battlemap for encounter:", state.name, "→", battlemapPath);
         this.imageToDataUrl(battlemapPath).then(dataUrl => {
           if (dataUrl && this.server) {
             // Add to DM panel image layers
@@ -329,6 +338,7 @@ export default class DmScreenPlugin extends Plugin {
   }
 
   private onInitiativeStop() {
+    debug("onInitiativeStop: disconnecting from tracker");
     const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
     for (const leaf of leaves) {
       const view = leaf.view as DmControlPanel;
@@ -341,7 +351,6 @@ export default class DmScreenPlugin extends Plugin {
   private statblockCache = new Map<string, import("./types").StatblockCreature | null>();
 
   private lookupStatblock(name: string, baseName: string): import("./types").StatblockCreature | null {
-    // Check cache first
     const cacheKey = name;
     if (this.statblockCache.has(cacheKey)) {
       return this.statblockCache.get(cacheKey)!;
@@ -349,17 +358,19 @@ export default class DmScreenPlugin extends Plugin {
 
     const fsApi = window.FantasyStatblocks;
     if (!fsApi) {
+      debug("lookupStatblock: FantasyStatblocks API not available");
       this.statblockCache.set(cacheKey, null);
       return null;
     }
 
-    // Try exact name, then base name (without trailing number)
     let creature = fsApi.getCreatureFromBestiary(name) ?? undefined;
     if (!creature && baseName !== name) {
+      debug("lookupStatblock: exact miss for", name, "→ trying baseName:", baseName);
       creature = fsApi.getCreatureFromBestiary(baseName);
     }
 
     const result = creature ?? null;
+    debug("lookupStatblock:", name, result ? "→ found" : "→ not found");
     this.statblockCache.set(cacheKey, result);
     return result;
   }

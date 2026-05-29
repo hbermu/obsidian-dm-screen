@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
 import type { HydrusClient, HydrusFile } from "./client";
+import { debug } from "../debug";
 
 export interface CachedEntry {
   hash: string;
@@ -83,9 +84,11 @@ export class HydrusCache {
   ): Promise<{ entry: CachedEntry; isFresh: boolean }> {
     const existing = await this.get(file.hash);
     if (existing && (await this.adapter.exists(existing.vaultPath))) {
+      debug("HydrusCache: hit for", file.hash.slice(0, 12));
       return { entry: existing, isFresh: false };
     }
 
+    debug("HydrusCache: downloading", file.hash.slice(0, 12), file.mime, file.size, "bytes");
     await this.ensureFolder();
     const { vaultPath, thumbVaultPath } = this.paths(file.hash, file.ext);
 
@@ -143,6 +146,7 @@ export class HydrusCache {
     const stale = Object.values(index.entries).filter(
       (entry) => entry.lastUsedAt > 0 && entry.lastUsedAt < cutoff
     );
+    debug("HydrusCache: sweep — total entries:", Object.keys(index.entries).length, "stale:", stale.length);
     for (const entry of stale) {
       await this.removeIfPresent(entry.vaultPath);
       if (entry.thumbVaultPath) await this.removeIfPresent(entry.thumbVaultPath);

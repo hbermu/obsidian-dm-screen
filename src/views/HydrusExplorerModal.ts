@@ -5,6 +5,7 @@ import type { CachedEntry, HydrusCache } from "../hydrus/cache";
 import { paginate } from "../hydrus/pagination";
 import { filterTags } from "../hydrus/tagFilter";
 import { TagSuggester } from "./HydrusTagSuggester";
+import { debug, debugWarn } from "../debug";
 
 interface RemoteTile {
   kind: "remote";
@@ -422,7 +423,7 @@ export class HydrusExplorerModal extends Modal {
         img.src = arrayBufferToDataUrl(buf, "image/jpeg");
       }
     } catch (err) {
-      console.warn("[Hydrus] thumbnail load failed for", tile.hash, err);
+      debugWarn("Hydrus Explorer: thumbnail load failed for", tile.hash, err);
     }
   }
 

@@ -38,6 +38,8 @@ vi.mock("../views/EncounterBattlemapPanel", () => ({
 vi.mock("../debug", () => ({
   initDebug: vi.fn(),
   debug: vi.fn(),
+  debugWarn: vi.fn(),
+  debugError: vi.fn(),
 }));
 
 import DmScreenPlugin from "../main";

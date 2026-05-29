@@ -1,5 +1,6 @@
 import { requestUrl } from "obsidian";
 import type { VaultAdapterLike } from "../hydrus/cache";
+import { debug, debugError } from "../debug";
 
 export interface ImageIndexEntry {
   monsterId: number;
@@ -31,19 +32,23 @@ export class DdbImageCache {
     const key = String(monsterId);
     const existing = index.entries[key];
     if (existing && (await this.adapter.exists(existing.vaultPath))) {
+      debug("DDB ImageCache: hit for", name, "(id:", monsterId, ")");
       existing.lastUsedAt = Date.now();
       await this.saveIndex(index);
       return existing.vaultPath;
     }
 
+    debug("DDB ImageCache: downloading", name, "(id:", monsterId, ") from", imageUrl.slice(0, 80));
     const ext = this.extFromUrl(imageUrl);
     const vaultPath = `${this.folder}/${monsterId}.${ext}`;
     await this.ensureFolder();
     const res = await requestUrl({ url: imageUrl, method: "GET", throw: false });
     if (res.status < 200 || res.status >= 300) {
+      debugError("DDB ImageCache: download failed (", res.status, ") for", name);
       throw new Error(`Failed to download monster image (${res.status})`);
     }
     await this.adapter.writeBinary(vaultPath, res.arrayBuffer);
+    debug("DDB ImageCache: saved", vaultPath, res.arrayBuffer.byteLength, "bytes");
 
     const now = Date.now();
     index.entries[key] = { monsterId, name, vaultPath, downloadedAt: now, lastUsedAt: now };
