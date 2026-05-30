@@ -128,15 +128,30 @@
   box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
 }
 
-.dm-tracker-scale-row {
+.dm-combat-name-row {
   display: flex;
-  gap: 4px;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
-.dm-tracker-scale-row button {
-  width: 28px;
+.dm-combat-name {
+  flex: 1;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dm-tracker-scale-buttons {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dm-tracker-scale-buttons button {
+  width: 32px;
   padding: 2px 6px;
 }
 
@@ -1305,21 +1320,3 @@
   white-space: nowrap;
 }
 
-.dm-ddb-tracking {
-  margin-top: 8px;
-  padding: 8px;
-  background: var(--background-secondary);
-  border-radius: 4px;
-}
-
-.dm-ddb-tracking-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.dm-ddb-stop-btn {
-  font-size: 0.8em;
-  padding: 2px 8px;
-}

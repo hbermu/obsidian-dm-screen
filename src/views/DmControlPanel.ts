@@ -850,17 +850,22 @@ export class DmControlPanel extends ItemView {
       });
     }
 
-    // Scale controls
-    const scaleRow = section.createDiv("dm-tracker-scale-row");
-    const decBtn = scaleRow.createEl("button", { text: "−", attr: { title: "Smaller tracker" } });
+    // Active combat name + scale controls row
+    const nameRow = section.createDiv("dm-combat-name-row");
+    nameRow.createDiv({ cls: "dm-combat-name", text: this.getActiveCombatLabel() });
+    const scaleButtons = nameRow.createDiv("dm-tracker-scale-buttons");
+    const decBtn = scaleButtons.createEl("button", { text: "−", attr: { title: "Smaller tracker" } });
     decBtn.addEventListener("click", () => this.adjustCombatTrackerScale(-0.1));
-    const incBtn = scaleRow.createEl("button", { text: "+", attr: { title: "Larger tracker" } });
+    const resetBtn = scaleButtons.createEl("button", { text: "1×", attr: { title: "Reset tracker scale" } });
+    resetBtn.addEventListener("click", () => this.setCombatTrackerScale(1));
+    const incBtn = scaleButtons.createEl("button", { text: "+", attr: { title: "Larger tracker" } });
     incBtn.addEventListener("click", () => this.adjustCombatTrackerScale(0.1));
 
     if (ddbActive && this.combatTab === "dndbeyond") {
       const ddbContainer = section.createDiv("dm-ddb-panel");
       if (!this.ddbPanel) {
         this.ddbPanel = new DnDBeyondPanel(this.plugin, ddbContainer);
+        this.ddbPanel.onTrackingChange = () => this.debouncedRender();
         this.ddbPanel.initialize();
       } else {
         this.ddbPanel.setContainer(ddbContainer);
@@ -898,8 +903,12 @@ export class DmControlPanel extends ItemView {
   private async adjustCombatTrackerScale(delta: number) {
     const current = this.plugin.settings.combatTrackerScale ?? 1;
     const next = Math.round((current + delta) * 10) / 10;
-    const clamped = Math.max(0.5, Math.min(2, next));
-    if (clamped === current) return;
+    await this.setCombatTrackerScale(next);
+  }
+
+  private async setCombatTrackerScale(value: number) {
+    const clamped = Math.max(0.5, Math.min(2, Math.round(value * 10) / 10));
+    if (clamped === (this.plugin.settings.combatTrackerScale ?? 1)) return;
     this.plugin.settings.combatTrackerScale = clamped;
     await this.plugin.saveSettings();
     if (this.plugin.server) {
@@ -908,6 +917,17 @@ export class DmControlPanel extends ItemView {
         payload: { scale: clamped },
       });
     }
+  }
+
+  private getActiveCombatLabel(): string {
+    if (this.combatTab === "dndbeyond" && this.ddbPanel) {
+      const status = this.ddbPanel.getActiveEncounterStatus();
+      if (status) return `${status.name} — Round ${status.roundNum}`;
+    }
+    if (this.trackerSource === "plugin" && this.encounterName) {
+      return `${this.encounterName} — Round ${this.pluginRound}`;
+    }
+    return "";
   }
 
   // ─── Plugin-Synced Tracker ─────────────────────────────────────────

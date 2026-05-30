@@ -16,9 +16,18 @@ export class DnDBeyondPanel {
   private showPcHp = true;
   private polledState: DdbPolledState | null = null;
   private container: HTMLElement;
+  onTrackingChange: (() => void) | null = null;
 
   constructor(private plugin: DmScreenPlugin, container: HTMLElement) {
     this.container = container;
+  }
+
+  getActiveEncounterStatus(): { name: string; roundNum: number } | null {
+    if (!this.poller || !this.polledState) return null;
+    return {
+      name: this.polledState.encounter.name,
+      roundNum: this.polledState.encounter.roundNum,
+    };
   }
 
   setContainer(el: HTMLElement): void {
@@ -91,11 +100,6 @@ export class DnDBeyondPanel {
     // Encounter list container
     this.container.createDiv({ cls: "dm-ddb-encounter-list" });
     this.renderList();
-
-    // Tracking status
-    if (this.selectedEncounterId && this.polledState) {
-      this.renderTrackingStatus();
-    }
   }
 
   private renderList(): void {
@@ -152,22 +156,6 @@ export class DnDBeyondPanel {
     }
   }
 
-  private renderTrackingStatus(): void {
-    const existing = this.container.querySelector(".dm-ddb-tracking");
-    if (existing) existing.remove();
-
-    if (!this.polledState) return;
-
-    const tracking = this.container.createDiv({ cls: "dm-ddb-tracking" });
-    const header = tracking.createDiv({ cls: "dm-ddb-tracking-header" });
-    header.createEl("span", {
-      text: `Tracking: ${this.polledState.encounter.name} — Round ${this.polledState.encounter.roundNum}`,
-    });
-
-    const stopBtn = header.createEl("button", { text: "Stop Tracking", cls: "dm-ddb-stop-btn" });
-    stopBtn.addEventListener("click", () => this.stopTracking());
-  }
-
   private async loadEncounters(): Promise<void> {
     if (!this.client) return;
     try {
@@ -185,7 +173,7 @@ export class DnDBeyondPanel {
     this.selectedEncounterId = id;
     this.startTracking(id);
     this.renderList();
-    this.renderTrackingStatus();
+    this.onTrackingChange?.();
 
     // Load monster images in the background
     if (this.client) {
@@ -213,14 +201,13 @@ export class DnDBeyondPanel {
     this.polledState = null;
     this.plugin.sendInitiativeUpdate([], 0);
     this.renderList();
-    const trackingEl = this.container.querySelector(".dm-ddb-tracking");
-    if (trackingEl) trackingEl.remove();
+    this.onTrackingChange?.();
   }
 
   private onPollUpdate(state: DdbPolledState): void {
     this.polledState = state;
     this.broadcastToPlayerScreen(state);
-    this.renderTrackingStatus();
+    this.onTrackingChange?.();
   }
 
   private onPollError(err: Error): void {
