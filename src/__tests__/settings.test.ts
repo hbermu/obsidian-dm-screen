@@ -33,6 +33,10 @@ describe("DEFAULT_SETTINGS", () => {
     expect(DEFAULT_SETTINGS.ddbCobaltSession).toBe("");
   });
 
+  it("has expected combat tracker scale default", () => {
+    expect(DEFAULT_SETTINGS.combatTrackerScale).toBe(1);
+  });
+
   it("has expected debug default", () => {
     expect(DEFAULT_SETTINGS.debugMode).toBe(false);
   });

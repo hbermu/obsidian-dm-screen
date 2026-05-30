@@ -52,6 +52,10 @@ export class DnDBeyondPanel {
     this.stopTracking();
   }
 
+  isTracking(): boolean {
+    return this.poller !== null && this.selectedEncounterId !== null;
+  }
+
   render(): void {
     this.container.empty();
 
@@ -200,7 +204,7 @@ export class DnDBeyondPanel {
     this.poller.start();
   }
 
-  private stopTracking(): void {
+  stopTracking(): void {
     if (this.poller) {
       this.poller.stop();
       this.poller = null;

@@ -17,7 +17,6 @@ interface ManualCombatant {
 
 export class DmControlPanel extends ItemView {
   plugin: DmScreenPlugin;
-  mode: "exploration" | "combat" = "exploration";
 
   // Manual initiative state
   manualCombatants: ManualCombatant[] = [];
@@ -224,11 +223,6 @@ export class DmControlPanel extends ItemView {
     this.pluginRound = round;
     this.encounterName = encounterName;
 
-    // Auto-switch to combat mode
-    if (this.mode !== "combat") {
-      this.mode = "combat";
-    }
-
     // Preserve expanded creature if still present
     if (this.expandedCreature) {
       const stillExists = combatants.some(c => c.name === this.expandedCreature);
@@ -260,11 +254,21 @@ export class DmControlPanel extends ItemView {
 
     this.renderServerSection(container);
     this.renderPlayerScreenSection(container);
-    this.renderModeSection(container);
+    this.renderInitiativeSection(container);
 
-    if (this.mode === "combat") {
-      this.renderInitiativeSection(container);
-    }
+    this.broadcastInitialScale();
+  }
+
+  private hasBroadcastInitialScale = false;
+
+  private broadcastInitialScale() {
+    if (this.hasBroadcastInitialScale) return;
+    if (!this.plugin.server) return;
+    this.plugin.server.broadcast({
+      type: "combat-scale",
+      payload: { scale: this.plugin.settings.combatTrackerScale },
+    });
+    this.hasBroadcastInitialScale = true;
   }
 
   // ─── Server Section ─────────────────────────────────────────────────
@@ -810,55 +814,44 @@ export class DmControlPanel extends ItemView {
     }
   }
 
-  // ─── Mode Section ──────────────────────────────────────────────────
-
-  private renderModeSection(container: HTMLElement) {
-    const section = container.createDiv("dm-section");
-    section.createEl("h3", { text: "Mode" });
-
-    const modeRow = section.createDiv("dm-mode-row");
-
-    const explorationBtn = modeRow.createEl("button", {
-      text: "Exploration",
-      cls: this.mode === "exploration" ? "mod-cta" : "",
-    });
-    explorationBtn.addEventListener("click", () => {
-      this.mode = "exploration";
-      if (this.plugin.server) {
-        this.plugin.server.broadcast({ type: "set-mode", payload: { mode: "exploration" } });
-      }
-      this.render();
-    });
-
-    const combatBtn = modeRow.createEl("button", {
-      text: "Combat",
-      cls: this.mode === "combat" ? "mod-cta" : "",
-    });
-    combatBtn.addEventListener("click", () => {
-      this.mode = "combat";
-      if (this.plugin.server) {
-        this.plugin.server.broadcast({ type: "set-mode", payload: { mode: "combat" } });
-      }
-      this.render();
-    });
-  }
-
   // ─── Initiative Section ────────────────────────────────────────────
 
   private renderInitiativeSection(container: HTMLElement) {
     const section = container.createDiv("dm-section");
 
+    // Header: COMBAT title + emit toggle
+    const header = section.createDiv("dm-section-header");
+    header.createEl("h3", { text: "COMBAT" });
+
+    const broadcasting = this.isCombatBroadcasting();
+    const emitToggle = header.createEl("button", {
+      cls: broadcasting ? "dm-emit-toggle dm-emit-active" : "dm-emit-toggle",
+      text: "●",
+      attr: {
+        "aria-label": broadcasting ? "Stop broadcasting combat" : "No combat being broadcast",
+        title: broadcasting ? "Stop broadcasting combat" : "No combat being broadcast",
+      },
+    });
+    emitToggle.addEventListener("click", () => {
+      if (this.isCombatBroadcasting()) {
+        this.stopAllCombatBroadcast();
+      }
+    });
+
+    // Tabs: Local Track + (optionally) D&D Beyond, full-width
     const ddbActive = this.plugin.settings.ddbEnabled && this.plugin.settings.ddbCobaltSession;
+    const tabBar = section.createDiv("dm-combat-tabs");
+
+    const initTab = tabBar.createEl("button", {
+      text: "Local Track",
+      cls: !ddbActive || this.combatTab === "initiative" ? "dm-tab-active" : "dm-tab",
+    });
+    initTab.addEventListener("click", () => {
+      this.combatTab = "initiative";
+      this.render();
+    });
+
     if (ddbActive) {
-      const tabBar = section.createDiv("dm-combat-tabs");
-      const initTab = tabBar.createEl("button", {
-        text: "Local Track",
-        cls: this.combatTab === "initiative" ? "dm-tab-active" : "dm-tab",
-      });
-      initTab.addEventListener("click", () => {
-        this.combatTab = "initiative";
-        this.render();
-      });
       const ddbTab = tabBar.createEl("button", {
         text: "D&D Beyond",
         cls: this.combatTab === "dndbeyond" ? "dm-tab-active" : "dm-tab",
@@ -868,6 +861,13 @@ export class DmControlPanel extends ItemView {
         this.render();
       });
     }
+
+    // Scale controls
+    const scaleRow = section.createDiv("dm-tracker-scale-row");
+    const decBtn = scaleRow.createEl("button", { text: "−", attr: { title: "Smaller tracker" } });
+    decBtn.addEventListener("click", () => this.adjustCombatTrackerScale(-0.1));
+    const incBtn = scaleRow.createEl("button", { text: "+", attr: { title: "Larger tracker" } });
+    incBtn.addEventListener("click", () => this.adjustCombatTrackerScale(0.1));
 
     if (ddbActive && this.combatTab === "dndbeyond") {
       const ddbContainer = section.createDiv("dm-ddb-panel");
@@ -883,6 +883,42 @@ export class DmControlPanel extends ItemView {
       } else {
         this.renderManualTracker(section);
       }
+    }
+  }
+
+  // ─── Combat Broadcasting Helpers ───────────────────────────────────
+
+  isCombatBroadcasting(): boolean {
+    if (this.trackerSource === "plugin" && this.pluginCombatants.length > 0) return true;
+    if (this.manualCombatants.length > 0) return true;
+    if (this.ddbPanel && this.ddbPanel.isTracking()) return true;
+    return false;
+  }
+
+  stopAllCombatBroadcast(): void {
+    if (this.ddbPanel) this.ddbPanel.stopTracking();
+    this.manualCombatants = [];
+    this.currentTurn = 0;
+    this.trackerSource = "manual";
+    this.pluginCombatants = [];
+    this.pluginRound = 0;
+    this.encounterName = "";
+    this.plugin.sendInitiativeUpdate([], 0);
+    this.render();
+  }
+
+  private async adjustCombatTrackerScale(delta: number) {
+    const current = this.plugin.settings.combatTrackerScale ?? 1;
+    const next = Math.round((current + delta) * 10) / 10;
+    const clamped = Math.max(0.5, Math.min(2, next));
+    if (clamped === current) return;
+    this.plugin.settings.combatTrackerScale = clamped;
+    await this.plugin.saveSettings();
+    if (this.plugin.server) {
+      this.plugin.server.broadcast({
+        type: "combat-scale",
+        payload: { scale: clamped },
+      });
     }
   }
 

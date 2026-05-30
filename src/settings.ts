@@ -29,6 +29,8 @@ export interface DmScreenSettings {
   // D&D Beyond integration
   ddbEnabled: boolean;
   ddbCobaltSession: string;
+  // Combat tracker
+  combatTrackerScale: number;
   // Server limits
   maxClients: number;
   // Debug
@@ -64,6 +66,7 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   ],
   ddbEnabled: false,
   ddbCobaltSession: "",
+  combatTrackerScale: 1,
   maxClients: 10,
   debugMode: false,
 };

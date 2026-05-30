@@ -92,6 +92,54 @@
   flex: 1;
 }
 
+/* ─── Section header (title + action button) ─── */
+
+.dm-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.dm-section-header h3 {
+  margin: 0;
+}
+
+.dm-emit-toggle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.dm-emit-toggle.dm-emit-active {
+  background: #4caf50;
+  color: white;
+  border-color: #4caf50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+}
+
+.dm-tracker-scale-row {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.dm-tracker-scale-row button {
+  width: 28px;
+  padding: 2px 6px;
+}
+
 /* ─── Initiative Tracker ─── */
 
 .dm-add-combatant {
@@ -1141,18 +1189,20 @@
 
 .dm-combat-tabs {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   margin-bottom: 12px;
-  border-bottom: 1px solid var(--background-modifier-border);
-  padding-bottom: 8px;
+}
+
+.dm-combat-tabs button {
+  flex: 1;
 }
 
 .dm-tab,
 .dm-tab-active {
-  padding: 4px 12px;
-  border-radius: 4px 4px 0 0;
+  padding: 6px 12px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 0.85em;
+  font-size: 0.9em;
   border: none;
   background: var(--background-secondary);
   color: var(--text-normal);

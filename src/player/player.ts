@@ -135,8 +135,8 @@ class PlayerScreen {
       case "initiative-update":
         this.updateInitiative(msg.payload as unknown as InitiativePayload);
         break;
-      case "set-mode":
-        this.setMode((msg.payload as { mode: string }).mode);
+      case "combat-scale":
+        this.applyCombatScale((msg.payload as { scale: number }).scale);
         break;
       case "image-layers-sync":
         this.syncImageLayers((msg.payload as { layers: ImageLayer[] }).layers);
@@ -182,10 +182,11 @@ class PlayerScreen {
     document.getElementById("waiting-screen")!.style.display = "flex";
   }
 
-  private setMode(mode: string) {
-    if (mode === "combat") {
-      this.mode = "combat";
-    }
+  private applyCombatScale(scale: number) {
+    const tracker = document.getElementById("initiative-tracker");
+    if (!tracker) return;
+    tracker.style.transform = `scale(${scale})`;
+    tracker.style.transformOrigin = "top right";
   }
 
   private showBattlemap(payload: ShowBattlemapPayload) {
