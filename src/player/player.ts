@@ -50,7 +50,6 @@ interface PlayerMessage {
 
 class PlayerScreen {
   private ws: WebSocket | null = null;
-  private mode: "waiting" | "combat" = "waiting";
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private lastImageLayers: ImageLayer[] = [];
 
@@ -177,7 +176,6 @@ class PlayerScreen {
   }
 
   private showWaiting() {
-    this.mode = "waiting";
     this.hideAll();
     document.getElementById("waiting-screen")!.style.display = "flex";
   }
@@ -191,7 +189,6 @@ class PlayerScreen {
 
   private showBattlemap(payload: ShowBattlemapPayload) {
     this.hideAll();
-    this.mode = "combat";
 
     const container = document.getElementById("battlemap-container")!;
     container.style.display = "flex";

@@ -565,8 +565,7 @@ export class DmControlPanel extends ItemView {
         });
         visBtn.addEventListener("click", () => {
           layer.visible = !layer.visible;
-          this.broadcastImageLayers();
-          this.render();
+          this.broadcastAndRender();
         });
 
         const bottomRow = leftCol.createDiv("dm-layer-left-bottom");
@@ -587,8 +586,7 @@ export class DmControlPanel extends ItemView {
             if (this.fogEditLayerId === layer.id) this.fogEditLayerId = null;
             layer.fogDataUrl = "";
           }
-          this.broadcastImageLayers();
-          this.render();
+          this.broadcastAndRender();
         });
 
         const bordered = layer.bordered !== false;
@@ -599,8 +597,7 @@ export class DmControlPanel extends ItemView {
         borderBtn.title = bordered ? "Border ON" : "Border OFF";
         borderBtn.addEventListener("click", () => {
           layer.bordered = !bordered;
-          this.broadcastImageLayers();
-          this.render();
+          this.broadcastAndRender();
         });
 
         // Middle column: name row + slider row
@@ -663,15 +660,13 @@ export class DmControlPanel extends ItemView {
         const rotLeftBtn = controls.createEl("button", { text: "\u21BA", cls: "dm-layer-btn" });
         rotLeftBtn.addEventListener("click", () => {
           layer.rotation = (layer.rotation - 15) % 360;
-          this.broadcastImageLayers();
-          this.render();
+          this.broadcastAndRender();
         });
 
         const rotRightBtn = controls.createEl("button", { text: "\u21BB", cls: "dm-layer-btn" });
         rotRightBtn.addEventListener("click", () => {
           layer.rotation = (layer.rotation + 15) % 360;
-          this.broadcastImageLayers();
-          this.render();
+          this.broadcastAndRender();
         });
 
         const upBtn = controls.createEl("button", { text: "\u25B2", cls: "dm-layer-btn" });
@@ -689,8 +684,7 @@ export class DmControlPanel extends ItemView {
           this.fogCanvases.delete(layer.id);
           if (this.fogEditLayerId === layer.id) this.fogEditLayerId = null;
           this.imageLayers = this.imageLayers.filter(l => l.id !== layer.id);
-          this.broadcastImageLayers();
-          this.render();
+          this.broadcastAndRender();
         });
 
         const posRow = rightCol.createDiv("dm-layer-position-row");
@@ -705,8 +699,7 @@ export class DmControlPanel extends ItemView {
           layer.height = vp.vpW * aspectRatio;
           layer.x = vp.vpX;
           layer.y = vp.vpY + (vp.vpH - layer.height) / 2;
-          this.broadcastImageLayers();
-          this.render();
+          this.broadcastAndRender();
         });
 
         const fitHBtn = posRow.createEl("button", { text: "H", cls: "dm-layer-btn" });
@@ -719,8 +712,7 @@ export class DmControlPanel extends ItemView {
           layer.width = vp.vpH * aspectRatio;
           layer.y = vp.vpY;
           layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
-          this.broadcastImageLayers();
-          this.render();
+          this.broadcastAndRender();
         });
 
         const alignLeftBtn = posRow.createEl("button", { text: "\u25c0", cls: "dm-layer-btn" });
@@ -729,8 +721,7 @@ export class DmControlPanel extends ItemView {
           const vp = this.getPlayerViewport();
           if (!vp) { new Notice("No player connected"); return; }
           layer.x = vp.vpX;
-          this.broadcastImageLayers();
-          this.render();
+          this.broadcastAndRender();
         });
 
         const centerBtn = posRow.createEl("button", { text: "\u25c6", cls: "dm-layer-btn" });
@@ -739,8 +730,7 @@ export class DmControlPanel extends ItemView {
           const vp = this.getPlayerViewport();
           if (!vp) { new Notice("No player connected"); return; }
           layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
-          this.broadcastImageLayers();
-          this.render();
+          this.broadcastAndRender();
         });
 
         const alignRightBtn = posRow.createEl("button", { text: "\u25b6", cls: "dm-layer-btn" });
@@ -749,8 +739,7 @@ export class DmControlPanel extends ItemView {
           const vp = this.getPlayerViewport();
           if (!vp) { new Notice("No player connected"); return; }
           layer.x = vp.vpX + vp.vpW - layer.width;
-          this.broadcastImageLayers();
-          this.render();
+          this.broadcastAndRender();
         });
 
         // Fog tool selector (always visible when fog is enabled)
@@ -796,8 +785,7 @@ export class DmControlPanel extends ItemView {
       clearLayersBtn.addEventListener("click", () => {
         this.imageLayers = [];
         this.nextZIndex = 1;
-        this.broadcastImageLayers();
-        this.render();
+        this.broadcastAndRender();
       });
       const clearAllBtn = clearRow.createEl("button", { text: "Clear Player Screen" });
       clearAllBtn.addEventListener("click", () => {
@@ -1119,320 +1107,6 @@ export class DmControlPanel extends ItemView {
     }
   }
 
-  // ─── Image Layers Section (merged into renderPlayerScreenSection) ──
-  // Old renderImageLayersSection removed.
-
-  private _removedImageLayersSection(container: HTMLElement) {
-    const section = container.createDiv("dm-section");
-    section.createEl("h3", { text: "Image Layers" });
-
-    // Button row
-    const btnRow = section.createDiv("dm-layer-btn-row");
-
-    const addBtn = btnRow.createEl("button", {
-      text: "Add Image",
-      cls: "mod-cta",
-    });
-    addBtn.addEventListener("click", (evt: MouseEvent) => this.showImagePicker(evt));
-
-    const videoBtnLabel = this.activeVideoPath ? "Stop Video BG" : "Video BG";
-    const videoBtn = btnRow.createEl("button", { text: videoBtnLabel });
-    videoBtn.addEventListener("click", (evt: MouseEvent) => {
-      if (this.activeVideoPath) {
-        // Stop video
-        this.activeVideoPath = null;
-        this.activeBackgroundUrl = null;
-        if (this.plugin.server) {
-          this.plugin.server.broadcast({ type: "hide-background-media", payload: {} });
-        }
-        this.render();
-      } else {
-        // Browse for video files
-        const files = this.plugin.app.vault.getFiles()
-          .filter(f => /\.(webm|mp4)$/i.test(f.path))
-          .sort((a, b) => a.path.localeCompare(b.path));
-
-        const { Menu } = require("obsidian");
-        const menu = new Menu();
-        for (const file of files) {
-          menu.addItem((item: any) => {
-            item.setTitle(file.path);
-            item.onClick(() => {
-              this.activeVideoPath = file.path;
-              const videoUrl = `/vault/${encodeURIComponent(file.path)}`;
-              this.activeBackgroundUrl = videoUrl;
-              if (this.plugin.server) {
-                this.plugin.server.broadcast({
-                  type: "show-background-media",
-                  payload: { url: videoUrl, mediaType: "video", loop: true, muted: true },
-                });
-              }
-              this.render();
-            });
-          });
-        }
-        if (files.length === 0) {
-          menu.addItem((item: any) => item.setTitle("No .webm or .mp4 files found").setDisabled(true));
-        }
-        menu.showAtMouseEvent(evt);
-      }
-    });
-
-    if (this.plugin.settings.hydrusEnabled && this.plugin.settings.hydrusApiUrl) {
-      const hydrusBtn = btnRow.createEl("button", { text: "BG from Hydrus" });
-      hydrusBtn.addEventListener("click", async () => {
-        try {
-          const { HydrusExplorerModal } = await import("./HydrusExplorerModal");
-          new HydrusExplorerModal(this.plugin.app, this.plugin).open();
-        } catch (err) {
-          debugError("Hydrus modal failed:", err);
-        }
-      });
-    }
-
-    const removeBgBtn = btnRow.createEl("button", { text: "Remove BG" });
-    removeBgBtn.disabled = !this.activeBackgroundUrl;
-    removeBgBtn.addEventListener("click", () => {
-      if (this.plugin.server) {
-        this.plugin.server.broadcast({ type: "hide-background-media", payload: {} });
-      }
-      this.activeBackgroundUrl = null;
-      this.activeVideoPath = null;
-      this.render();
-    });
-
-    // Preview area
-    const { width: tvW, height: tvH } = this.getEffectiveResolution();
-    const previewArea = section.createDiv("dm-layer-preview");
-    previewArea.style.aspectRatio = `${tvW} / ${tvH}`;
-
-    // Draw colored rectangles for each layer (sorted by zIndex ascending)
-    const sorted = [...this.imageLayers].sort((a, b) => a.zIndex - b.zIndex);
-    for (const layer of sorted) {
-      const colorIdx = this.imageLayers.indexOf(layer) % DmControlPanel.LAYER_COLORS.length;
-      const color = DmControlPanel.LAYER_COLORS[colorIdx];
-      const rect = previewArea.createDiv("dm-layer-rect");
-      rect.setAttribute("data-id", layer.id);
-      rect.style.left = `${layer.x}%`;
-      rect.style.top = `${layer.y}%`;
-      rect.style.width = `${layer.width}%`;
-      rect.style.height = `${layer.height}%`;
-      rect.style.backgroundImage = `url(${layer.dataUrl})`;
-      rect.style.backgroundSize = "contain";
-      rect.style.backgroundPosition = "center";
-      rect.style.backgroundRepeat = "no-repeat";
-      rect.style.borderColor = color;
-      rect.style.zIndex = String(layer.zIndex);
-      if (layer.rotation) {
-        rect.style.transform = `rotate(${layer.rotation}deg)`;
-      }
-      rect.textContent = layer.label;
-      rect.title = layer.label;
-      if (!layer.visible) {
-        rect.style.opacity = "0.25";
-        rect.style.borderStyle = "dashed";
-      }
-
-      // Drag to reposition
-      this.makeDraggable(rect, layer, previewArea);
-    }
-
-    // Layer list
-    if (this.imageLayers.length > 0) {
-      const list = section.createDiv("dm-layer-list");
-
-      // Show highest z-index first
-      const byZ = [...this.imageLayers].sort((a, b) => b.zIndex - a.zIndex);
-      for (const layer of byZ) {
-        const colorIdx = this.imageLayers.indexOf(layer) % DmControlPanel.LAYER_COLORS.length;
-        const color = DmControlPanel.LAYER_COLORS[colorIdx];
-        const row = list.createDiv("dm-layer-row");
-        if (!layer.visible) row.addClass("dm-layer-hidden");
-
-        // Left column: eye on top (full width), border below
-        const leftCol = row.createDiv("dm-layer-left-col");
-
-        const visBtn = leftCol.createEl("button", {
-          text: layer.visible ? "👁" : "👁‍🗨",
-          cls: `dm-layer-btn dm-layer-vis-toggle ${layer.visible ? "dm-layer-vis-on" : "dm-layer-vis-off"}`,
-        });
-        visBtn.addEventListener("click", () => {
-          layer.visible = !layer.visible;
-          this.broadcastImageLayers();
-          this.render();
-        });
-
-        const bordered2 = layer.bordered !== false;
-        const borderBtn2 = leftCol.createEl("button", {
-          cls: `dm-layer-btn dm-border-toggle ${bordered2 ? "dm-border-active" : ""}`,
-        });
-        borderBtn2.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${bordered2 ? "2.5" : "1.5"}"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>`;
-        borderBtn2.title = bordered2 ? "Border ON" : "Border OFF";
-        borderBtn2.addEventListener("click", () => {
-          layer.bordered = !bordered2;
-          this.broadcastImageLayers();
-          this.render();
-        });
-
-        // Middle column: name row + slider row
-        const midCol = row.createDiv("dm-layer-mid-col");
-
-        const nameRow = midCol.createDiv("dm-layer-name-row");
-        const swatch = nameRow.createDiv("dm-layer-swatch");
-        swatch.style.backgroundColor = color;
-        nameRow.createSpan({ text: layer.label, cls: "dm-layer-label" });
-
-        const sliderRow = midCol.createDiv("dm-layer-slider-row");
-        const scaleLabel = sliderRow.createSpan({ text: `${Math.round(layer.width)}%`, cls: "dm-layer-scale-label" });
-        const scaleSlider = sliderRow.createEl("input", {
-          type: "range",
-          cls: "dm-layer-scale-slider",
-        });
-        scaleSlider.min = "10";
-        scaleSlider.max = "500";
-        scaleSlider.value = String(Math.round(layer.width));
-        scaleSlider.addEventListener("keydown", (e: KeyboardEvent) => {
-          if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-            e.preventDefault();
-            const current = parseInt(scaleSlider.value);
-            let newVal: number;
-            if (e.key === "ArrowLeft") {
-              newVal = Math.floor((current - 1) / 10) * 10;
-            } else {
-              newVal = Math.ceil((current + 1) / 10) * 10;
-            }
-            newVal = Math.max(10, Math.min(500, newVal));
-            scaleSlider.value = String(newVal);
-            scaleSlider.dispatchEvent(new Event("input"));
-          }
-        });
-        scaleSlider.addEventListener("input", () => {
-          const scale = parseInt(scaleSlider.value);
-          const centerX = layer.x + layer.width / 2;
-          const centerY = layer.y + layer.height / 2;
-          const aspectRatio = layer.height / layer.width;
-          layer.width = scale;
-          layer.height = scale * aspectRatio;
-          layer.x = centerX - layer.width / 2;
-          layer.y = centerY - layer.height / 2;
-          scaleLabel.textContent = `${scale}%`;
-          this.broadcastImageLayers();
-          const previewRect = this.contentEl.querySelector(`.dm-layer-rect[data-id="${layer.id}"]`) as HTMLElement;
-          if (previewRect) {
-            previewRect.style.left = `${layer.x}%`;
-            previewRect.style.top = `${layer.y}%`;
-            previewRect.style.width = `${layer.width}%`;
-            previewRect.style.height = `${layer.height}%`;
-          }
-        });
-
-        // Right column: two button rows
-        const rightCol = row.createDiv("dm-layer-right-col");
-
-        const controls = rightCol.createDiv("dm-layer-controls");
-
-        const rotLeftBtn = controls.createEl("button", { text: "↺", cls: "dm-layer-btn" });
-        rotLeftBtn.addEventListener("click", () => {
-          layer.rotation = (layer.rotation - 15) % 360;
-          this.broadcastImageLayers();
-          this.render();
-        });
-
-        const rotRightBtn = controls.createEl("button", { text: "↻", cls: "dm-layer-btn" });
-        rotRightBtn.addEventListener("click", () => {
-          layer.rotation = (layer.rotation + 15) % 360;
-          this.broadcastImageLayers();
-          this.render();
-        });
-
-        const upBtn = controls.createEl("button", { text: "▲", cls: "dm-layer-btn" });
-        upBtn.addEventListener("click", () => {
-          this.moveLayerUp(layer);
-        });
-
-        const downBtn = controls.createEl("button", { text: "▼", cls: "dm-layer-btn" });
-        downBtn.addEventListener("click", () => {
-          this.moveLayerDown(layer);
-        });
-
-        const removeBtn = controls.createEl("button", { text: "✕", cls: "dm-layer-btn dm-layer-remove" });
-        removeBtn.addEventListener("click", () => {
-          this.imageLayers = this.imageLayers.filter(l => l.id !== layer.id);
-          this.broadcastImageLayers();
-          this.render();
-        });
-
-        const posRow = rightCol.createDiv("dm-layer-position-row");
-
-        const fitWBtn = posRow.createEl("button", { text: "W", cls: "dm-layer-btn" });
-        fitWBtn.title = "Fit to player width";
-        fitWBtn.addEventListener("click", () => {
-          const vp = this.getPlayerViewport();
-          if (!vp) { new Notice("No player connected"); return; }
-          const aspectRatio = layer.height / layer.width;
-          layer.width = vp.vpW;
-          layer.height = vp.vpW * aspectRatio;
-          layer.x = vp.vpX;
-          layer.y = vp.vpY + (vp.vpH - layer.height) / 2;
-          this.broadcastImageLayers();
-          this.render();
-        });
-
-        const fitHBtn = posRow.createEl("button", { text: "H", cls: "dm-layer-btn" });
-        fitHBtn.title = "Fit to player height";
-        fitHBtn.addEventListener("click", () => {
-          const vp = this.getPlayerViewport();
-          if (!vp) { new Notice("No player connected"); return; }
-          const aspectRatio = layer.width / layer.height;
-          layer.height = vp.vpH;
-          layer.width = vp.vpH * aspectRatio;
-          layer.y = vp.vpY;
-          layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
-          this.broadcastImageLayers();
-          this.render();
-        });
-
-        const alignLeftBtn = posRow.createEl("button", { text: "◀", cls: "dm-layer-btn" });
-        alignLeftBtn.title = "Align to left edge";
-        alignLeftBtn.addEventListener("click", () => {
-          const vp = this.getPlayerViewport();
-          if (!vp) { new Notice("No player connected"); return; }
-          layer.x = vp.vpX;
-          this.broadcastImageLayers();
-          this.render();
-        });
-
-        const centerBtn = posRow.createEl("button", { text: "◆", cls: "dm-layer-btn" });
-        centerBtn.title = "Center horizontally";
-        centerBtn.addEventListener("click", () => {
-          const vp = this.getPlayerViewport();
-          if (!vp) { new Notice("No player connected"); return; }
-          layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
-          this.broadcastImageLayers();
-          this.render();
-        });
-
-        const alignRightBtn = posRow.createEl("button", { text: "▶", cls: "dm-layer-btn" });
-        alignRightBtn.title = "Align to right edge";
-        alignRightBtn.addEventListener("click", () => {
-          const vp = this.getPlayerViewport();
-          if (!vp) { new Notice("No player connected"); return; }
-          layer.x = vp.vpX + vp.vpW - layer.width;
-          this.broadcastImageLayers();
-          this.render();
-        });
-      }
-
-      const clearAllBtn = section.createEl("button", { text: "Clear All Layers" });
-      clearAllBtn.addEventListener("click", () => {
-        this.imageLayers = [];
-        this.nextZIndex = 1;
-        this.broadcastImageLayers();
-        this.render();
-      });
-    }
-  }
-
   addImageLayer(label: string, dataUrl: string, noteType?: string, visible = true) {
     // Load image to get natural dimensions, then size correctly
     const img = new Image();
@@ -1477,8 +1151,7 @@ export class DmControlPanel extends ItemView {
       };
 
       this.imageLayers.push(layer);
-      this.broadcastImageLayers();
-      this.render();
+      this.broadcastAndRender();
     };
     img.src = dataUrl;
   }
@@ -2172,8 +1845,7 @@ export class DmControlPanel extends ItemView {
       const tmp = layer.zIndex;
       layer.zIndex = other.zIndex;
       other.zIndex = tmp;
-      this.broadcastImageLayers();
-      this.render();
+      this.broadcastAndRender();
     }
   }
 
@@ -2185,8 +1857,7 @@ export class DmControlPanel extends ItemView {
       const tmp = layer.zIndex;
       layer.zIndex = other.zIndex;
       other.zIndex = tmp;
-      this.broadcastImageLayers();
-      this.render();
+      this.broadcastAndRender();
     }
   }
 
@@ -2197,6 +1868,11 @@ export class DmControlPanel extends ItemView {
       payload: { layers: this.imageLayers },
     });
     this.saveState();
+  }
+
+  private broadcastAndRender() {
+    this.broadcastImageLayers();
+    this.render();
   }
 
   // ─── Manual Tracker Helpers ────────────────────────────────────────
