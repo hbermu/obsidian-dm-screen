@@ -70,6 +70,7 @@ export class DdbClient {
       })),
       players: players
         .filter((p: Record<string, unknown>) => p.type !== "CHARACTER_TYPE_ABSTRACT")
+        .filter((p: Record<string, unknown>) => p.hidden !== true)
         .map((p: Record<string, unknown>) => ({
           id: this.parsePlayerId(p.id),
           name: (p.name as string) ?? (p.userName as string) ?? "Unknown",

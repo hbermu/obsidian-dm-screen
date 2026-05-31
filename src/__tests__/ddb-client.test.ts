@@ -126,6 +126,35 @@ describe("DdbClient - getEncounters", () => {
     expect(encounters[0].name).toBe("Fight");
   });
 
+  it("filters out players with hidden:true but keeps monsters that lack the field", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: [{
+            id: "enc-1", name: "Test", inProgress: true, roundNum: 1, turnNum: 0,
+            monsters: [
+              { id: 1, name: "Goblin", initiative: 14, currentHitPoints: 7, maximumHitPoints: 7, uniqueId: "u1" },
+            ],
+            players: [
+              { id: "111", type: "CHARACTER_TYPE_DDB", name: "Visible Hero", initiative: 18, hidden: false },
+              { id: "222", type: "CHARACTER_TYPE_DDB", name: "Kokoro", initiative: null, hidden: true },
+              { id: "333", type: "CHARACTER_TYPE_DDB", name: "No Field Hero", initiative: 12 },
+            ],
+          }],
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const encounters = await client.getEncounters();
+    expect(encounters[0].players.map(p => p.name)).toEqual(["Visible Hero", "No Field Hero"]);
+    expect(encounters[0].monsters).toHaveLength(1);
+    expect(encounters[0].monsters[0].name).toBe("Goblin");
+  });
+
   it("filters out abstract preset players", async () => {
     mockRequestUrl((call) => {
       if (call.url.includes("cobalt-token")) {

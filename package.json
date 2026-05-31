@@ -1,6 +1,6 @@
 {
   "name": "dm-screen",
-  "version": "0.8.1-beta.4",
+  "version": "0.8.1-beta.5",
   "description": "DM Screen - Obsidian plugin for D&D campaign management with player screen",
   "main": "main.js",
   "scripts": {
