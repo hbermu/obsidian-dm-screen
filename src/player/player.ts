@@ -185,6 +185,7 @@ class PlayerScreen {
     if (!tracker) return;
     tracker.style.transform = `scale(${scale})`;
     tracker.style.transformOrigin = "top right";
+    tracker.style.setProperty("--combat-scale", String(scale));
   }
 
   private showBattlemap(payload: ShowBattlemapPayload) {
@@ -366,6 +367,11 @@ class PlayerScreen {
 
       list.appendChild(li);
     });
+
+    const activeLi = list.querySelector<HTMLLIElement>("li.init-active");
+    if (activeLi) {
+      activeLi.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
   }
 
   private syncImageLayers(layers: ImageLayer[]) {

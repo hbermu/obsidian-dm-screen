@@ -83,12 +83,33 @@ body {
   top: 20px;
   right: 20px;
   width: 280px;
+  max-height: calc((100vh - 40px) / var(--combat-scale, 1));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
   background: rgba(10, 10, 10, 0.9);
   border: 1px solid rgba(201, 170, 113, 0.4);
   border-radius: 12px;
   padding: 16px;
   z-index: 1000;
   backdrop-filter: blur(10px);
+}
+
+#initiative-tracker::-webkit-scrollbar {
+  width: 6px;
+}
+
+#initiative-tracker::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#initiative-tracker::-webkit-scrollbar-thumb {
+  background: rgba(201, 170, 113, 0.4);
+  border-radius: 3px;
+}
+
+#initiative-tracker::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 170, 113, 0.6);
 }
 
 #initiative-tracker h2 {
