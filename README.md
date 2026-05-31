@@ -40,13 +40,15 @@ Campaign management plugin for [Obsidian](https://obsidian.md). Run D&D 5e sessi
 
 ### Combat & Initiative Tracking
 
-- **Two modes**: Exploration (map/media focus) and Combat (initiative + battlemap)
+- **Three sources**: manual entry, Initiative Tracker plugin, or D&D Beyond — switchable from the same panel
 - **Manual tracking** — add/remove combatants, edit HP, AC, initiative, statuses, advance turns
 - **Initiative Tracker plugin sync** — auto-imports combatants, HP, statuses, and round from the [Initiative Tracker](https://github.com/javalent/initiative-tracker) plugin
 - Combatant properties: name, HP/maxHP/tempHP, AC, initiative, statuses, hidden, friendly, player character flag
-- Hidden combatants filtered from player screen automatically
+- Hidden combatants filtered from player screen automatically (including PCs marked hidden in a D&D Beyond encounter)
+- Round-1 reveal: combatants whose turn has not happened yet stay hidden until their initiative comes up
 - Active turn highlighting with gold border on player screen
 - HP shown as condition words to players (Well, Hurt, Bloodied, Down)
+- Adjustable tracker scale with a 1× reset button
 
 ### Encounter Battlemaps
 
@@ -101,7 +103,8 @@ Sync encounters from your [D&D Beyond](https://www.dndbeyond.com) account for li
 - CobaltSession cookie authentication with validation
 - Encounter browser with search
 - Real-time polling — initiative, character HP, and manual entries update live
-- Monster image caching for fast statblock display
+- Hidden players (marked as not participating in the encounter) are filtered out before broadcast and from the DM panel
+- Monster image caching for fast statblock display; identical monsters in the encounter dedupe to a single layer
 - PC HP visibility options: numbers + condition, or condition only
 - Broadcasts sorted combatant list with active turn highlighting
 
@@ -172,10 +175,12 @@ The DM broadcasts JSON messages over WebSocket:
 | `hide-background-media` | Clear background |
 | `image-layers-sync` | Multi-layer image compositing with fog state |
 | `initiative-update` | Combat initiative list with HP, statuses, active turn |
+| `combat-scale` | Initiative tracker zoom factor on the player screen |
 | `viewport-update` | Pan/zoom synchronization |
-| `set-mode` | Switch between exploration and combat display |
 | `clear` | Reset all player screen content |
 | `client-info` | Client reports screen dimensions to DM |
+
+The server caches the last message of each type and replays it to clients that connect after the broadcast, so a player joining mid-session gets the current scene immediately.
 
 ## Development
 
@@ -185,12 +190,16 @@ Requires Docker. No Node.js on the host.
 make dev         # esbuild watcher
 make up          # Obsidian GUI at https://localhost:3001 + watcher
 make typecheck   # tsc --noEmit
-make test        # vitest run
+make test        # vitest run (unit + integration)
 make test-watch  # vitest in watch mode
 make build       # production bundle
 make down        # stop containers
 make clean       # remove build artefacts
 ```
+
+### Tests
+
+The Vitest suite mixes unit tests with integration tests that boot a real `PlayerScreenServer`, connect real `ws` clients, replay sanitized D&D Beyond fixtures (`test/fixtures/ddb/`), and smoke-test the bundled `main.js`. Everything runs under `make test`.
 
 ## License
 
