@@ -143,3 +143,59 @@ describe("DmControlPanel.stopAllCombatBroadcast", () => {
     expect(plugin.sendInitiativeUpdate).toHaveBeenCalledWith([], 0);
   });
 });
+
+describe("DmControlPanel.addImageLayer dedup", () => {
+  it("does not add a layer with a duplicate label (case-insensitive)", () => {
+    const panel = makePanel();
+    panel.imageLayers = [
+      {
+        id: "l1",
+        label: "Adult Red Dragon",
+        dataUrl: "data:image/png;base64,X",
+        x: 0, y: 0, width: 30, height: 60, zIndex: 1,
+        rotation: 0, visible: true, fogEnabled: false, fogDataUrl: "", bordered: true,
+      } as any,
+    ];
+
+    panel.addImageLayer("adult red dragon", "data:image/png;base64,Y", "monster", false);
+
+    expect(panel.imageLayers.length).toBe(1);
+    expect(panel.imageLayers[0].dataUrl).toBe("data:image/png;base64,X");
+  });
+});
+
+describe("DmControlPanel.broadcastManualInitiative round-1 hide", () => {
+  it("hides combatants past the active turn during round 1", () => {
+    const plugin = makePlugin();
+    const panel = makePanel(plugin);
+    panel.manualRound = 1;
+    panel.manualCombatants = [
+      { name: "A", hp: 10, maxHp: 10, initiative: 20, active: false },
+      { name: "B", hp: 10, maxHp: 10, initiative: 15, active: true },
+      { name: "C", hp: 10, maxHp: 10, initiative: 10, active: false },
+    ];
+
+    (panel as any).broadcastManualInitiative();
+
+    expect(plugin.sendInitiativeUpdate).toHaveBeenCalledTimes(1);
+    const [combatants, round] = (plugin.sendInitiativeUpdate as any).mock.calls[0];
+    expect(round).toBe(1);
+    expect(combatants.map((c: any) => c.hidden)).toEqual([false, false, true]);
+  });
+
+  it("does not hide anyone after round 1", () => {
+    const plugin = makePlugin();
+    const panel = makePanel(plugin);
+    panel.manualRound = 2;
+    panel.manualCombatants = [
+      { name: "A", hp: 10, maxHp: 10, initiative: 20, active: false },
+      { name: "B", hp: 10, maxHp: 10, initiative: 15, active: true },
+      { name: "C", hp: 10, maxHp: 10, initiative: 10, active: false },
+    ];
+
+    (panel as any).broadcastManualInitiative();
+
+    const [combatants] = (plugin.sendInitiativeUpdate as any).mock.calls[0];
+    expect(combatants.every((c: any) => c.hidden === false)).toBe(true);
+  });
+});

@@ -21,6 +21,7 @@ export class DmControlPanel extends ItemView {
   // Manual initiative state
   manualCombatants: ManualCombatant[] = [];
   currentTurn = 0;
+  manualRound = 1;
 
   // Plugin-synced initiative state
   trackerSource: "manual" | "plugin" = "manual";
@@ -892,6 +893,7 @@ export class DmControlPanel extends ItemView {
     if (this.ddbPanel) this.ddbPanel.stopTracking();
     this.manualCombatants = [];
     this.currentTurn = 0;
+    this.manualRound = 1;
     this.trackerSource = "manual";
     this.pluginCombatants = [];
     this.pluginRound = 0;
@@ -1111,6 +1113,7 @@ export class DmControlPanel extends ItemView {
       const resetBtn = turnRow.createEl("button", { text: "Reset Round" });
       resetBtn.addEventListener("click", () => {
         this.currentTurn = 0;
+        this.manualRound = 1;
         this.manualCombatants.forEach(c => (c.active = false));
         if (this.manualCombatants.length > 0) this.manualCombatants[0].active = true;
         this.broadcastManualInitiative();
@@ -1121,6 +1124,7 @@ export class DmControlPanel extends ItemView {
       clearAllBtn.addEventListener("click", () => {
         this.manualCombatants = [];
         this.currentTurn = 0;
+        this.manualRound = 1;
         this.broadcastManualInitiative();
         this.render();
       });
@@ -1128,6 +1132,11 @@ export class DmControlPanel extends ItemView {
   }
 
   addImageLayer(label: string, dataUrl: string, noteType?: string, visible = true) {
+    const exists = this.imageLayers.some(
+      (l) => l.label.toLowerCase() === label.toLowerCase()
+    );
+    if (exists) return;
+
     // Load image to get natural dimensions, then size correctly
     const img = new Image();
     img.onload = () => {
@@ -1904,13 +1913,25 @@ export class DmControlPanel extends ItemView {
   private advanceManualTurn() {
     if (this.manualCombatants.length === 0) return;
     this.manualCombatants.forEach(c => (c.active = false));
-    this.currentTurn = (this.currentTurn + 1) % this.manualCombatants.length;
+    const next = this.currentTurn + 1;
+    if (next >= this.manualCombatants.length) {
+      this.currentTurn = 0;
+      this.manualRound += 1;
+    } else {
+      this.currentTurn = next;
+    }
     this.manualCombatants[this.currentTurn].active = true;
     this.broadcastManualInitiative();
     this.render();
   }
 
   private broadcastManualInitiative() {
-    this.plugin.sendInitiativeUpdate(this.manualCombatants);
+    const isRoundOne = this.manualRound === 1;
+    const activeIdx = this.manualCombatants.findIndex(c => c.active);
+    const out = this.manualCombatants.map((c, i) => ({
+      ...c,
+      hidden: isRoundOne && activeIdx >= 0 && i > activeIdx,
+    }));
+    this.plugin.sendInitiativeUpdate(out, this.manualRound);
   }
 }

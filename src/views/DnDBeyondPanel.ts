@@ -234,10 +234,12 @@ export class DnDBeyondPanel {
 
     // DDB turnNum is 1-indexed
     const currentTurnIdx = encounter.inProgress ? encounter.turnNum - 1 : -1;
+    const isRoundOne = encounter.roundNum === 1;
 
     for (let i = 0; i < allParticipants.length; i++) {
       const p = allParticipants[i];
       const isActive = i === currentTurnIdx;
+      const hidden = isRoundOne && i > currentTurnIdx;
 
       if (p.kind === "player") {
         const char = characters.get(p.id);
@@ -249,7 +251,7 @@ export class DnDBeyondPanel {
           active: isActive,
           friendly: true,
           isPlayer: true,
-          hidden: false,
+          hidden,
           hideHp: !this.showPcHp,
           statuses: [],
         });
@@ -262,7 +264,7 @@ export class DnDBeyondPanel {
           active: isActive,
           friendly: false,
           isPlayer: false,
-          hidden: false,
+          hidden,
           statuses: [],
         });
       }

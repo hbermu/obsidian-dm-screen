@@ -323,8 +323,12 @@ export default class DmScreenPlugin extends Plugin {
       }
     }
 
-    // Broadcast to player screen
-    this.sendInitiativeUpdate(combatants.map(c => ({
+    // Broadcast to player screen.
+    // In round 1, hide combatants whose turn hasn't happened yet so players
+    // discover the encounter as it unfolds.
+    const isRoundOne = state.round === 1;
+    const activeIdx = combatants.findIndex(c => c.active);
+    this.sendInitiativeUpdate(combatants.map((c, i) => ({
       name: c.displayName,
       hp: c.hp,
       maxHp: c.maxHp,
@@ -332,7 +336,7 @@ export default class DmScreenPlugin extends Plugin {
       active: c.active,
       friendly: c.friendly,
       isPlayer: c.isPlayer,
-      hidden: c.hidden,
+      hidden: c.hidden || (isRoundOne && activeIdx >= 0 && i > activeIdx),
       statuses: c.statuses,
     })), state.round);
   }
