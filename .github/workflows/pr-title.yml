@@ -1,0 +1,22 @@
+name: pr-title
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if ! echo "$TITLE" | grep -qE '^(feat|feature|fix|hotfix|chore|refactor|docs|test|ci|release)(\([a-z0-9-]+\))?: .{10,}$'; then
+            echo "::error::PR title '$TITLE' does not match Conventional Commits."
+            echo "Format: <type>(<scope>): <subject>"
+            echo "Types: feat, fix, hotfix, chore, refactor, docs, test, ci, release"
+            echo "Scope (optional): a feature dir under .agent/features/ or deps/release/repo"
+            echo "Subject: at least 10 chars, imperative mood, no trailing period"
+            exit 1
+          fi

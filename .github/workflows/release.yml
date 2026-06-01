@@ -1,0 +1,93 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from manifest.json
+        id: ver
+        run: |
+          VERSION=$(jq -r .version manifest.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if echo "$VERSION" | grep -qE -- '-beta\.[0-9]+$'; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sanity-check version against branch (prereleases only)
+        if: steps.ver.outputs.is_prerelease == 'true'
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          if [ "$REF_NAME" != "release/v$VERSION" ]; then
+            echo "::error::Branch '$REF_NAME' does not match manifest version 'v$VERSION'."
+            echo "Prerelease branches must be named release/v<version>."
+            exit 1
+          fi
+
+      - name: Refuse prerelease publishes from main
+        if: steps.ver.outputs.is_prerelease == 'true' && github.ref == 'refs/heads/main'
+        run: |
+          echo "::error::main must not carry a -beta version. Prereleases live on release/v* branches only."
+          exit 1
+
+      - name: Refuse stable publishes from non-main
+        if: steps.ver.outputs.is_prerelease == 'false' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Stable releases must be published from main."
+          exit 1
+
+      - name: Check whether tag already exists
+        id: tag_check
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag v$VERSION already exists; nothing to do."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build artefacts
+        if: steps.tag_check.outputs.exists == 'false'
+        run: make build
+
+      - name: Create annotated tag
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Create release
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          IS_PRERELEASE: ${{ steps.ver.outputs.is_prerelease }}
+        run: |
+          PRERELEASE_FLAG=""
+          if [ "$IS_PRERELEASE" = "true" ]; then PRERELEASE_FLAG="--prerelease"; fi
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --generate-notes \
+            $PRERELEASE_FLAG \
+            main.js manifest.json styles.css

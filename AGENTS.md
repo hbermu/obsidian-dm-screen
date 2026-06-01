@@ -26,7 +26,24 @@ DM Screen is an Obsidian plugin for running D&D 5e sessions in-person. It pairs 
 ### Git
 
 - Never use `--no-verify`, `--no-gpg-sign`, or any flag that bypasses hooks or signing.
-- Never force-push to main. Never move existing tags. To replace a release, bump to the next version.
+- Never push to `main` directly. The branch is protected; CI is required. Always go through a PR (see `Branching and PRs` below).
+- Never force-push to any shared branch. Never move existing tags. To replace a release, bump to the next version.
+
+### Branching and PRs
+
+- Create a branch named `<type>/<slug>` where `<type>` is one of `feature`, `fix`, `hotfix`, `chore`, `refactor`, `docs`, `test`, `ci`, or `release/v<X.Y.Z>[-beta.N]`. Slugs are lowercase a–z, 0–9, hyphens only — no underscores, no leading hyphen, no consecutive hyphens.
+- Open the PR via `gh pr create` against `main`. The PR title must follow Conventional Commits: `<type>(<scope>): <subject>` where `<scope>` is a feature directory name under `.agent/features/` (for example `hydrus`, `fog-of-war`, `dm-preview`) or `deps`, `release`, `repo`. The subject is at least 10 characters in imperative mood with no trailing period.
+- Five status checks must pass before merge: `typecheck`, `test`, `build`, `branch-name / lint`, `pr-title / lint`.
+- Merges are squash-only; the PR title becomes the squash-commit subject on `main` (make it grep-worthy — future `git log --grep` runs depend on it). Merged branches are auto-deleted.
+- No approving reviews are required (solo project); admin bypass exists for break-glass emergencies. Do not request reviews from anyone.
+
+Examples of compliant PR titles:
+
+- `feat(hydrus): add multi-service tag search`
+- `fix(fog-of-war): preserve canvas size after layer reload`
+- `chore(deps): bump esbuild to 0.25.1`
+- `refactor(combat-tracker): extract round-1 reveal helper`
+- `release: v0.8.5-beta.1`
 
 ### AI documentation
 
@@ -49,9 +66,7 @@ All targets run inside Docker; the container manages `node_modules`.
 | `make down` | stop containers |
 | `make clean` | remove build artefacts |
 
-`make typecheck` currently surfaces a type error in a `happy-dom` dependency definition that is unrelated to project code. `make test` is the authoritative green check.
-
-Run `make typecheck && make test` before every commit. The bundle smoke test (`bundle-smoke.integration.test.ts`) re-builds `main.js` inside the test run, so changes that break the production build also fail tests.
+Run `make typecheck && make test` before every commit. CI runs the same targets plus `make build`; all three must pass on every PR. The bundle smoke test (`bundle-smoke.integration.test.ts`) re-builds `main.js` inside the test run, so changes that break the production build also fail tests.
 
 ## Where to find what
 
@@ -96,15 +111,33 @@ src/
 
 ## Release process
 
-Versioning: `MAJOR.MINOR.PATCH-beta.N` for prereleases, `MAJOR.MINOR.PATCH` for stable. Three files carry the version and must move together: `package.json`, `package-lock.json` (top-level `version`), `manifest.json`.
+Releases are **automated** by `.github/workflows/release.yml`. The AI never runs `git tag` or `gh release create` by hand. Versioning is SemVer: `MAJOR.MINOR.PATCH-beta.N` for prereleases, `MAJOR.MINOR.PATCH` for stable. Three files carry the version and must move together: `package.json`, `package-lock.json` (top-level `version`), `manifest.json`.
 
-Steps:
-1. `make typecheck && make test && make build` — all green (happy-dom typecheck error tolerated).
-2. Bump version in the three files.
-3. Commit with a descriptive message.
-4. Annotated tag: `git tag -a vX.Y.Z-beta.N -m "vX.Y.Z-beta.N — short description"`.
-5. `git push && git push --tags`.
-6. Cut a release attaching `main.js`, `manifest.json`, `styles.css`. Mark prerelease for beta tags.
+### Prerelease (beta)
+
+1. From `main`, cut a branch `release/vX.Y.Z-beta.N`.
+2. Bump the version in the three files to `X.Y.Z-beta.N`.
+3. Commit (PR title: `release: vX.Y.Z-beta.N`) and push the branch.
+4. The push triggers CI and the release workflow. When green, the workflow tags `vX.Y.Z-beta.N` from the branch HEAD and publishes a GitHub prerelease with `main.js`, `manifest.json`, `styles.css`.
+5. Betas live on their branch. Iterate by bumping to `-beta.N+1` and pushing, or by cutting a new `release/vX.Y.Z-beta.N+1` branch from the previous one.
+
+### Stable
+
+1. Cut `release/vX.Y.Z` from `main` (or from the latest matching beta branch).
+2. Bump the three version files to `X.Y.Z` (no `-beta` suffix).
+3. Open a PR titled `release: vX.Y.Z`.
+4. After CI passes, squash-merge to `main`.
+5. The push to `main` triggers the release workflow, which tags `vX.Y.Z` and publishes a non-prerelease GitHub release with auto-generated notes built from every PR squash-merged since the previous tag.
+
+### Version judgement
+
+SemVer applies. Use the cumulative diff since the last stable tag:
+
+- Breaking change in observable behaviour → bump major.
+- New user-facing capability or new spec under `.agent/features/` → bump minor.
+- Bug fix only, no new requirements → bump patch.
+
+The AI proposes the version in the branch name; the user can override by renaming the branch before pushing.
 
 To replace a beta or stable, bump to the next version. Never force-move a tag.
 
