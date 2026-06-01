@@ -1,0 +1,37 @@
+# Hydrus Explorer Modal
+
+> The grid of tiles the DM browses when picking a Hydrus file as background. Supports searching by tags, switching between remote/merged and local-only sources, filtering by media type, and paging through results.
+
+## Source files
+
+- `src/views/HydrusExplorerModal.ts` — modal lifecycle, tile rendering, source toggle, filter checkboxes, page controls, tile context menu, thumbnail loading
+- `src/hydrus/pagination.ts` — `paginate(items, pageIndex, pageSize)`
+
+## Settings used
+
+- `hydrusDefaultSearchTags`, `hydrusDefaultLoop`, `hydrusDefaultMuted`, `hydrusIgnoredTagPatterns`, `hydrusCacheFolder`
+
+## Requirements
+
+1. The modal shall add the `dm-hydrus-modal` CSS class and set the title to `BG from Hydrus`.
+2. The modal shall pre-fill the search input with `hydrusDefaultSearchTags`.
+3. The modal shall expose a source selector with three options: `Remote + Local` (merged), `Local only`, and implicitly `Online` mode when the Hydrus client is reachable. Switching shall re-render the tile grid.
+4. The modal shall expose two filter checkboxes: `images` and `videos`. Unchecking a class shall hide its tiles from the grid.
+5. The modal shall render a maximum of `PAGE_SIZE = 100` tiles per page; total tiles considered are capped at `HARD_CAP = 1000`.
+6. Each remote tile shall load its thumbnail via `client.getThumbnailBytes(hash)` and render it as a data URL.
+7. Each local tile shall load its thumbnail from the cached `thumbVaultPath` via `vault.adapter.getResourcePath`.
+8. Clicking a tile shall set the file as the player background (see `../background-media/overview.md` and `cache.md`).
+9. Each tile shall expose a `⋮` button that opens a context menu with at least: a tag list (filtered through `hydrusIgnoredTagPatterns`) and a Copy tags action.
+10. The modal shall display a banner element (`dm-hydrus-banner`) for transient status/error messages.
+
+## Tests covering this
+
+- `src/__tests__/pagination.test.ts` — the paging math
+- `src/__tests__/tag-filter.test.ts` — the ignored-tags regex matching used by the context menu
+
+## Non-goals
+
+- Server-side pagination cursors. Hydrus does not expose them; the modal pages locally up to `HARD_CAP`.
+- Selecting multiple files at once.
+- Saving filter or source state across modal opens. They reset to defaults on each open.
+- Showing files larger than `HARD_CAP`. The modal expects the DM to narrow the search with extra tags rather than scroll past 1000 items.

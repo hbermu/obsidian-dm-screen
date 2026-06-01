@@ -1,0 +1,43 @@
+# Monster Avatar Cache and Layer Push
+
+> When the DM selects a D&D Beyond encounter, the unique monster IDs are looked up via the monster service to fetch portrait URLs. Each unique monster's avatar is downloaded once, cached on disk, and inserted as a hidden image layer on the DM panel so the DM can flip them on quickly. Duplicate monsters in the encounter (same `id`) share one layer.
+
+## Source files
+
+- `src/dndbeyond/client.ts` — `getMonsterImages(ids)` — issues individual GETs to the monster service and returns a `Map<id, avatarUrl>`
+- `src/dndbeyond/imageCache.ts` — `DdbImageCache`, `getOrDownload(monsterId, imageUrl, name)`, `sweep`
+- `src/views/DnDBeyondPanel.ts` — `loadMonsterImages(encounter)` orchestrates dedupe → fetch → cache → layer add
+- `src/main.ts` — schedules a daily sweep alongside the Hydrus cache sweep
+
+## Settings used
+
+- `hydrusCacheFolder` (parent path; the DDB cache lives at `<parent>/.dm-screen` or `.dm-screen` if the Hydrus folder strips to empty)
+- `hydrusCacheTtlDays`
+
+## Requirements
+
+1. `loadMonsterImages(encounter)` shall dedupe the encounter's monster IDs via `Set`.
+2. The panel shall call `client.getMonsterImages(uniqueIds)` once per encounter selection.
+3. `client.getMonsterImages` shall issue one GET per id (rate-limit pacing is handled by the poller's `MIN_REQUEST_GAP_MS` when called inside a poll cycle; here it issues all calls back-to-back).
+4. For each `(monsterId, imageUrl)` pair, the panel shall:
+   - Look up the monster's name from `encounter.monsters` (fallback `Monster <id>`).
+   - Call `cache.getOrDownload(monsterId, imageUrl, name)` to obtain a vault path.
+   - Convert the vault file to a data URL via `plugin.imageToDataUrl`.
+   - Call `dmPanel.addImageLayer(name, dataUrl, "monster", false)` to add it as a hidden, portrait-sized layer.
+5. If no DM Control Panel is open at the time, `loadMonsterImages` shall short-circuit and not download anything.
+6. `getOrDownload` shall:
+   - Return the cached `vaultPath` if an entry for `monsterId` already exists and is on disk.
+   - Otherwise download the image, write it to `<folder>/<monsterId>.<ext>`, insert an index entry, and return the path.
+7. The DDB image cache shall be subject to the same TTL sweep as the Hydrus cache; sweep frequency is once per day during plugin uptime.
+
+## Tests covering this
+
+- `src/__tests__/ddb-image-cache.test.ts` — round-trip cache, sweep
+- `src/__tests__/ddb-to-player.integration.test.ts` — monster image layer added in addition to broadcast
+
+## Non-goals
+
+- Variant images per monster (e.g. swapping out the avatar for a token). One avatar per `monsterId`.
+- Pre-fetching avatars before the DM selects the encounter.
+- Sharing the cache with Hydrus (separate folder, separate index).
+- Marking the monster layers visible automatically. They are added hidden so the DM controls when they appear.
