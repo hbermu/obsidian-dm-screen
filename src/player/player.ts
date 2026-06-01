@@ -14,14 +14,6 @@ interface Combatant {
   statuses?: string[];
 }
 
-interface ShowBattlemapPayload {
-  name: string;
-  image: string;
-  gridSize: number;
-  gridType: string;
-  creatures: Array<{ name: string; count: number; hp: number; ac: number }>;
-}
-
 interface InitiativePayload {
   combatants: Combatant[];
   round?: number;
@@ -128,9 +120,6 @@ class PlayerScreen {
 
   private handleMessage(msg: PlayerMessage) {
     switch (msg.type) {
-      case "show-battlemap":
-        this.showBattlemap(msg.payload as unknown as ShowBattlemapPayload);
-        break;
       case "initiative-update":
         this.updateInitiative(msg.payload as unknown as InitiativePayload);
         break;
@@ -139,14 +128,6 @@ class PlayerScreen {
         break;
       case "image-layers-sync":
         this.syncImageLayers((msg.payload as { layers: ImageLayer[] }).layers);
-        break;
-      case "show-video-bg": {
-        const { url } = msg.payload as { url: string };
-        this.showBackgroundMedia({ url, mediaType: "video", loop: true, muted: true });
-        break;
-      }
-      case "hide-video-bg":
-        this.hideBackgroundMedia();
         break;
       case "show-background-media":
         this.showBackgroundMedia(
@@ -169,14 +150,8 @@ class PlayerScreen {
     }
   }
 
-  private hideAll() {
-    document.getElementById("waiting-screen")!.style.display = "none";
-    document.getElementById("battlemap-container")!.style.display = "none";
-    document.getElementById("initiative-tracker")!.style.display = "none";
-  }
-
   private showWaiting() {
-    this.hideAll();
+    document.getElementById("initiative-tracker")!.style.display = "none";
     document.getElementById("waiting-screen")!.style.display = "flex";
   }
 
@@ -186,119 +161,6 @@ class PlayerScreen {
     tracker.style.transform = `scale(${scale})`;
     tracker.style.transformOrigin = "top right";
     tracker.style.setProperty("--combat-scale", String(scale));
-  }
-
-  private showBattlemap(payload: ShowBattlemapPayload) {
-    this.hideAll();
-
-    const container = document.getElementById("battlemap-container")!;
-    container.style.display = "flex";
-
-    const img = document.getElementById("battlemap-image") as HTMLImageElement;
-    const canvas = document.getElementById("grid-overlay") as HTMLCanvasElement;
-
-    // Show initiative tracker in combat mode
-    document.getElementById("initiative-tracker")!.style.display = "block";
-
-    if (payload.image) {
-      img.src = payload.image;
-      img.onload = () => {
-        // Scale image to fill the screen while maintaining aspect ratio
-        const screenW = window.innerWidth;
-        const screenH = window.innerHeight;
-        const imgW = img.naturalWidth;
-        const imgH = img.naturalHeight;
-
-        const scale = Math.max(screenW / imgW, screenH / imgH);
-        const displayW = imgW * scale;
-        const displayH = imgH * scale;
-
-        img.style.width = `${displayW}px`;
-        img.style.height = `${displayH}px`;
-        img.style.position = "absolute";
-        img.style.left = `${(screenW - displayW) / 2}px`;
-        img.style.top = `${(screenH - displayH) / 2}px`;
-
-        // Draw grid overlay
-        canvas.width = screenW;
-        canvas.height = screenH;
-        canvas.style.position = "absolute";
-        canvas.style.left = "0";
-        canvas.style.top = "0";
-        canvas.style.pointerEvents = "none";
-
-        this.drawGrid(canvas, displayW, displayH, imgW, imgH, payload.gridType);
-      };
-    }
-  }
-
-  private drawGrid(
-    canvas: HTMLCanvasElement,
-    displayW: number,
-    displayH: number,
-    imgW: number,
-    imgH: number,
-    gridType: string
-  ) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Assume a standard battlemap grid (typically maps are designed with a specific grid)
-    // Default: try to detect ~1 inch squares scaled to the display
-    // For now, use a configurable approach: 50px per square on the original image
-    const pixelsPerSquare = 70; // Common battlemap grid size
-    const scaleX = displayW / imgW;
-    const scaleY = displayH / imgH;
-    const squareW = pixelsPerSquare * scaleX;
-    const squareH = pixelsPerSquare * scaleY;
-
-    const offsetX = (canvas.width - displayW) / 2;
-    const offsetY = (canvas.height - displayH) / 2;
-
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-    ctx.lineWidth = 1;
-
-    if (gridType === "hex") {
-      // Hex grid
-      const hexW = squareW;
-      const hexH = squareH * 0.866;
-      for (let row = 0; row * hexH < displayH; row++) {
-        for (let col = 0; col * hexW < displayW; col++) {
-          const x = offsetX + col * hexW * 0.75;
-          const y = offsetY + row * hexH + (col % 2 === 1 ? hexH / 2 : 0);
-          this.drawHex(ctx, x + hexW / 2, y + hexH / 2, hexW / 2);
-        }
-      }
-    } else {
-      // Square grid
-      for (let x = offsetX; x <= offsetX + displayW; x += squareW) {
-        ctx.beginPath();
-        ctx.moveTo(x, offsetY);
-        ctx.lineTo(x, offsetY + displayH);
-        ctx.stroke();
-      }
-      for (let y = offsetY; y <= offsetY + displayH; y += squareH) {
-        ctx.beginPath();
-        ctx.moveTo(offsetX, y);
-        ctx.lineTo(offsetX + displayW, y);
-        ctx.stroke();
-      }
-    }
-  }
-
-  private drawHex(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const angle = (Math.PI / 3) * i - Math.PI / 6;
-      const x = cx + r * Math.cos(angle);
-      const y = cy + r * Math.sin(angle);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.stroke();
   }
 
   private updateInitiative(payload: InitiativePayload) {

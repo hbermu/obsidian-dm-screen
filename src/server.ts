@@ -219,10 +219,6 @@ export class PlayerScreenServer {
       <p>Waiting for DM to push content...</p>
       <div class="pulse-dot"></div>
     </div>
-    <div id="battlemap-container" style="display:none;">
-      <canvas id="grid-overlay"></canvas>
-      <img id="battlemap-image" />
-    </div>
     <video id="video-background" muted loop playsinline></video>
     <img id="image-background" alt="" />
     <div id="image-layers-container"></div>

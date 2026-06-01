@@ -30,11 +30,6 @@ vi.mock("../views/DmControlPanel", () => ({
   DM_CONTROL_VIEW_TYPE: "dm-control-panel",
 }));
 
-vi.mock("../views/EncounterBattlemapPanel", () => ({
-  EncounterBattlemapPanel: vi.fn(),
-  ENCOUNTER_BATTLEMAP_VIEW_TYPE: "encounter-battlemap-panel",
-}));
-
 vi.mock("../debug", () => ({
   initDebug: vi.fn(),
   debug: vi.fn(),
@@ -160,10 +155,10 @@ describe("DmScreenPlugin", () => {
   describe("loadSettings", () => {
     it("merges saved data with defaults", async () => {
       const plugin = makePlugin();
-      (plugin as any).loadData = vi.fn(async () => ({ serverPort: 9999, gridColor: "#000" }));
+      (plugin as any).loadData = vi.fn(async () => ({ serverPort: 9999, debugMode: true }));
       await plugin.loadSettings();
       expect(plugin.settings.serverPort).toBe(9999);
-      expect(plugin.settings.gridColor).toBe("#000");
+      expect(plugin.settings.debugMode).toBe(true);
       expect(plugin.settings.autoStartServer).toBe(false); // default preserved
     });
 
@@ -577,50 +572,6 @@ describe("DmScreenPlugin", () => {
       );
     });
 
-    it("auto-pushes battlemap when encounter name matches and round <= 1", async () => {
-      const plugin = makePlugin({
-        encounterBattlemaps: { "Cave Fight": "maps/cave.png" },
-      });
-      const fakeServer = makeFakeServer();
-      plugin.server = fakeServer as any;
-
-      const addImageLayerFn = vi.fn();
-      const mockView = { addImageLayer: addImageLayerFn, syncFromInitiativeTracker: vi.fn() };
-      (plugin as any).app.workspace.getLeavesOfType = vi.fn(() => [{ view: mockView }]);
-
-      vi.spyOn(plugin, "imageToDataUrl").mockResolvedValue("data:image/png;base64,FAKE");
-
-      const state: InitiativeViewState = {
-        creatures: [],
-        state: true,
-        name: "Cave Fight",
-        round: 1,
-      };
-
-      callOnState(plugin, state);
-
-      await vi.waitFor(() => {
-        expect(addImageLayerFn).toHaveBeenCalledWith("Cave Fight", "data:image/png;base64,FAKE", "encounter", false);
-      });
-    });
-
-    it("does NOT auto-push battlemap when round > 1", () => {
-      const plugin = makePlugin({
-        encounterBattlemaps: { "Cave Fight": "maps/cave.png" },
-      });
-      plugin.server = makeFakeServer() as any;
-      const imageToDataUrlSpy = vi.spyOn(plugin, "imageToDataUrl");
-
-      const state: InitiativeViewState = {
-        creatures: [],
-        state: true,
-        name: "Cave Fight",
-        round: 3,
-      };
-
-      callOnState(plugin, state);
-      expect(imageToDataUrlSpy).not.toHaveBeenCalled();
-    });
   });
 
   // ─── onInitiativeStop (private) ──────────────────────────────

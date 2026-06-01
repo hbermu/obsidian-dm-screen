@@ -1662,12 +1662,10 @@ export class DmControlPanel extends ItemView {
     // Collect images from frontmatter fields
     const images: { label: string; path: string; source: string }[] = [];
     if (fm) {
-      for (const key of ["map-image", "battlemap", "image"]) {
-        if (fm[key]) {
-          const resolved = this.plugin.app.metadataCache.getFirstLinkpathDest(fm[key], activeFile.path);
-          if (resolved) {
-            images.push({ label: `${key}: ${resolved.name}`, path: resolved.path, source: key });
-          }
+      if (fm["image"]) {
+        const resolved = this.plugin.app.metadataCache.getFirstLinkpathDest(fm["image"], activeFile.path);
+        if (resolved) {
+          images.push({ label: `image: ${resolved.name}`, path: resolved.path, source: "image" });
         }
       }
       // Portrait field (wiki-link format)
@@ -1799,12 +1797,10 @@ export class DmControlPanel extends ItemView {
     const fm = cache?.frontmatter;
 
     if (fm) {
-      for (const key of ["map-image", "battlemap", "image"]) {
-        if (fm[key]) {
-          const resolved = this.plugin.app.metadataCache.getFirstLinkpathDest(fm[key], file.path);
-          if (resolved && imageExts.some(ext => resolved.path.toLowerCase().endsWith(ext))) {
-            results.push({ path: resolved.path, label: `${key}: ${resolved.name}` });
-          }
+      if (fm["image"]) {
+        const resolved = this.plugin.app.metadataCache.getFirstLinkpathDest(fm["image"], file.path);
+        if (resolved && imageExts.some(ext => resolved.path.toLowerCase().endsWith(ext))) {
+          results.push({ path: resolved.path, label: `image: ${resolved.name}` });
         }
       }
       if (fm["portrait"]) {

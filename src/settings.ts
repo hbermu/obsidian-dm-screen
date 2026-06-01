@@ -4,11 +4,8 @@ import type DmScreenPlugin from "./main";
 export interface DmScreenSettings {
   serverPort: number;
   autoStartServer: boolean;
-  gridColor: string;
-  gridOpacity: number;
   tvWidth: number;
   tvHeight: number;
-  encounterBattlemaps: Record<string, string>; // encounter name → battlemap vault path
   // Persisted player screen state
   lastPlayerScreenWidth: number;
   lastPlayerScreenHeight: number;
@@ -41,11 +38,8 @@ export interface DmScreenSettings {
 export const DEFAULT_SETTINGS: DmScreenSettings = {
   serverPort: 3000,
   autoStartServer: false,
-  gridColor: "#ffffff",
-  gridOpacity: 0.3,
   tvWidth: 1920,
   tvHeight: 1080,
-  encounterBattlemaps: {},
   lastPlayerScreenWidth: 0,
   lastPlayerScreenHeight: 0,
   lastImageLayers: "[]",
@@ -118,30 +112,6 @@ export class DmScreenSettingTab extends PluginSettingTab {
           .setValue(String(this.plugin.settings.maxClients))
           .onChange(async (value) => {
             this.plugin.settings.maxClients = parseInt(value) || 10;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    containerEl.createEl("h3", { text: "Combat Grid" });
-
-    new Setting(containerEl)
-      .setName("Grid Color")
-      .setDesc("Color of the grid overlay on battlemaps")
-      .addText((text) =>
-        text.setValue(this.plugin.settings.gridColor).onChange(async (value) => {
-          this.plugin.settings.gridColor = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName("Grid Opacity")
-      .setDesc("Opacity of the grid overlay (0-1)")
-      .addText((text) =>
-        text
-          .setValue(String(this.plugin.settings.gridOpacity))
-          .onChange(async (value) => {
-            this.plugin.settings.gridOpacity = parseFloat(value) || 0.3;
             await this.plugin.saveSettings();
           })
       );

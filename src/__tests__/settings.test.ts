@@ -9,9 +9,7 @@ describe("DEFAULT_SETTINGS", () => {
     expect(DEFAULT_SETTINGS.maxClients).toBe(10);
   });
 
-  it("has expected grid defaults", () => {
-    expect(DEFAULT_SETTINGS.gridColor).toBe("#ffffff");
-    expect(DEFAULT_SETTINGS.gridOpacity).toBe(0.3);
+  it("has expected fallback resolution defaults", () => {
     expect(DEFAULT_SETTINGS.tvWidth).toBe(1920);
     expect(DEFAULT_SETTINGS.tvHeight).toBe(1080);
   });
@@ -47,10 +45,6 @@ describe("DEFAULT_SETTINGS", () => {
     expect(DEFAULT_SETTINGS.hydrusIgnoredTagPatterns).toContain("rating:.*");
   });
 
-  it("has empty encounter battlemaps map", () => {
-    expect(DEFAULT_SETTINGS.encounterBattlemaps).toEqual({});
-  });
-
   it("has empty persisted player screen state", () => {
     expect(DEFAULT_SETTINGS.lastPlayerScreenWidth).toBe(0);
     expect(DEFAULT_SETTINGS.lastPlayerScreenHeight).toBe(0);
@@ -65,7 +59,7 @@ describe("Settings merge behavior", () => {
     const merged = Object.assign({}, DEFAULT_SETTINGS, saved);
     expect(merged.serverPort).toBe(8080);
     expect(merged.autoStartServer).toBe(false);
-    expect(merged.gridColor).toBe("#ffffff");
+    expect(merged.tvWidth).toBe(1920);
     expect(merged.hydrusCacheFolder).toBe(".dm-screen/bg");
   });
 
@@ -77,12 +71,6 @@ describe("Settings merge behavior", () => {
   it("Object.assign with undefined returns defaults", () => {
     const merged = Object.assign({}, DEFAULT_SETTINGS, undefined);
     expect(merged).toEqual(DEFAULT_SETTINGS);
-  });
-
-  it("saved encounterBattlemaps overrides completely (not deep merged)", () => {
-    const saved = { encounterBattlemaps: { "Fight": "maps/fight.png" } } as Partial<DmScreenSettings>;
-    const merged = Object.assign({}, DEFAULT_SETTINGS, saved);
-    expect(merged.encounterBattlemaps).toEqual({ "Fight": "maps/fight.png" });
   });
 
   it("preserves hydrusDefaultSearchTags default when missing from saved data", () => {
@@ -116,24 +104,6 @@ describe("Settings input validation logic", () => {
 
     it("parseInt handles zero (falsy) — falls back to default", () => {
       expect(parseInt("0") || 3000).toBe(3000);
-    });
-  });
-
-  describe("opacity parsing", () => {
-    it("parseFloat coerces valid opacity", () => {
-      expect(parseFloat("0.5") || 0.3).toBe(0.5);
-    });
-
-    it("parseFloat fallback for invalid string", () => {
-      expect(parseFloat("not-a-number") || 0.3).toBe(0.3);
-    });
-
-    it("parseFloat handles 0 — falls back to default", () => {
-      expect(parseFloat("0") || 0.3).toBe(0.3);
-    });
-
-    it("parseFloat preserves 1.0", () => {
-      expect(parseFloat("1.0") || 0.3).toBe(1.0);
     });
   });
 

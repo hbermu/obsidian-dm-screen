@@ -4,7 +4,6 @@ import {
   Notice,
 } from "obsidian";
 import { DmControlPanel, DM_CONTROL_VIEW_TYPE } from "./views/DmControlPanel";
-import { EncounterBattlemapPanel, ENCOUNTER_BATTLEMAP_VIEW_TYPE } from "./views/EncounterBattlemapPanel";
 import { PlayerScreenServer } from "./server";
 import { DmScreenSettingTab, DmScreenSettings, DEFAULT_SETTINGS } from "./settings";
 import type { InitiativeViewState, TrackerCombatant } from "./types";
@@ -50,19 +49,12 @@ export default class DmScreenPlugin extends Plugin {
 
     // Register views
     this.registerView(DM_CONTROL_VIEW_TYPE, (leaf) => new DmControlPanel(leaf, this));
-    this.registerView(ENCOUNTER_BATTLEMAP_VIEW_TYPE, (leaf) => new EncounterBattlemapPanel(leaf, this));
 
     // Commands
     this.addCommand({
       id: "open-dm-control-panel",
       name: "Open DM Control Panel",
       callback: () => this.activateView(DM_CONTROL_VIEW_TYPE),
-    });
-
-    this.addCommand({
-      id: "open-encounter-battlemaps",
-      name: "Open Encounter Battlemaps",
-      callback: () => this.activateView(ENCOUNTER_BATTLEMAP_VIEW_TYPE),
     });
 
     this.addCommand({
@@ -294,25 +286,6 @@ export default class DmScreenPlugin extends Plugin {
         source: "tracker-plugin" as const,
       };
     });
-
-    if (state.name && state.round <= 1) {
-      const battlemapPath = this.settings.encounterBattlemaps[state.name];
-      if (battlemapPath && this.server) {
-        debug("Auto-pushing battlemap for encounter:", state.name, "→", battlemapPath);
-        this.imageToDataUrl(battlemapPath).then(dataUrl => {
-          if (dataUrl && this.server) {
-            // Add to DM panel image layers
-            const dmLeaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
-            for (const leaf of dmLeaves) {
-              const view = leaf.view as DmControlPanel;
-              if (view.addImageLayer) {
-                view.addImageLayer(state.name || "Battlemap", dataUrl, "encounter", false);
-              }
-            }
-          }
-        });
-      }
-    }
 
     // Forward to DmControlPanel
     const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
