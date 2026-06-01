@@ -26,6 +26,7 @@ describe("DEFAULT_SETTINGS", () => {
     expect(DEFAULT_SETTINGS.hydrusDefaultMuted).toBe(true);
     expect(DEFAULT_SETTINGS.hydrusTagServices).toEqual([]);
     expect(DEFAULT_SETTINGS.hydrusAvailableTagServices).toEqual([]);
+    expect(DEFAULT_SETTINGS.hydrusDefaultSearchTags).toBe("");
   });
 
   it("has expected DDB defaults", () => {
@@ -82,6 +83,20 @@ describe("Settings merge behavior", () => {
     const saved = { encounterBattlemaps: { "Fight": "maps/fight.png" } } as Partial<DmScreenSettings>;
     const merged = Object.assign({}, DEFAULT_SETTINGS, saved);
     expect(merged.encounterBattlemaps).toEqual({ "Fight": "maps/fight.png" });
+  });
+
+  it("preserves hydrusDefaultSearchTags default when missing from saved data", () => {
+    const saved = { hydrusEnabled: true } as Partial<DmScreenSettings>;
+    const merged = Object.assign({}, DEFAULT_SETTINGS, saved);
+    expect(merged.hydrusDefaultSearchTags).toBe("");
+  });
+
+  it("saved hydrusDefaultSearchTags overrides default", () => {
+    const saved = {
+      hydrusDefaultSearchTags: "tavern, night",
+    } as Partial<DmScreenSettings>;
+    const merged = Object.assign({}, DEFAULT_SETTINGS, saved);
+    expect(merged.hydrusDefaultSearchTags).toBe("tavern, night");
   });
 });
 

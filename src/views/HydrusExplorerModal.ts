@@ -4,6 +4,7 @@ import { HydrusClient, type HydrusFile, extFromMime } from "../hydrus/client";
 import type { CachedEntry, HydrusCache } from "../hydrus/cache";
 import { paginate } from "../hydrus/pagination";
 import { filterTags } from "../hydrus/tagFilter";
+import { parseTagQuery } from "../hydrus/tagInput";
 import { TagSuggester } from "./HydrusTagSuggester";
 import { debug, debugWarn } from "../debug";
 
@@ -82,6 +83,7 @@ export class HydrusExplorerModal extends Modal {
       placeholder: 'tags separated by commas, e.g. "tavern night, castle exterior, rain"',
     });
     input.style.flex = "1";
+    input.value = this.plugin.settings.hydrusDefaultSearchTags;
     this.tagSuggester = new TagSuggester({
       inputEl: input,
       fetchSuggestions: (prefix) => this.suggestTags(prefix),
@@ -129,7 +131,7 @@ export class HydrusExplorerModal extends Modal {
       sourceSel.disabled = true;
       this.localOnly = true;
     }
-    await this.runSearch("");
+    await this.runSearch(input.value);
     input.focus();
   }
 
@@ -226,10 +228,7 @@ export class HydrusExplorerModal extends Modal {
     this.pageIndex = 0;
     this.setStatus("Searching…");
 
-    const tags = this.query
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const tags = parseTagQuery(this.query);
 
     if (this.filterImages && !this.filterVideos) {
       tags.push("system:filetype is image");

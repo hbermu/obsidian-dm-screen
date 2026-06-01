@@ -42,3 +42,15 @@ export function applySuggestion(
   const next = value.slice(0, segment.start) + insertion + value.slice(segment.end);
   return { value: next, caret: segment.start + insertion.length };
 }
+
+/**
+ * Splits a comma-delimited tag query into trimmed, non-empty tags. Shared by
+ * the Hydrus explorer's search input and the default-tag setting so both apply
+ * identical parsing rules.
+ */
+export function parseTagQuery(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+}

@@ -26,6 +26,7 @@ export interface DmScreenSettings {
   hydrusDefaultLoop: boolean;
   hydrusDefaultMuted: boolean;
   hydrusIgnoredTagPatterns: string[];
+  hydrusDefaultSearchTags: string;
   // D&D Beyond integration
   ddbEnabled: boolean;
   ddbCobaltSession: string;
@@ -64,6 +65,7 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
     "wd v1\\.4 vit v2 tagger ai generated tags",
     "rating:.*",
   ],
+  hydrusDefaultSearchTags: "",
   ddbEnabled: false,
   ddbCobaltSession: "",
   combatTrackerScale: 1,
@@ -309,6 +311,21 @@ export class DmScreenSettingTab extends PluginSettingTab {
           this.plugin.settings.hydrusDefaultMuted = value;
           await this.plugin.saveSettings();
         })
+      );
+
+    new Setting(containerEl)
+      .setName("Default search tags")
+      .setDesc(
+        'Tags pre-filled in the search box when opening the Hydrus Explorer (comma-separated, e.g. "landscape, no humans"). Leave empty to start with a blank search.'
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("landscape, no humans")
+          .setValue(this.plugin.settings.hydrusDefaultSearchTags)
+          .onChange(async (value) => {
+            this.plugin.settings.hydrusDefaultSearchTags = value;
+            await this.plugin.saveSettings();
+          })
       );
 
     new Setting(containerEl)

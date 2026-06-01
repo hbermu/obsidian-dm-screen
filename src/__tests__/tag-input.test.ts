@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeSegment, applySuggestion } from "../hydrus/tagInput";
+import { activeSegment, applySuggestion, parseTagQuery } from "../hydrus/tagInput";
 
 describe("activeSegment", () => {
   it("returns the empty segment for an empty input", () => {
@@ -51,5 +51,34 @@ describe("applySuggestion", () => {
       value: "tavern, ",
       caret: 8,
     });
+  });
+});
+
+describe("parseTagQuery", () => {
+  it("returns an empty array for an empty string", () => {
+    expect(parseTagQuery("")).toEqual([]);
+  });
+
+  it("returns an empty array for whitespace-only input", () => {
+    expect(parseTagQuery("   ")).toEqual([]);
+  });
+
+  it("splits comma-delimited tags and trims them", () => {
+    expect(parseTagQuery("tavern, night, rain")).toEqual([
+      "tavern",
+      "night",
+      "rain",
+    ]);
+  });
+
+  it("drops empty segments from leading/trailing/double commas", () => {
+    expect(parseTagQuery(",tavern,,night,")).toEqual(["tavern", "night"]);
+  });
+
+  it("preserves spaces inside multi-word tags", () => {
+    expect(parseTagQuery("castle exterior, no humans")).toEqual([
+      "castle exterior",
+      "no humans",
+    ]);
   });
 });
