@@ -27,18 +27,49 @@ jobs:
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Skip when main carries a beta version (no-op)
+      - name: Decide whether to publish
         id: skip_check
-        if: steps.ver.outputs.is_prerelease == 'true' && github.ref == 'refs/heads/main'
+        env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          IS_PRERELEASE: ${{ steps.ver.outputs.is_prerelease }}
         run: |
-          echo "main currently holds a -beta version; nothing to publish from main."
-          echo "skip=true" >> $GITHUB_OUTPUT
+          skip=false
+          reason=""
+          if [ "$IS_PRERELEASE" = "true" ] && [ "$REF" = "refs/heads/main" ]; then
+            skip=true
+            reason="main currently holds a -beta version; publication happens on the release/v* branch instead."
+          elif [ "$IS_PRERELEASE" = "false" ] && [ "$REF" != "refs/heads/main" ]; then
+            case "$REF_NAME" in
+              release/v*)
+                skip=true
+                reason="Stable version on a release/* branch; publication happens after the branch merges to main."
+                ;;
+            esac
+          fi
+          if [ "$skip" = "true" ]; then
+            echo "$reason"
+          fi
+          echo "skip=$skip" >> $GITHUB_OUTPUT
 
-      - name: Refuse stable publishes from non-main
+      - name: Refuse stable publishes from non-main, non-release branches
         if: steps.skip_check.outputs.skip != 'true' && steps.ver.outputs.is_prerelease == 'false' && github.ref != 'refs/heads/main'
         run: |
-          echo "::error::Stable releases must be published from main."
+          echo "::error::Stable releases live on main or on a release/v* branch. Current ref is '${{ github.ref_name }}'."
           exit 1
+
+      - name: Refuse prerelease publishes from outside release/v* branches
+        if: steps.skip_check.outputs.skip != 'true' && steps.ver.outputs.is_prerelease == 'true' && github.ref != 'refs/heads/main'
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          case "$REF_NAME" in
+            release/v*) ;;
+            *)
+              echo "::error::Prereleases live on release/v* branches only. Current ref is '$REF_NAME'."
+              exit 1
+              ;;
+          esac
 
       - name: Sanity-check version against branch (prereleases only)
         if: steps.skip_check.outputs.skip != 'true' && steps.ver.outputs.is_prerelease == 'true' && github.ref != 'refs/heads/main'

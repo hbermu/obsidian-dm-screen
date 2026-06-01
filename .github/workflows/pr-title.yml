@@ -12,11 +12,11 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run: |
-          if ! echo "$TITLE" | grep -qE '^(feat|feature|fix|hotfix|chore|refactor|docs|test|ci|release)(\([a-z0-9-]+\))?: .{10,}$'; then
+          if ! echo "$TITLE" | grep -qE '^release(\([a-z0-9-]+\))?: .+$|^(feat|feature|fix|hotfix|chore|refactor|docs|test|ci)(\([a-z0-9-]+\))?: .{10,}$'; then
             echo "::error::PR title '$TITLE' does not match Conventional Commits."
             echo "Format: <type>(<scope>): <subject>"
             echo "Types: feat, fix, hotfix, chore, refactor, docs, test, ci, release"
             echo "Scope (optional): a feature dir under .agent/features/ or deps/release/repo"
-            echo "Subject: at least 10 chars, imperative mood, no trailing period"
+            echo "Subject: at least 10 chars (imperative mood, no trailing period); release titles may be shorter, e.g. 'release: v0.9.0'."
             exit 1
           fi
