@@ -5,7 +5,7 @@ on:
     types: [opened, reopened, edited, synchronize]
 
 jobs:
-  lint:
+  pr-title-lint:
     runs-on: ubuntu-latest
     steps:
       - name: Validate PR title
