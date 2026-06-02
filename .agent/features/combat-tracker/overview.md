@@ -36,6 +36,7 @@
 14. The player shall render HP as a condition word for hostile combatants: `Well` (100%), `Hurt` (<100%), `Bloodied` (≤50%), `Down` (≤0). Allies (`friendly` or `isPlayer`) shall show both numeric HP and condition unless `hideHp` is set.
 15. Round-1 reveal behaviour is specified in `round-1-reveal.md`.
 16. The player-screen tracker panel (`#initiative-tracker`) shall be rendered with a translucent dark background (`rgba(10, 10, 10, 0.55)`) layered over `backdrop-filter: blur(10px)` so the player-screen background remains partly visible through the panel while combatant text stays legible.
+17. Stopping the Player Screen server (via the Stop Server button, the `Toggle Player Screen Server` command, or plugin unload) shall invoke `stopAllCombatBroadcast` on every open DM Control Panel view *before* tearing down the server. This guarantees the D&D Beyond poller is cancelled and no further encounter/character requests fire once there is no player screen to receive the broadcast.
 
 ## Broadcast / IPC
 

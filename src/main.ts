@@ -179,9 +179,20 @@ export default class DmScreenPlugin extends Plugin {
   stopServer() {
     if (this.server) {
       debug("stopServer");
+      this.stopCombatBroadcastsInOpenPanels();
       this.server.stop();
       this.server = null;
       new Notice("Player Screen server stopped");
+    }
+  }
+
+  private stopCombatBroadcastsInOpenPanels(): void {
+    const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
+    for (const leaf of leaves) {
+      const view = leaf.view as DmControlPanel;
+      if (typeof view.stopAllCombatBroadcast === "function") {
+        view.stopAllCombatBroadcast();
+      }
     }
   }
 
