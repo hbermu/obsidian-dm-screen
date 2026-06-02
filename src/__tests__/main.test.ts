@@ -513,6 +513,7 @@ describe("DmScreenPlugin", () => {
               initiative: 14,
               active: true,
               hidden: false,
+              statuses: ["poisoned"],
             }),
           ],
           round: 1,
