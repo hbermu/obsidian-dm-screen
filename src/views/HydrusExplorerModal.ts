@@ -472,7 +472,9 @@ export class HydrusExplorerModal extends Modal {
         new Notice("Open the DM Control Panel before adding layers.", 5000);
         return;
       }
-      panel.addImageLayer(`Hydrus ${entry.hash.slice(0, 8)}`, dataUrl, "hydrus", true);
+      const base = layerLabelFromTags(tile.knownTags, entry.hash);
+      const label = uniqueLayerLabel(panel.imageLayers, base);
+      panel.addImageLayer(label, dataUrl, "hydrus", true);
       await this.cache.markUsed(entry.hash);
       new Notice("Added as image layer.");
     } catch (err) {
@@ -607,4 +609,26 @@ function encodeForVaultUrl(vaultPath: string): string {
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/");
+}
+
+export function layerLabelFromTags(tags: string[], hash: string): string {
+  for (const tag of tags) {
+    if (tag.toLowerCase().startsWith("name:")) {
+      const value = tag.slice(5).trim();
+      if (value) return value;
+    }
+  }
+  return `Hydrus ${hash.slice(0, 8)}`;
+}
+
+export function uniqueLayerLabel(
+  layers: { label: string }[],
+  base: string
+): string {
+  const taken = new Set(layers.map((l) => l.label.toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let n = 2; ; n++) {
+    const candidate = `${base} ${n}`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
 }

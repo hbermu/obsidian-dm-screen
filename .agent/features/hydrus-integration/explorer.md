@@ -22,6 +22,7 @@
 7. Each local tile shall load its thumbnail from the cached `thumbVaultPath` via `vault.adapter.getResourcePath`.
 8. A regular click on an image tile shall add the file as an image layer on the open DM Control Panel (see `../image-layers/overview.md` and `cache.md`). When the tile's MIME is `video/*`, the click shall instead show the Notice `Videos can only be set as background. Shift-click the tile or use the ⋮ menu.` and do nothing else.
 8a. A Shift-click on any tile shall set the file as the player background (see `../background-media/overview.md` and `cache.md`).
+8b. The label assigned to a Hydrus-sourced image layer shall be the value of the file's first `name:` tag (the prefix `name:` stripped, surrounding whitespace trimmed). When the file has no `name:` tag, the label shall fall back to `Hydrus <first 8 hex chars of hash>`. When that label collides with an existing layer (case-insensitive), the modal shall append the smallest integer suffix `>= 2` that yields a unique label (e.g. `Goblin`, then `Goblin 2`, `Goblin 3`).
 9. Each tile shall expose a `⋮` button that opens a context menu with at least: a tag list (filtered through `hydrusIgnoredTagPatterns`), a Copy tags action, and a `Set as background` action that works for both images and videos.
 10. The modal shall display a banner element (`dm-hydrus-banner`) for transient status/error messages.
 
