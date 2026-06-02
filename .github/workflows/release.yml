@@ -1,22 +1,156 @@
 name: release
 
 on:
+  pull_request:
+    types: [closed]
+    branches: [main]
   push:
     branches:
-      - main
       - 'release/v*'
 
 jobs:
   publish:
+    if: >
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+      github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && 'main' || github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Read version from manifest.json
+      - name: Determine bump from PR labels (merge path)
+        if: github.event_name == 'pull_request'
+        id: pr_bump
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          labels=$(echo "$LABELS" | jq -r '.[]')
+          if echo "$labels" | grep -qx "release:skip"; then
+            echo "type=skip" >> $GITHUB_OUTPUT
+          elif echo "$labels" | grep -qx "release:major"; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif echo "$labels" | grep -qx "release:minor"; then
+            echo "type=minor" >> $GITHUB_OUTPUT
+          else
+            echo "type=patch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip release when label says so
+        if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type == 'skip'
+        run: |
+          echo "Release skipped (release:skip label on PR #${{ github.event.pull_request.number }})."
+          exit 0
+
+      # ────────────── Merge-to-main path: auto-bump and publish stable ──────────────
+
+      - name: Compute next stable version
+        if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
+        id: next
+        env:
+          BUMP: ${{ steps.pr_bump.outputs.type }}
+        run: |
+          current=$(jq -r .version manifest.json)
+          stripped=${current%-beta.*}
+          IFS=. read -r MA MI PA <<< "$stripped"
+          case "$BUMP" in
+            major) MA=$((MA+1)); MI=0; PA=0 ;;
+            minor) MI=$((MI+1)); PA=0 ;;
+            patch) PA=$((PA+1)) ;;
+          esac
+          echo "version=$MA.$MI.$PA" >> $GITHUB_OUTPUT
+
+      - name: Bump version in three files
+        if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+          CURRENT: $(jq -r .version manifest.json)
+        run: |
+          current=$(jq -r .version manifest.json)
+          for f in package.json package-lock.json manifest.json; do
+            tmp=$(mktemp)
+            jq --arg v "$VERSION" '.version = $v' "$f" > "$tmp" && mv "$tmp" "$f"
+          done
+          tmp=$(mktemp)
+          jq --arg v "$VERSION" '.packages[""].version = $v' package-lock.json > "$tmp" && mv "$tmp" package-lock.json
+
+      - name: Build artefacts (merge path)
+        if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
+        run: make build
+
+      - name: Build categorized release notes
+        if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
+        id: notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          prev_tag=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "")
+          if [ -n "$prev_tag" ]; then
+            since=$(git log -1 --format=%cI "$prev_tag")
+          else
+            since="1970-01-01T00:00:00Z"
+          fi
+          prs=$(gh pr list --state merged --base main \
+              --search "merged:>$since" \
+              --json number,title --limit 200)
+
+          cat_match() {
+            echo "$prs" | jq -r --arg re "$1" \
+              '.[] | select(.title | test($re; "i")) | "- \(.title) (#\(.number))"'
+          }
+          features=$(cat_match '^(feat|feature)(\(|:)')
+          fixes=$(cat_match '^(fix|hotfix)(\(|:)')
+          docs=$(cat_match '^docs(\(|:)')
+          ci=$(cat_match '^(ci|chore|build)(\(|:)')
+          other=$(cat_match '^(refactor|test|perf|style|revert|release)(\(|:)')
+
+          {
+            [ -n "$features" ] && printf "### Features\n%s\n\n" "$features"
+            [ -n "$fixes" ]    && printf "### Fixes\n%s\n\n" "$fixes"
+            [ -n "$docs" ]     && printf "### Documentation\n%s\n\n" "$docs"
+            [ -n "$ci" ]       && printf "### Build & CI\n%s\n\n" "$ci"
+            [ -n "$other" ]    && printf "### Other\n%s\n\n" "$other"
+            if [ -n "$prev_tag" ]; then
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...v${VERSION}"
+            fi
+          } > notes.md
+          echo "Generated notes:"
+          cat notes.md
+
+      - name: Commit bump, tag, push
+        if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json manifest.json
+          git commit -m "release: v$VERSION [skip ci]"
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin main
+          git push origin "v$VERSION"
+
+      - name: Publish stable release
+        if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+              --title "v$VERSION" \
+              --notes-file notes.md \
+              main.js manifest.json styles.css
+
+      # ────────────── Push-to-release/v* path: beta only ──────────────
+
+      - name: Read version from manifest.json (push path)
+        if: github.event_name == 'push'
         id: ver
         run: |
           VERSION=$(jq -r .version manifest.json)
@@ -27,7 +161,8 @@ jobs:
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Decide whether to publish
+      - name: Decide whether to publish (push path)
+        if: github.event_name == 'push'
         id: skip_check
         env:
           REF: ${{ github.ref }}
@@ -36,14 +171,11 @@ jobs:
         run: |
           skip=false
           reason=""
-          if [ "$IS_PRERELEASE" = "true" ] && [ "$REF" = "refs/heads/main" ]; then
-            skip=true
-            reason="main currently holds a -beta version; publication happens on the release/v* branch instead."
-          elif [ "$IS_PRERELEASE" = "false" ] && [ "$REF" != "refs/heads/main" ]; then
+          if [ "$IS_PRERELEASE" = "false" ]; then
             case "$REF_NAME" in
               release/v*)
                 skip=true
-                reason="Stable version on a release/* branch; publication happens after the branch merges to main."
+                reason="Stable version on release/* branch; stable releases publish on merge to main."
                 ;;
             esac
           fi
@@ -52,14 +184,8 @@ jobs:
           fi
           echo "skip=$skip" >> $GITHUB_OUTPUT
 
-      - name: Refuse stable publishes from non-main, non-release branches
-        if: steps.skip_check.outputs.skip != 'true' && steps.ver.outputs.is_prerelease == 'false' && github.ref != 'refs/heads/main'
-        run: |
-          echo "::error::Stable releases live on main or on a release/v* branch. Current ref is '${{ github.ref_name }}'."
-          exit 1
-
-      - name: Refuse prerelease publishes from outside release/v* branches
-        if: steps.skip_check.outputs.skip != 'true' && steps.ver.outputs.is_prerelease == 'true' && github.ref != 'refs/heads/main'
+      - name: Refuse prerelease publishes from unexpected branches
+        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true' && steps.ver.outputs.is_prerelease == 'true'
         env:
           REF_NAME: ${{ github.ref_name }}
         run: |
@@ -71,8 +197,8 @@ jobs:
               ;;
           esac
 
-      - name: Sanity-check version against branch (prereleases only)
-        if: steps.skip_check.outputs.skip != 'true' && steps.ver.outputs.is_prerelease == 'true' && github.ref != 'refs/heads/main'
+      - name: Sanity-check prerelease branch name matches version (push path)
+        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true' && steps.ver.outputs.is_prerelease == 'true'
         env:
           REF_NAME: ${{ github.ref_name }}
           VERSION: ${{ steps.ver.outputs.version }}
@@ -83,9 +209,9 @@ jobs:
             exit 1
           fi
 
-      - name: Check whether tag already exists
+      - name: Bail if prerelease tag already exists
+        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true'
         id: tag_check
-        if: steps.skip_check.outputs.skip != 'true'
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
@@ -96,12 +222,12 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build artefacts
-        if: steps.skip_check.outputs.skip != 'true' && steps.tag_check.outputs.exists == 'false'
+      - name: Build prerelease artefacts
+        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true' && steps.tag_check.outputs.exists == 'false'
         run: make build
 
-      - name: Create annotated tag
-        if: steps.skip_check.outputs.skip != 'true' && steps.tag_check.outputs.exists == 'false'
+      - name: Create prerelease tag
+        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true' && steps.tag_check.outputs.exists == 'false'
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
@@ -110,17 +236,14 @@ jobs:
           git tag -a "v$VERSION" -m "v$VERSION"
           git push origin "v$VERSION"
 
-      - name: Create release
-        if: steps.skip_check.outputs.skip != 'true' && steps.tag_check.outputs.exists == 'false'
+      - name: Publish prerelease
+        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true' && steps.tag_check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.ver.outputs.version }}
-          IS_PRERELEASE: ${{ steps.ver.outputs.is_prerelease }}
         run: |
-          PRERELEASE_FLAG=""
-          if [ "$IS_PRERELEASE" = "true" ]; then PRERELEASE_FLAG="--prerelease"; fi
           gh release create "v$VERSION" \
-            --title "v$VERSION" \
-            --generate-notes \
-            $PRERELEASE_FLAG \
-            main.js manifest.json styles.css
+              --title "v$VERSION" \
+              --generate-notes \
+              --prerelease \
+              main.js manifest.json styles.css

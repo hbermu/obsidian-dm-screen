@@ -1,0 +1,38 @@
+name: spec-update-check
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+    branches: [main]
+
+jobs:
+  spec-update-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect spec-update need
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          if echo "$LABELS" | jq -r '.[]' | grep -qx "spec:not-needed"; then
+            echo "spec:not-needed label present; skipping check."
+            exit 0
+          fi
+
+          src_changed=$(git diff --name-only "$BASE" "$HEAD" -- \
+              'src/' ':!src/__tests__/' ':!src/global.d.ts' \
+              | grep -E '\.(ts|css|html)$' | wc -l | tr -d ' ')
+          spec_changed=$(git diff --name-only "$BASE" "$HEAD" -- \
+              '.agent/features/' | grep '\.md$' | wc -l | tr -d ' ')
+
+          if [ "$src_changed" -gt 0 ] && [ "$spec_changed" -eq 0 ]; then
+            echo "::error::PR changes src/ files but no .agent/features/ spec was updated."
+            echo "Either update the matching spec(s) for the affected feature, or apply the label 'spec:not-needed' if the change is genuinely behaviour-free."
+            exit 1
+          fi
+          echo "spec-update rule satisfied (src_changed=$src_changed, spec_changed=$spec_changed)."
