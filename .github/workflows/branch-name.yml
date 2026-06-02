@@ -8,7 +8,12 @@ jobs:
   branch-name-lint:
     runs-on: ubuntu-latest
     steps:
+      - name: Bypass for Dependabot
+        if: ${{ github.actor == 'dependabot[bot]' || startsWith(github.head_ref, 'dependabot/') }}
+        run: echo "Skipping branch-name lint for Dependabot-authored PR."
+
       - name: Validate head branch name
+        if: ${{ github.actor != 'dependabot[bot]' && !startsWith(github.head_ref, 'dependabot/') }}
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |

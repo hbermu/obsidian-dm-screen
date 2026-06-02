@@ -39,6 +39,7 @@ DM Screen is an Obsidian plugin for running D&D 5e sessions in-person. It pairs 
 - When a PR changes `src/` files, the matching `.agent/features/` spec MUST be updated in the same PR. The `spec-update-check` CI gate enforces this. Apply `spec:not-needed` only when the change is truly behaviour-free (e.g. a comment-only edit, a CI tweak).
 - Merges are squash-only; the PR title becomes the squash-commit subject on `main` (make it grep-worthy — future `git log --grep` runs depend on it). Merged branches are auto-deleted.
 - No approving reviews are required (solo project); admin bypass exists for break-glass emergencies. Do not request reviews from anyone.
+- Dependabot PRs are exempt from `branch-name-lint` and `pr-title-lint` (Dependabot owns the `dependabot/...` branch name and is configured in `.github/dependabot.yml` to emit `chore(deps): …` titles). Every other required check (`typecheck`, `test`, `build`, `spec-update-check`) still applies.
 
 Examples of compliant PR titles:
 
