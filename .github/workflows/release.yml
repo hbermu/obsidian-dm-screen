@@ -49,29 +49,33 @@ jobs:
 
       # ────────────── Merge-to-main path: auto-bump and publish stable ──────────────
 
-      - name: Compute next stable version
+      - name: Compute next stable version (from latest stable tag)
         if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
         id: next
         env:
           BUMP: ${{ steps.pr_bump.outputs.type }}
         run: |
-          current=$(jq -r .version manifest.json)
-          stripped=${current%-beta.*}
-          IFS=. read -r MA MI PA <<< "$stripped"
+          latest=$(git tag --list 'v*' --sort=-version:refname \
+              | grep -vE -- '-beta\.[0-9]+$' | head -1)
+          if [ -z "$latest" ]; then
+            current="0.0.0"
+          else
+            current="${latest#v}"
+          fi
+          IFS=. read -r MA MI PA <<< "$current"
           case "$BUMP" in
             major) MA=$((MA+1)); MI=0; PA=0 ;;
             minor) MI=$((MI+1)); PA=0 ;;
             patch) PA=$((PA+1)) ;;
           esac
           echo "version=$MA.$MI.$PA" >> $GITHUB_OUTPUT
+          echo "Bumping from $current ($BUMP) to $MA.$MI.$PA"
 
-      - name: Bump version in three files
+      - name: Bump version in three files (working tree, not committed yet)
         if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
         env:
           VERSION: ${{ steps.next.outputs.version }}
-          CURRENT: $(jq -r .version manifest.json)
         run: |
-          current=$(jq -r .version manifest.json)
           for f in package.json package-lock.json manifest.json; do
             tmp=$(mktemp)
             jq --arg v "$VERSION" '.version = $v' "$f" > "$tmp" && mv "$tmp" "$f"
@@ -123,17 +127,20 @@ jobs:
           echo "Generated notes:"
           cat notes.md
 
-      - name: Commit bump, tag, push
+      - name: Tag the bumped commit (without touching main)
         if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
         env:
           VERSION: ${{ steps.next.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Commit the bump on a detached head so we can tag a commit that
+          # contains the new version files. The branch is never pushed; only
+          # the tag is, so main stays untouched and protection is respected.
+          git checkout --detach
           git add package.json package-lock.json manifest.json
-          git commit -m "release: v$VERSION [skip ci]"
+          git commit -m "release: v$VERSION"
           git tag -a "v$VERSION" -m "v$VERSION"
-          git push origin main
           git push origin "v$VERSION"
 
       - name: Publish stable release
