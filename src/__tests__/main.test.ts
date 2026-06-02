@@ -140,7 +140,7 @@ describe("DmScreenPlugin", () => {
     });
 
     it("returns null if HydrusClient constructor throws", () => {
-      (HydrusClient as any).mockImplementationOnce(() => { throw new Error("bad url"); });
+      (HydrusClient as any).mockImplementationOnce(function () { throw new Error("bad url"); });
       const plugin = makePlugin({
         hydrusEnabled: true,
         hydrusApiUrl: "http://hydrus.local:45869",
@@ -187,7 +187,7 @@ describe("DmScreenPlugin", () => {
   describe("startServer", () => {
     it("creates and starts a PlayerScreenServer", () => {
       const fakeServer = makeFakeServer();
-      (PlayerScreenServer as any).mockImplementation(() => fakeServer);
+      (PlayerScreenServer as any).mockImplementation(function () { return fakeServer; });
       const plugin = makePlugin({ serverPort: 4000, maxClients: 5 });
       plugin.startServer();
       expect(plugin.server).not.toBeNull();
@@ -199,7 +199,7 @@ describe("DmScreenPlugin", () => {
 
     it("does nothing if server is already running", () => {
       const fakeServer = makeFakeServer();
-      (PlayerScreenServer as any).mockImplementation(() => fakeServer);
+      (PlayerScreenServer as any).mockImplementation(function () { return fakeServer; });
       const plugin = makePlugin();
       plugin.startServer();
       const firstServer = plugin.server;
@@ -246,7 +246,7 @@ describe("DmScreenPlugin", () => {
 
   describe("toggleServer", () => {
     it("starts server when not running", () => {
-      (PlayerScreenServer as any).mockImplementation(() => makeFakeServer());
+      (PlayerScreenServer as any).mockImplementation(function () { return makeFakeServer(); });
       const plugin = makePlugin();
       plugin.toggleServer();
       expect(plugin.server).not.toBeNull();
@@ -667,9 +667,9 @@ describe("DmScreenPlugin", () => {
   describe("initHydrusCache", () => {
     beforeEach(() => {
       const fakeHydrusCache = { sweep: vi.fn(async () => 0), clear: vi.fn(async () => 0) };
-      (HydrusCache as any).mockImplementation(() => fakeHydrusCache);
+      (HydrusCache as any).mockImplementation(function () { return fakeHydrusCache; });
       const fakeDdbImageCache = { sweep: vi.fn(async () => 0) };
-      (DdbImageCache as any).mockImplementation(() => fakeDdbImageCache);
+      (DdbImageCache as any).mockImplementation(function () { return fakeDdbImageCache; });
     });
 
     it("creates HydrusCache with settings folder and TTL", () => {
