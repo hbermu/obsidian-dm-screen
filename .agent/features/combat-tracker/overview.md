@@ -8,7 +8,7 @@
 - `src/main.ts` — `sendInitiativeUpdate`, `onInitiativeStateChange`, `onInitiativeStop`, `lookupStatblock` for plugin-synced creatures
 - `src/views/DnDBeyondPanel.ts` — D&D Beyond tab implementation (specified in `../dndbeyond-integration/`)
 - `src/player/player.ts` — `updateInitiative`, `applyCombatScale`
-- `src/player/player.css` — `#initiative-tracker`, `.init-entry`, `.init-active`, `.init-friendly`, condition colour classes
+- `src/player/player.css` — `#initiative-tracker` (translucent panel chrome), `.init-entry`, `.init-active`, `.init-friendly`, condition colour classes
 
 ## Settings used
 
@@ -35,6 +35,7 @@
 13. The player shall scroll the active combatant into view (`scroll-behavior: smooth`).
 14. The player shall render HP as a condition word for hostile combatants: `Well` (100%), `Hurt` (<100%), `Bloodied` (≤50%), `Down` (≤0). Allies (`friendly` or `isPlayer`) shall show both numeric HP and condition unless `hideHp` is set.
 15. Round-1 reveal behaviour is specified in `round-1-reveal.md`.
+16. The player-screen tracker panel (`#initiative-tracker`) shall be rendered with a translucent dark background (`rgba(10, 10, 10, 0.55)`) layered over `backdrop-filter: blur(10px)` so the player-screen background remains partly visible through the panel while combatant text stays legible.
 
 ## Broadcast / IPC
 
