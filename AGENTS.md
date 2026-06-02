@@ -133,7 +133,9 @@ Use `release:skip` for purely-internal PRs that ship no observable change (CI re
 
 1. Open a PR. Apply the right bump label (or none for patch).
 2. CI runs the six required checks. Squash-merge to `main`.
-3. The release workflow reads the labels, bumps the three version files on `main` with a `release: vX.Y.Z [skip ci]` commit, tags `vX.Y.Z`, builds `main.js`, and publishes a GitHub release with categorized notes (Features / Fixes / Documentation / Build & CI / Other) built from PR titles since the previous tag.
+3. The release workflow reads the labels, computes the next version from the latest stable tag (not `manifest.json` — see below), bumps the three version files in a detached commit, tags `vX.Y.Z`, builds `main.js`, and publishes a GitHub release with categorized notes (Features / Fixes / Documentation / Build & CI / Other) built from PR titles since the previous tag.
+
+**Version source of truth.** The latest git tag is authoritative for "what's released". `manifest.json` on `main` stays as it was on the last manual edit and may lag behind — that is fine. The release workflow never pushes to `main`; it creates a detached commit, tags it, and pushes only the tag. The released asset carries the correct bumped version. Local `make build` on `main` produces a bundle stamped with whatever `manifest.json` currently says, so for development you should treat `manifest.json` as "version under development" rather than "version released".
 
 ### Beta flow (rare)
 
