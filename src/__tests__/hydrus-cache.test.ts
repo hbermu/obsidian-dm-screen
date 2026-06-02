@@ -54,7 +54,7 @@ describe("HydrusCache", () => {
   beforeEach(() => {
     adapter = new MemoryAdapter();
     cache = new HydrusCache(null, {
-      folder: ".dm-screen/bg",
+      folder: ".dm-screen/hydrus",
       ttlDays: 30,
       adapter,
     });
@@ -64,11 +64,11 @@ describe("HydrusCache", () => {
     const client = fakeClient();
     const { entry, isFresh } = await cache.fetchAndCache(client, fakeFile());
     expect(isFresh).toBe(true);
-    expect(entry.vaultPath).toBe(".dm-screen/bg/h1.png");
-    expect(entry.thumbVaultPath).toBe(".dm-screen/bg/h1.thumb.jpg");
-    expect(adapter.bin.has(".dm-screen/bg/h1.png")).toBe(true);
-    expect(adapter.bin.has(".dm-screen/bg/h1.thumb.jpg")).toBe(true);
-    expect(adapter.text.has(".dm-screen/bg/index.json")).toBe(true);
+    expect(entry.vaultPath).toBe(".dm-screen/hydrus/h1.png");
+    expect(entry.thumbVaultPath).toBe(".dm-screen/hydrus/h1.thumb.jpg");
+    expect(adapter.bin.has(".dm-screen/hydrus/h1.png")).toBe(true);
+    expect(adapter.bin.has(".dm-screen/hydrus/h1.thumb.jpg")).toBe(true);
+    expect(adapter.text.has(".dm-screen/hydrus/index.json")).toBe(true);
     expect(entry.lastUsedAt).toBe(0);
   });
 
@@ -102,7 +102,7 @@ describe("HydrusCache", () => {
     await cache.markUsed("h1");
 
     // Cheat: rewrite the index to backdate lastUsedAt.
-    const indexPath = ".dm-screen/bg/index.json";
+    const indexPath = ".dm-screen/hydrus/index.json";
     const idx = JSON.parse(adapter.text.get(indexPath)!) as {
       entries: Record<string, { lastUsedAt: number }>;
     };
@@ -110,11 +110,11 @@ describe("HydrusCache", () => {
     adapter.text.set(indexPath, JSON.stringify(idx));
 
     // Reopen the cache so loadIndex re-reads from disk.
-    const fresh = new HydrusCache(null, { folder: ".dm-screen/bg", ttlDays: 30, adapter });
+    const fresh = new HydrusCache(null, { folder: ".dm-screen/hydrus", ttlDays: 30, adapter });
     const removed = await fresh.sweep();
     expect(removed).toBe(1);
-    expect(adapter.bin.has(".dm-screen/bg/h1.png")).toBe(false);
-    expect(adapter.bin.has(".dm-screen/bg/h1.thumb.jpg")).toBe(false);
+    expect(adapter.bin.has(".dm-screen/hydrus/h1.png")).toBe(false);
+    expect(adapter.bin.has(".dm-screen/hydrus/h1.thumb.jpg")).toBe(false);
     expect(await fresh.get("h1")).toBeUndefined();
   });
 
@@ -122,14 +122,14 @@ describe("HydrusCache", () => {
     const client = fakeClient();
     await cache.fetchAndCache(client, fakeFile()); // lastUsedAt = 0 → ignored by sweep
     expect(await cache.sweep()).toBe(0);
-    expect(adapter.bin.has(".dm-screen/bg/h1.png")).toBe(true);
+    expect(adapter.bin.has(".dm-screen/hydrus/h1.png")).toBe(true);
   });
 
   it("evict removes a single entry from disk and index", async () => {
     const client = fakeClient();
     await cache.fetchAndCache(client, fakeFile());
     await cache.evict("h1");
-    expect(adapter.bin.has(".dm-screen/bg/h1.png")).toBe(false);
+    expect(adapter.bin.has(".dm-screen/hydrus/h1.png")).toBe(false);
     expect(await cache.get("h1")).toBeUndefined();
   });
 
@@ -159,7 +159,7 @@ describe("HydrusCache", () => {
     } as Partial<HydrusClient>);
     const { entry } = await cache.fetchAndCache(client, fakeFile());
     expect(entry.thumbVaultPath).toBe("");
-    expect(adapter.bin.has(".dm-screen/bg/h1.png")).toBe(true);
-    expect(adapter.bin.has(".dm-screen/bg/h1.thumb.jpg")).toBe(false);
+    expect(adapter.bin.has(".dm-screen/hydrus/h1.png")).toBe(true);
+    expect(adapter.bin.has(".dm-screen/hydrus/h1.thumb.jpg")).toBe(false);
   });
 });

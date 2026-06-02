@@ -14,6 +14,7 @@
 
 - `hydrusDefaultLoop` — default `loop` flag for the `show-background-media` payload when pushed from the Hydrus modal
 - `hydrusDefaultMuted` — default `muted` flag (videos autoplay only when muted)
+- `cacheBaseFolder` — Hydrus-sourced backgrounds are persisted by `HydrusCache` at `<cacheBaseFolder>/hydrus/<hash>.<ext>` and served back over `/vault/`
 
 ## Requirements
 

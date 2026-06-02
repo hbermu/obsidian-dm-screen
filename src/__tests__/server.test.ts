@@ -47,10 +47,10 @@ describe("readVaultBytes", () => {
       adapterExists,
       adapterReadBinary,
     });
-    const out = await readVaultBytes(app, ".dm-screen/bg/abc.png");
+    const out = await readVaultBytes(app, ".dm-screen/hydrus/abc.png");
     expect(new TextDecoder().decode(out!)).toBe("FROM-DISK");
-    expect(adapterExists).toHaveBeenCalledWith(".dm-screen/bg/abc.png");
-    expect(adapterReadBinary).toHaveBeenCalledWith(".dm-screen/bg/abc.png");
+    expect(adapterExists).toHaveBeenCalledWith(".dm-screen/hydrus/abc.png");
+    expect(adapterReadBinary).toHaveBeenCalledWith(".dm-screen/hydrus/abc.png");
   });
 
   it("returns null when neither the index nor the adapter can find the path", async () => {

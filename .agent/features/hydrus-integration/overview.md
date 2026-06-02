@@ -22,7 +22,7 @@
 - `hydrusAvailableTagServices` — `{ name, key }[]` populated by Fetch services
 - `hydrusTagServices` — list of selected service keys for searches
 - `hydrusTagService` — deprecated single-service name, migrated to `hydrusTagServices` on first Fetch
-- `hydrusCacheFolder` — relative vault path under which cached files live
+- `cacheBaseFolder` — relative vault path under which all plugin caches live; the Hydrus cache lives at `<cacheBaseFolder>/hydrus/`
 - `hydrusCacheTtlDays` — files unused longer than this are swept on plugin load and once per day
 - `hydrusDefaultLoop`, `hydrusDefaultMuted` — defaults for `show-background-media`
 - `hydrusDefaultSearchTags` — tags pre-filled in the explorer search box

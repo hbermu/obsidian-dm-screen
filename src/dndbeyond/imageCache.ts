@@ -21,8 +21,8 @@ export class DdbImageCache {
   private ttlMs: number;
   private index: ImageIndex | null = null;
 
-  constructor(cacheBaseFolder: string, adapter: VaultAdapterLike, ttlDays: number) {
-    this.folder = `${cacheBaseFolder.replace(/\/+$/, "")}/images`;
+  constructor(folder: string, adapter: VaultAdapterLike, ttlDays: number) {
+    this.folder = folder.replace(/^\/+|\/+$/g, "") || ".dm-screen/beyond";
     this.adapter = adapter;
     this.ttlMs = Math.max(1, ttlDays) * 24 * 60 * 60 * 1000;
   }

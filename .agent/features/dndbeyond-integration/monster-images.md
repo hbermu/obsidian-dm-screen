@@ -11,7 +11,7 @@
 
 ## Settings used
 
-- `hydrusCacheFolder` (parent path; the DDB cache lives at `<parent>/.dm-screen` or `.dm-screen` if the Hydrus folder strips to empty)
+- `cacheBaseFolder` — the DDB monster avatar cache lives at `<cacheBaseFolder>/beyond/` (default `.dm-screen/beyond/`)
 - `hydrusCacheTtlDays`
 
 ## Requirements
@@ -27,7 +27,7 @@
 5. If no DM Control Panel is open at the time, `loadMonsterImages` shall short-circuit and not download anything.
 6. `getOrDownload` shall:
    - Return the cached `vaultPath` if an entry for `monsterId` already exists and is on disk.
-   - Otherwise download the image, write it to `<folder>/<monsterId>.<ext>`, insert an index entry, and return the path.
+   - Otherwise download the image, write it to `<cacheBaseFolder>/beyond/<monsterId>.<ext>`, insert an index entry, and return the path.
 7. The DDB image cache shall be subject to the same TTL sweep as the Hydrus cache; sweep frequency is once per day during plugin uptime.
 
 ## Tests covering this

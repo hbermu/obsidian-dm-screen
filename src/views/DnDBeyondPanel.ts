@@ -285,11 +285,11 @@ export class DnDBeyondPanel {
       const avatarMap = await this.client.getMonsterImages(uniqueIds);
       debug("loadMonsterImages: avatarMap entries", avatarMap.size, [...avatarMap.entries()]);
 
-      const cacheFolder =
-        this.plugin.settings.hydrusCacheFolder.replace(/\/bg\/?$/, "") || ".dm-screen";
+      const base =
+        this.plugin.settings.cacheBaseFolder.replace(/^\/+|\/+$/g, "") || ".dm-screen";
       const adapter = this.plugin.app.vault.adapter as unknown as VaultAdapterLike;
       const ttlDays = this.plugin.settings.hydrusCacheTtlDays || 30;
-      const cache = new DdbImageCache(cacheFolder, adapter, ttlDays);
+      const cache = new DdbImageCache(`${base}/beyond`, adapter, ttlDays);
 
       const dmPanel = await this.plugin.findOpenDmControlPanel();
       if (!dmPanel) {

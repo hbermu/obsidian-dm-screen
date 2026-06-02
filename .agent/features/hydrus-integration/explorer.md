@@ -9,7 +9,7 @@
 
 ## Settings used
 
-- `hydrusDefaultSearchTags`, `hydrusDefaultLoop`, `hydrusDefaultMuted`, `hydrusIgnoredTagPatterns`, `hydrusCacheFolder`
+- `hydrusDefaultSearchTags`, `hydrusDefaultLoop`, `hydrusDefaultMuted`, `hydrusIgnoredTagPatterns`, `cacheBaseFolder`
 
 ## Requirements
 
