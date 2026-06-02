@@ -27,7 +27,7 @@ describe("DdbImageCache", () => {
 
   beforeEach(() => {
     adapter = makeAdapter();
-    cache = new DdbImageCache(".dm-screen", adapter, 30);
+    cache = new DdbImageCache(".dm-screen/beyond", adapter, 30);
     vi.mocked(requestUrl).mockReset();
   });
 
@@ -40,11 +40,11 @@ describe("DdbImageCache", () => {
 
     const path = await cache.getOrDownload(123, "https://cdn.example.com/img/123.jpeg", "Goblin");
 
-    expect(path).toBe(".dm-screen/images/123.jpeg");
+    expect(path).toBe(".dm-screen/beyond/123.jpeg");
     expect(adapter.files.has(path)).toBe(true);
     expect(requestUrl).toHaveBeenCalledOnce();
 
-    const index = JSON.parse(adapter.files.get(".dm-screen/images/index.json") as string);
+    const index = JSON.parse(adapter.files.get(".dm-screen/beyond/index.json") as string);
     expect(index.entries["123"].monsterId).toBe(123);
     expect(index.entries["123"].name).toBe("Goblin");
     expect(index.entries["123"].lastUsedAt).toBeGreaterThan(0);
@@ -59,7 +59,7 @@ describe("DdbImageCache", () => {
 
     const path = await cache.getOrDownload(123, "https://cdn.example.com/img/123.jpeg", "Goblin");
 
-    expect(path).toBe(".dm-screen/images/123.jpeg");
+    expect(path).toBe(".dm-screen/beyond/123.jpeg");
     expect(requestUrl).not.toHaveBeenCalled();
   });
 
@@ -68,14 +68,14 @@ describe("DdbImageCache", () => {
     vi.mocked(requestUrl).mockResolvedValue({ status: 200, arrayBuffer: fakeImage } as never);
 
     await cache.getOrDownload(123, "https://cdn.example.com/img/123.jpeg", "Goblin");
-    const index1 = JSON.parse(adapter.files.get(".dm-screen/images/index.json") as string);
+    const index1 = JSON.parse(adapter.files.get(".dm-screen/beyond/index.json") as string);
     const firstUsedAt = index1.entries["123"].lastUsedAt;
 
     // Simulate time passing
     vi.spyOn(Date, "now").mockReturnValue(firstUsedAt + 10000);
     await cache.getOrDownload(123, "https://cdn.example.com/img/123.jpeg", "Goblin");
 
-    const index2 = JSON.parse(adapter.files.get(".dm-screen/images/index.json") as string);
+    const index2 = JSON.parse(adapter.files.get(".dm-screen/beyond/index.json") as string);
     expect(index2.entries["123"].lastUsedAt).toBe(firstUsedAt + 10000);
     vi.restoreAllMocks();
   });
@@ -88,16 +88,16 @@ describe("DdbImageCache", () => {
     await cache.getOrDownload(456, "https://cdn.example.com/img/456.png", "Dragon");
 
     // Backdate the lastUsedAt to 60 days ago
-    const index = JSON.parse(adapter.files.get(".dm-screen/images/index.json") as string);
+    const index = JSON.parse(adapter.files.get(".dm-screen/beyond/index.json") as string);
     index.entries["456"].lastUsedAt = Date.now() - 60 * 24 * 60 * 60 * 1000;
-    adapter.files.set(".dm-screen/images/index.json", JSON.stringify(index));
+    adapter.files.set(".dm-screen/beyond/index.json", JSON.stringify(index));
 
     // Create a fresh cache instance to reload the index
-    const cache2 = new DdbImageCache(".dm-screen", adapter, 30);
+    const cache2 = new DdbImageCache(".dm-screen/beyond", adapter, 30);
     const swept = await cache2.sweep();
 
     expect(swept).toBe(1);
-    expect(adapter.files.has(".dm-screen/images/456.png")).toBe(false);
+    expect(adapter.files.has(".dm-screen/beyond/456.png")).toBe(false);
   });
 
   it("sweep keeps fresh entries", async () => {
@@ -108,7 +108,7 @@ describe("DdbImageCache", () => {
     const swept = await cache.sweep();
 
     expect(swept).toBe(0);
-    expect(adapter.files.has(".dm-screen/images/789.webp")).toBe(true);
+    expect(adapter.files.has(".dm-screen/beyond/789.webp")).toBe(true);
   });
 
   it("handles download failure gracefully", async () => {
@@ -124,6 +124,6 @@ describe("DdbImageCache", () => {
     vi.mocked(requestUrl).mockResolvedValue({ status: 200, arrayBuffer: fakeImage } as never);
 
     const path = await cache.getOrDownload(111, "https://cdn.example.com/avatars/111.png?v=2", "Orc");
-    expect(path).toBe(".dm-screen/images/111.png");
+    expect(path).toBe(".dm-screen/beyond/111.png");
   });
 });

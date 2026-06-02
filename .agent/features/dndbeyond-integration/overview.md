@@ -6,7 +6,7 @@
 
 - `src/dndbeyond/client.ts` — `DdbClient`, token refresh, encounter/character/monster API calls
 - `src/dndbeyond/poller.ts` — `DdbEncounterPoller`, min-gap pacing, circuit breaker
-- `src/dndbeyond/imageCache.ts` — `DdbImageCache`, monster-avatar download + TTL sweep (shares config with Hydrus cache folder)
+- `src/dndbeyond/imageCache.ts` — `DdbImageCache`, monster-avatar download + TTL sweep (rooted at `<cacheBaseFolder>/beyond/`)
 - `src/dndbeyond/types.ts` — type shapes
 - `src/views/DnDBeyondPanel.ts` — the D&D Beyond tab inside the COMBAT section
 - `src/settings.ts` — D&D Beyond settings section (enable, cookie, test connection)
@@ -16,7 +16,7 @@
 
 - `ddbEnabled` — gates the tab
 - `ddbCobaltSession` — the `CobaltSession` cookie used as auth
-- `hydrusCacheFolder` (parent of `<folder>` for monster image cache) — re-used so the monster cache lives at `<parent>/.dm-screen` by default
+- `cacheBaseFolder` — the monster image cache lives at `<cacheBaseFolder>/beyond/`
 - `hydrusCacheTtlDays` — re-used for the monster image cache TTL
 
 ## Requirements

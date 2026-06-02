@@ -673,15 +673,15 @@ describe("DmScreenPlugin", () => {
       (DdbImageCache as any).mockImplementation(function () { return fakeDdbImageCache; });
     });
 
-    it("creates HydrusCache with settings folder and TTL", () => {
+    it("creates HydrusCache with hydrus/ subfolder under cacheBaseFolder", () => {
       const plugin = makePlugin({
-        hydrusCacheFolder: ".custom/cache",
+        cacheBaseFolder: ".custom/cache",
         hydrusCacheTtlDays: 14,
         hydrusEnabled: false,
       });
       (plugin as any).initHydrusCache();
       expect(HydrusCache).toHaveBeenCalledWith((plugin as any).app, {
-        folder: ".custom/cache",
+        folder: ".custom/cache/hydrus",
         ttlDays: 14,
       });
       expect(plugin.hydrusCache).not.toBeNull();

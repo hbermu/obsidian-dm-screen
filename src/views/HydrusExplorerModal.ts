@@ -69,7 +69,7 @@ export class HydrusExplorerModal extends Modal {
 
   async onOpen() {
     this.modalEl.addClass("dm-hydrus-modal");
-    this.titleEl.setText("BG from Hydrus");
+    this.titleEl.setText("Image from Hydrus");
 
     const { contentEl } = this;
     contentEl.empty();
@@ -396,9 +396,9 @@ export class HydrusExplorerModal extends Modal {
       card.addEventListener("click", (evt) => {
         evt.preventDefault();
         if (evt.shiftKey) {
-          void this.handleAddAsLayer(tile);
-        } else {
           void this.handleSetBackground(tile);
+        } else {
+          void this.handleAddAsLayer(tile);
         }
       });
 
@@ -462,7 +462,7 @@ export class HydrusExplorerModal extends Modal {
   private async handleAddAsLayer(tile: Tile) {
     try {
       if (mediaTypeOf(tile.mime) !== "image") {
-        new Notice("Image layers only support still images. Use background for videos.", 5000);
+        new Notice("Videos can only be set as background. Shift-click the tile or use the ⋮ menu.", 5000);
         return;
       }
       const entry = await this.ensureCached(tile);
@@ -472,7 +472,9 @@ export class HydrusExplorerModal extends Modal {
         new Notice("Open the DM Control Panel before adding layers.", 5000);
         return;
       }
-      panel.addImageLayer(`Hydrus ${entry.hash.slice(0, 8)}`, dataUrl, "hydrus", true);
+      const base = layerLabelFromTags(tile.knownTags, entry.hash);
+      const label = uniqueLayerLabel(panel.imageLayers, base);
+      panel.addImageLayer(label, dataUrl, "hydrus", true);
       await this.cache.markUsed(entry.hash);
       new Notice("Added as image layer.");
     } catch (err) {
@@ -519,6 +521,15 @@ export class HydrusExplorerModal extends Modal {
       );
     }
     menu.addSeparator();
+
+    menu.addItem((item: any) =>
+      item
+        .setTitle("Set as background")
+        .setIcon("monitor")
+        .onClick(() => {
+          void this.handleSetBackground(tile);
+        })
+    );
 
     if (tile.kind === "remote") {
       menu.addItem((item: any) =>
@@ -598,4 +609,26 @@ function encodeForVaultUrl(vaultPath: string): string {
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/");
+}
+
+export function layerLabelFromTags(tags: string[], hash: string): string {
+  for (const tag of tags) {
+    if (tag.toLowerCase().startsWith("name:")) {
+      const value = tag.slice(5).trim();
+      if (value) return value;
+    }
+  }
+  return `Hydrus ${hash.slice(0, 8)}`;
+}
+
+export function uniqueLayerLabel(
+  layers: { label: string }[],
+  base: string
+): string {
+  const taken = new Set(layers.map((l) => l.label.toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let n = 2; ; n++) {
+    const candidate = `${base} ${n}`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
 }
