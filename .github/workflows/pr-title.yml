@@ -9,11 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Bypass for Dependabot
-        if: ${{ github.actor == 'dependabot[bot]' }}
+        if: ${{ github.actor == 'dependabot[bot]' || startsWith(github.head_ref, 'dependabot/') }}
         run: echo "Skipping PR-title lint for Dependabot-authored PR (its commit-message prefix is enforced in .github/dependabot.yml)."
 
       - name: Validate PR title
-        if: ${{ github.actor != 'dependabot[bot]' }}
+        if: ${{ github.actor != 'dependabot[bot]' && !startsWith(github.head_ref, 'dependabot/') }}
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run: |
