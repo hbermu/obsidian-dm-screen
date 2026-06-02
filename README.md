@@ -197,7 +197,7 @@ The Vitest suite mixes unit tests with integration tests that boot a real `Playe
 
 ### Contributing & AI agents
 
-Behavioural specifications for every feature live under `.agent/features/<feature>/` and are the canonical reference for what each subsystem must do. Start with [`AGENTS.md`](AGENTS.md) at the repo root for general conventions, then read the relevant feature spec before modifying any subsystem. See [`.agent/conventions.md`](.agent/conventions.md) for the spec format and the update rule (behaviour change → spec change, same commit).
+Behavioural specifications for every feature live under [`.agent/features/<feature>/`](.agent/features/) and are the canonical reference for what each subsystem must do. Start with [`AGENTS.md`](AGENTS.md) at the repo root for general conventions, then read the relevant feature spec before modifying any subsystem. See [`.agent/conventions.md`](.agent/conventions.md) for the spec format and the update rule (behaviour change → spec change, same commit).
 
 ## License
 

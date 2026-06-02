@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DdbEncounter, DdbCharacterSummary } from "../dndbeyond/types";
-import { DdbEncounterPoller, type DdbPolledState } from "../dndbeyond/poller";
+import {
+  DdbEncounterPoller,
+  CYCLE_PAUSE_MIN_MS,
+  CYCLE_PAUSE_MAX_MS,
+  type DdbPolledState,
+} from "../dndbeyond/poller";
 
 function createMockClient(opts?: {
   encounterFails?: boolean;
@@ -31,8 +36,13 @@ function createMockClient(opts?: {
   } as any;
 }
 
-beforeEach(() => { vi.useFakeTimers(); });
-afterEach(() => { vi.useRealTimers(); });
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("DdbEncounterPoller", () => {
   it("calls onUpdate with encounter and character data", async () => {
@@ -41,9 +51,7 @@ describe("DdbEncounterPoller", () => {
     const poller = new DdbEncounterPoller(client, "enc-1", (state) => updates.push(state));
 
     poller.start();
-    await vi.advanceTimersByTimeAsync(100);
-    // Allow the delay(1000) + poll to complete
-    await vi.advanceTimersByTimeAsync(1200);
+    await vi.advanceTimersByTimeAsync(10);
 
     expect(updates).toHaveLength(1);
     expect(updates[0].encounter.name).toBe("Test Fight");
@@ -57,11 +65,11 @@ describe("DdbEncounterPoller", () => {
     const poller = new DdbEncounterPoller(client, "enc-1", (state) => updates.push(state));
 
     poller.start();
-    await vi.advanceTimersByTimeAsync(1200);
+    await vi.advanceTimersByTimeAsync(10);
     poller.stop();
 
     const countAfterStop = updates.length;
-    await vi.advanceTimersByTimeAsync(10000);
+    await vi.advanceTimersByTimeAsync(20000);
     expect(updates.length).toBe(countAfterStop);
   });
 
@@ -72,16 +80,13 @@ describe("DdbEncounterPoller", () => {
 
     poller.start();
 
-    // 3 failures with MIN_CYCLE_PAUSE_MS between them
-    await vi.advanceTimersByTimeAsync(100); // 1st failure
-    await vi.advanceTimersByTimeAsync(2500); // 2nd failure
-    await vi.advanceTimersByTimeAsync(2500); // 3rd failure
-
+    for (let i = 0; i < 3; i++) {
+      await vi.advanceTimersByTimeAsync(CYCLE_PAUSE_MAX_MS + 50);
+    }
     expect(errors.length).toBeGreaterThanOrEqual(3);
 
-    // After circuit break (30s), should try again
     const callsBefore = client.getEncounter.mock.calls.length;
-    await vi.advanceTimersByTimeAsync(30000);
+    await vi.advanceTimersByTimeAsync(Math.ceil(30000 * 1.25));
     expect(client.getEncounter.mock.calls.length).toBeGreaterThan(callsBefore);
 
     poller.stop();
@@ -93,7 +98,7 @@ describe("DdbEncounterPoller", () => {
     const poller = new DdbEncounterPoller(client, "enc-1", (state) => updates.push(state));
 
     poller.start();
-    await vi.advanceTimersByTimeAsync(1200);
+    await vi.advanceTimersByTimeAsync(10);
 
     expect(updates).toHaveLength(1);
     expect(updates[0].encounter.name).toBe("Test Fight");
@@ -107,10 +112,55 @@ describe("DdbEncounterPoller", () => {
     const poller = new DdbEncounterPoller(client, "enc-1", (state) => updates.push(state));
 
     poller.start();
-    poller.start(); // no-op
-    await vi.advanceTimersByTimeAsync(1200);
+    poller.start();
+    await vi.advanceTimersByTimeAsync(10);
 
     expect(updates).toHaveLength(1);
     poller.stop();
+  });
+
+  it("fetches all PC characters in parallel within a cycle (no intra-cycle delay)", async () => {
+    const client = createMockClient({
+      encounter: {
+        players: [
+          { id: 100, name: "A", initiative: 18 },
+          { id: 200, name: "B", initiative: 17 },
+          { id: 300, name: "C", initiative: 16 },
+          { id: 400, name: "D", initiative: 15 },
+        ],
+      },
+    });
+    const poller = new DdbEncounterPoller(client, "enc-1", () => {});
+
+    poller.start();
+    // 10 ms is enough to fire the start setTimeout(0) and flush microtasks.
+    // With the old (sequential, 1 s per character) model only one
+    // getCharacter call would have happened; the parallel model fires all four.
+    await vi.advanceTimersByTimeAsync(10);
+    expect(client.getCharacter).toHaveBeenCalledTimes(4);
+    poller.stop();
+  });
+
+  it("inter-cycle pause respects [CYCLE_PAUSE_MIN_MS, CYCLE_PAUSE_MAX_MS]", async () => {
+    const client = createMockClient();
+    const poller = new DdbEncounterPoller(client, "enc-1", () => {});
+
+    // Drive Math.random() deterministically: 0 at end of cycle 1 (→ MIN pause),
+    // ~1 at end of cycle 2 (→ MAX pause). Anything after we don't care about.
+    let randIdx = 0;
+    vi.spyOn(Math, "random").mockImplementation(
+      () => [0, 0.999999, 0][randIdx++] ?? 0
+    );
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
+    poller.start();
+    await vi.advanceTimersByTimeAsync(10); // cycle 1 fires, schedules cycle 2 at MIN
+    await vi.advanceTimersByTimeAsync(CYCLE_PAUSE_MIN_MS + 100); // cycle 2 fires, schedules cycle 3 at MAX
+    poller.stop();
+
+    const cycleDelays = setTimeoutSpy.mock.calls
+      .map((c) => c[1])
+      .filter((d): d is number => typeof d === "number" && d > 0);
+    expect(cycleDelays).toEqual([CYCLE_PAUSE_MIN_MS, CYCLE_PAUSE_MAX_MS]);
   });
 });

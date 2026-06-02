@@ -64,7 +64,7 @@ body {
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-behavior: smooth;
-  background: rgba(10, 10, 10, 0.9);
+  background: rgba(10, 10, 10, 0.55);
   border: 1px solid rgba(201, 170, 113, 0.4);
   border-radius: 12px;
   padding: 16px;

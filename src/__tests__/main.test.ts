@@ -225,6 +225,23 @@ describe("DmScreenPlugin", () => {
       plugin.stopServer();
       expect(Notice).not.toHaveBeenCalledWith("Player Screen server stopped");
     });
+
+    it("stops combat broadcast on open DM Control Panel views before the server", () => {
+      const plugin = makePlugin();
+      const fakeServer = makeFakeServer();
+      plugin.server = fakeServer as any;
+      const stopBroadcast = vi.fn();
+      const fakeLeaf = { view: { stopAllCombatBroadcast: stopBroadcast } };
+      ((plugin as any).app.workspace.getLeavesOfType as any).mockReturnValue([fakeLeaf]);
+
+      plugin.stopServer();
+
+      expect(stopBroadcast).toHaveBeenCalledTimes(1);
+      expect(fakeServer.stop).toHaveBeenCalled();
+      expect(stopBroadcast.mock.invocationCallOrder[0]).toBeLessThan(
+        fakeServer.stop.mock.invocationCallOrder[0]
+      );
+    });
   });
 
   describe("toggleServer", () => {
