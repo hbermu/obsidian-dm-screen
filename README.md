@@ -73,8 +73,6 @@ To set it up:
 
 ## Configuration
 
-![Settings tab](docs/screenshots/settings.png)
-
 Open **Settings → DM Screen**. The tab is split into four sections — Server, Hydrus Library, D&D Beyond, and Advanced — each with inline descriptions for every option. Most defaults are fine for a first run; you only need to revisit settings when you plug in Hydrus or D&D Beyond.
 
 ## Compatible plugins
