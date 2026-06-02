@@ -33,7 +33,10 @@ DM Screen is an Obsidian plugin for running D&D 5e sessions in-person. It pairs 
 
 - Create a branch named `<type>/<slug>` where `<type>` is one of `feature`, `fix`, `hotfix`, `chore`, `refactor`, `docs`, `test`, `ci`, or `release/v<X.Y.Z>[-beta.N]`. Slugs are lowercase a–z, 0–9, hyphens only — no underscores, no leading hyphen, no consecutive hyphens.
 - Open the PR via `gh pr create` against `main`. The PR title must follow Conventional Commits: `<type>(<scope>): <subject>` where `<scope>` is a feature directory name under `.agent/features/` (for example `hydrus`, `fog-of-war`, `dm-preview`) or `deps`, `release`, `repo`. The subject is at least 10 characters in imperative mood with no trailing period. Exception: `release:` titles may carry just the version (e.g. `release: v0.9.0`).
-- Five status checks must pass before merge: `typecheck`, `test`, `build`, `branch-name / lint`, `pr-title / lint`.
+- Apply a bump label on the PR (see `Release process` below). Patch is the default and needs no label; minor / major / skip need `release:minor`, `release:major`, or `release:skip`.
+- Six status checks must pass before merge: `typecheck`, `test`, `build`, `branch-name-lint`, `pr-title-lint`, `spec-update-check`.
+- The PR title type and the bump label must align with intent. `feat:` PRs are typically `release:minor`; `fix:` and `chore:` PRs are typically `release:patch` (default).
+- When a PR changes `src/` files, the matching `.agent/features/` spec MUST be updated in the same PR. The `spec-update-check` CI gate enforces this. Apply `spec:not-needed` only when the change is truly behaviour-free (e.g. a comment-only edit, a CI tweak).
 - Merges are squash-only; the PR title becomes the squash-commit subject on `main` (make it grep-worthy — future `git log --grep` runs depend on it). Merged branches are auto-deleted.
 - No approving reviews are required (solo project); admin bypass exists for break-glass emergencies. Do not request reviews from anyone.
 
@@ -111,33 +114,40 @@ src/
 
 ## Release process
 
-Releases are **automated** by `.github/workflows/release.yml`. The AI never runs `git tag` or `gh release create` by hand. Versioning is SemVer: `MAJOR.MINOR.PATCH-beta.N` for prereleases, `MAJOR.MINOR.PATCH` for stable. Three files carry the version and must move together: `package.json`, `package-lock.json` (top-level `version`), `manifest.json`.
+Releases are **fully automated** by `.github/workflows/release.yml`. **Every PR squash-merged to `main` publishes a new release**, version-bumped from the labels on the PR. The AI never runs `git tag`, `gh release create`, or `make build` by hand.
 
-### Prerelease (beta)
+Versioning is SemVer: `MAJOR.MINOR.PATCH-beta.N` for prereleases, `MAJOR.MINOR.PATCH` for stable. Three files carry the version and the workflow moves them together: `package.json`, `package-lock.json` (top-level `version`), `manifest.json`.
 
-1. From `main`, cut a branch `release/vX.Y.Z-beta.N`.
-2. Bump the version in the three files to `X.Y.Z-beta.N`.
-3. Commit (PR title: `release: vX.Y.Z-beta.N`) and push the branch.
-4. The push triggers CI and the release workflow. When green, the workflow tags `vX.Y.Z-beta.N` from the branch HEAD and publishes a GitHub prerelease with `main.js`, `manifest.json`, `styles.css`.
-5. Betas live on their branch. Iterate by bumping to `-beta.N+1` and pushing, or by cutting a new `release/vX.Y.Z-beta.N+1` branch from the previous one.
+### Bump labels (apply on the PR before merge)
 
-### Stable
+| Label | Effect on merge to `main` |
+|-------|---------------------------|
+| (none) | Default — patch bump (`0.0.x`) |
+| `release:minor` | Minor bump (`0.x.0`) |
+| `release:major` | Major bump (`x.0.0`) |
+| `release:skip` | No release on this merge |
 
-1. Cut `release/vX.Y.Z` from `main` (or from the latest matching beta branch).
-2. Bump the three version files to `X.Y.Z` (no `-beta` suffix).
-3. Open a PR titled `release: vX.Y.Z`.
-4. After CI passes, squash-merge to `main`.
-5. The push to `main` triggers the release workflow, which tags `vX.Y.Z` and publishes a non-prerelease GitHub release with auto-generated notes built from every PR squash-merged since the previous tag.
+Use `release:skip` for purely-internal PRs that ship no observable change (CI rewires, doc-only edits that do not change product behaviour, throwaway smoke tests).
+
+### Stable flow
+
+1. Open a PR. Apply the right bump label (or none for patch).
+2. CI runs the six required checks. Squash-merge to `main`.
+3. The release workflow reads the labels, bumps the three version files on `main` with a `release: vX.Y.Z [skip ci]` commit, tags `vX.Y.Z`, builds `main.js`, and publishes a GitHub release with categorized notes (Features / Fixes / Documentation / Build & CI / Other) built from PR titles since the previous tag.
+
+### Beta flow (rare)
+
+If you need a prerelease before merging to `main`, cut a `release/vX.Y.Z-beta.N` branch from `main`, bump the three files to the beta version, push. The push triggers the release workflow on the branch and publishes a prerelease attached to the branch HEAD with `main.js`, `manifest.json`, `styles.css`. Betas are never merged to `main` directly; they live on their branch as proof points.
 
 ### Version judgement
 
-SemVer applies. Use the cumulative diff since the last stable tag:
+SemVer applies. Decide bump from the cumulative diff since the last stable tag:
 
-- Breaking change in observable behaviour → bump major.
-- New user-facing capability or new spec under `.agent/features/` → bump minor.
-- Bug fix only, no new requirements → bump patch.
+- Breaking change in observable behaviour → `release:major`.
+- New user-facing capability or new spec under `.agent/features/` → `release:minor`.
+- Bug fix only, no new requirements → patch (default, no label).
 
-The AI proposes the version in the branch name; the user can override by renaming the branch before pushing.
+The AI proposes the label when opening the PR via `gh pr create --label`. The user can change the label up to the moment of merge.
 
 To replace a beta or stable, bump to the next version. Never force-move a tag.
 
