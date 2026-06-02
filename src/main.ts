@@ -107,7 +107,12 @@ export default class DmScreenPlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const raw = ((await this.loadData()) as Record<string, unknown> | null) ?? {};
+    const migrated = migrateLegacyCacheFolder(raw);
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, migrated.data) as DmScreenSettings;
+    if (migrated.changed) {
+      await this.saveData(this.settings);
+    }
   }
 
   async saveSettings() {
@@ -117,9 +122,10 @@ export default class DmScreenPlugin extends Plugin {
   }
 
   private initHydrusCache() {
-    debug("initHydrusCache: folder=", this.settings.hydrusCacheFolder, "ttl=", this.settings.hydrusCacheTtlDays, "days");
+    const base = this.settings.cacheBaseFolder.replace(/^\/+|\/+$/g, "") || ".dm-screen";
+    debug("initHydrusCache: base=", base, "ttl=", this.settings.hydrusCacheTtlDays, "days");
     this.hydrusCache = new HydrusCache(this.app, {
-      folder: this.settings.hydrusCacheFolder,
+      folder: `${base}/hydrus`,
       ttlDays: this.settings.hydrusCacheTtlDays,
     });
     if (this.settings.hydrusEnabled) {
@@ -135,9 +141,8 @@ export default class DmScreenPlugin extends Plugin {
       }
     }
 
-    const imgCacheFolder = this.settings.hydrusCacheFolder.replace(/\/bg\/?$/, "") || ".dm-screen";
     const imgCache = new DdbImageCache(
-      imgCacheFolder,
+      `${base}/beyond`,
       this.app.vault.adapter as unknown as VaultAdapterLike,
       this.settings.hydrusCacheTtlDays
     );
@@ -362,6 +367,23 @@ export default class DmScreenPlugin extends Plugin {
     this.statblockCache.set(cacheKey, result);
     return result;
   }
+}
+
+export function migrateLegacyCacheFolder(raw: Record<string, unknown>): {
+  data: Record<string, unknown>;
+  changed: boolean;
+} {
+  if (!("hydrusCacheFolder" in raw)) {
+    return { data: raw, changed: false };
+  }
+  const legacy = typeof raw.hydrusCacheFolder === "string" ? raw.hydrusCacheFolder : "";
+  const next = { ...raw };
+  delete next.hydrusCacheFolder;
+  if (typeof next.cacheBaseFolder !== "string" || next.cacheBaseFolder.length === 0) {
+    const base = legacy.replace(/^\/+|\/+$/g, "").replace(/\/(bg|hydrus)$/, "");
+    next.cacheBaseFolder = base || ".dm-screen";
+  }
+  return { data: next, changed: true };
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {

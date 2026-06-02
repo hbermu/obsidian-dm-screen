@@ -5,28 +5,33 @@
 ## Source files
 
 - `src/hydrus/cache.ts` — `HydrusCache` class, `IndexFile`, `paths`, `listCached`, `get`, `markUsed`, `fetchAndCache`, `sweep`, `clear`, `loadIndex` / `saveIndex`, write-queue serialisation
-- `src/main.ts` — `initHydrusCache` instantiates the cache and starts the daily sweep
-- `src/settings.ts` — cache folder input (with `..` validation), TTL input, Clear cache button
+- `src/main.ts` — `initHydrusCache` instantiates the cache rooted at `<cacheBaseFolder>/hydrus/` and starts the daily sweep; `migrateLegacyCacheFolder` translates a pre-rename `hydrusCacheFolder` value into the new `cacheBaseFolder` on load
+- `src/settings.ts` — cache base folder input (with `..` validation), TTL input, Clear cache button
 
 ## Settings used
 
-- `hydrusCacheFolder` — relative vault path (default `.dm-screen/bg`)
+- `cacheBaseFolder` — relative vault path (default `.dm-screen`); the Hydrus cache lives at `<cacheBaseFolder>/hydrus/`
 - `hydrusCacheTtlDays` — staleness threshold for sweep (default `30`)
 
 ## Requirements
 
 ### On-disk layout
 
-1. Files shall be stored under `<folder>/<hash>.<ext>`.
-2. Thumbnails shall be stored under `<folder>/<hash>.thumb.jpg`.
-3. The cache index shall be a JSON file at `<folder>/index.json` of shape `{ version: 1, entries: Record<hash, CachedEntry> }`.
+1. Files shall be stored under `<cacheBaseFolder>/hydrus/<hash>.<ext>`.
+2. Thumbnails shall be stored under `<cacheBaseFolder>/hydrus/<hash>.thumb.jpg`.
+3. The cache index shall be a JSON file at `<cacheBaseFolder>/hydrus/index.json` of shape `{ version: 1, entries: Record<hash, CachedEntry> }`.
 4. A `CachedEntry` shall contain: `hash`, `ext`, `mime`, `sizeBytes`, `width?`, `height?`, `downloadedAt`, `lastUsedAt`, `knownTags`, `vaultPath`, `thumbVaultPath`.
 
 ### Folder validation
 
-5. The cache-folder setting shall reject values containing `..` (Notice: `Cache folder must be relative to the vault, no ".." segments`).
-6. The cache-folder setting shall strip leading and trailing slashes.
-7. An empty cache-folder value shall fall back to `.dm-screen/bg`.
+5. The cache-base-folder setting shall reject values containing `..` (Notice: `Cache folder must be relative to the vault, no ".." segments`).
+6. The cache-base-folder setting shall strip leading and trailing slashes.
+7. An empty cache-base-folder value shall fall back to `.dm-screen`.
+
+### Settings migration
+
+7a. On plugin load, the plugin shall migrate a saved `hydrusCacheFolder` field into `cacheBaseFolder` by stripping a trailing `/bg` or `/hydrus` segment, falling back to `.dm-screen` when the result is empty. The legacy field shall be removed and the settings persisted.
+7b. When both `hydrusCacheFolder` and `cacheBaseFolder` are present in the saved data, the existing `cacheBaseFolder` shall win and the legacy field shall still be removed.
 
 ### Sweep and TTL
 
@@ -55,6 +60,7 @@
 
 - `src/__tests__/hydrus-cache.test.ts` — basic round-trip, paths, get, markUsed
 - `src/__tests__/hydrus-cache-extra.test.ts` — sweep, clear, write-queue concurrency, corrupted-index recovery
+- `src/__tests__/settings-migration.test.ts` — legacy `hydrusCacheFolder` → `cacheBaseFolder` migration cases
 
 ## Non-goals
 

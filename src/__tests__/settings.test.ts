@@ -18,7 +18,7 @@ describe("DEFAULT_SETTINGS", () => {
     expect(DEFAULT_SETTINGS.hydrusEnabled).toBe(false);
     expect(DEFAULT_SETTINGS.hydrusApiUrl).toBe("");
     expect(DEFAULT_SETTINGS.hydrusApiKey).toBe("");
-    expect(DEFAULT_SETTINGS.hydrusCacheFolder).toBe(".dm-screen/bg");
+    expect(DEFAULT_SETTINGS.cacheBaseFolder).toBe(".dm-screen");
     expect(DEFAULT_SETTINGS.hydrusCacheTtlDays).toBe(30);
     expect(DEFAULT_SETTINGS.hydrusDefaultLoop).toBe(true);
     expect(DEFAULT_SETTINGS.hydrusDefaultMuted).toBe(true);
@@ -60,7 +60,7 @@ describe("Settings merge behavior", () => {
     expect(merged.serverPort).toBe(8080);
     expect(merged.autoStartServer).toBe(false);
     expect(merged.tvWidth).toBe(1920);
-    expect(merged.hydrusCacheFolder).toBe(".dm-screen/bg");
+    expect(merged.cacheBaseFolder).toBe(".dm-screen");
   });
 
   it("Object.assign with null returns defaults", () => {
@@ -137,10 +137,10 @@ describe("Settings input validation logic", () => {
     });
 
     it("accepts normal relative paths", () => {
-      const value = ".dm-screen/bg";
+      const value = ".dm-screen";
       const normalized = value.trim().replace(/^\/+|\/+$/g, "");
       expect(normalized.includes("..")).toBe(false);
-      expect(normalized).toBe(".dm-screen/bg");
+      expect(normalized).toBe(".dm-screen");
     });
 
     it("strips leading and trailing slashes", () => {
@@ -152,7 +152,7 @@ describe("Settings input validation logic", () => {
     it("empty input falls back to default", () => {
       const value = "   ";
       const normalized = value.trim().replace(/^\/+|\/+$/g, "");
-      expect(normalized || ".dm-screen/bg").toBe(".dm-screen/bg");
+      expect(normalized || ".dm-screen").toBe(".dm-screen");
     });
   });
 

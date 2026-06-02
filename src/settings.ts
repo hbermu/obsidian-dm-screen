@@ -18,7 +18,7 @@ export interface DmScreenSettings {
   hydrusTagService: string; // deprecated — kept for migration
   hydrusAvailableTagServices: { name: string; key: string }[];
   hydrusTagServices: string[]; // selected service keys
-  hydrusCacheFolder: string;
+  cacheBaseFolder: string;
   hydrusCacheTtlDays: number;
   hydrusDefaultLoop: boolean;
   hydrusDefaultMuted: boolean;
@@ -50,7 +50,7 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   hydrusTagService: "",
   hydrusAvailableTagServices: [],
   hydrusTagServices: [],
-  hydrusCacheFolder: ".dm-screen/bg",
+  cacheBaseFolder: ".dm-screen",
   hydrusCacheTtlDays: 30,
   hydrusDefaultLoop: true,
   hydrusDefaultMuted: true,
@@ -120,7 +120,7 @@ export class DmScreenSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Enable Hydrus integration")
-      .setDesc('Surfaces a "BG from Hydrus" button in the DM panel to browse the tagged library')
+      .setDesc('Surfaces an "Image from Hydrus" button in the DM panel to browse the tagged library')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.hydrusEnabled).onChange(async (value) => {
           this.plugin.settings.hydrusEnabled = value;
@@ -234,18 +234,20 @@ export class DmScreenSettingTab extends PluginSettingTab {
     }
 
     new Setting(containerEl)
-      .setName("Cache folder")
-      .setDesc("Relative vault path where downloaded files are kept. Hidden by default.")
+      .setName("Cache base folder")
+      .setDesc(
+        "Relative vault path under which the plugin keeps cached files. Hydrus downloads land in <folder>/hydrus/ and D&D Beyond avatars in <folder>/beyond/."
+      )
       .addText((text) =>
         text
-          .setValue(this.plugin.settings.hydrusCacheFolder)
+          .setValue(this.plugin.settings.cacheBaseFolder)
           .onChange(async (value) => {
             const normalized = value.trim().replace(/^\/+|\/+$/g, "");
             if (normalized.includes("..")) {
               new Notice('Cache folder must be relative to the vault, no ".." segments', 6000);
               return;
             }
-            this.plugin.settings.hydrusCacheFolder = normalized || ".dm-screen/bg";
+            this.plugin.settings.cacheBaseFolder = normalized || ".dm-screen";
             await this.plugin.saveSettings();
           })
       );

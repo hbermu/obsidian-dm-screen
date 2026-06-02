@@ -1,6 +1,6 @@
 # Hydrus Integration
 
-> The DM can browse a self-hosted Hydrus Network library by tag and push any image or video as a player-screen background. Hydrus is contacted through its Client API; downloaded files are cached in the vault so subsequent uses do not re-download. Hydrus is an optional integration — when disabled the BG from Hydrus button is hidden and no network calls are made.
+> The DM can browse a self-hosted Hydrus Network library by tag and push any image as a player-screen layer (default click) or any image / video as a player-screen background (Shift-click or context menu). Hydrus is contacted through its Client API; downloaded files are cached in the vault so subsequent uses do not re-download. Hydrus is an optional integration — when disabled the Image from Hydrus button is hidden and no network calls are made.
 
 ## Source files
 
@@ -16,13 +16,13 @@
 
 ## Settings used
 
-- `hydrusEnabled` — gates the BG from Hydrus button and the sweep interval
+- `hydrusEnabled` — gates the Image from Hydrus button and the sweep interval
 - `hydrusApiUrl` — base URL of the Hydrus Client API (no trailing slash)
 - `hydrusApiKey` — 64-hex `Hydrus-Client-API-Access-Key`
 - `hydrusAvailableTagServices` — `{ name, key }[]` populated by Fetch services
 - `hydrusTagServices` — list of selected service keys for searches
 - `hydrusTagService` — deprecated single-service name, migrated to `hydrusTagServices` on first Fetch
-- `hydrusCacheFolder` — relative vault path under which cached files live
+- `cacheBaseFolder` — relative vault path under which all plugin caches live; the Hydrus cache lives at `<cacheBaseFolder>/hydrus/`
 - `hydrusCacheTtlDays` — files unused longer than this are swept on plugin load and once per day
 - `hydrusDefaultLoop`, `hydrusDefaultMuted` — defaults for `show-background-media`
 - `hydrusDefaultSearchTags` — tags pre-filled in the explorer search box
@@ -30,7 +30,7 @@
 
 ## Requirements
 
-1. The DM Control Panel shall expose a BG from Hydrus button if and only if `hydrusEnabled` is true and `hydrusApiUrl` is non-empty.
+1. The DM Control Panel shall expose an Image from Hydrus button if and only if `hydrusEnabled` is true and `hydrusApiUrl` is non-empty.
 2. When the button is clicked, the panel shall open `HydrusExplorerModal`.
 3. The plugin shall instantiate `HydrusCache` on load and on every settings save (so cache options reflect the latest settings).
 4. While `hydrusEnabled` is true, the plugin shall sweep the cache once on load and then every 24 hours.
@@ -57,7 +57,7 @@ The Hydrus integration uses the background-media broadcast (`show-background-med
 
 ## Non-goals
 
-- Pushing files as image **layers** (only as backgrounds). Layers come from notes or the D&D Beyond avatar fetcher.
+- Pushing a video as an image layer. Videos render only as the player-screen background.
 - Tag editing or any write operation on the Hydrus server. The integration is read-only.
 - Authenticating per-user. There is a single API key in settings.
 - Streaming partial downloads. Files are fetched whole and stored on disk.
