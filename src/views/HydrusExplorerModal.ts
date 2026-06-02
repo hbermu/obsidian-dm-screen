@@ -69,7 +69,7 @@ export class HydrusExplorerModal extends Modal {
 
   async onOpen() {
     this.modalEl.addClass("dm-hydrus-modal");
-    this.titleEl.setText("BG from Hydrus");
+    this.titleEl.setText("Image from Hydrus");
 
     const { contentEl } = this;
     contentEl.empty();
@@ -396,9 +396,9 @@ export class HydrusExplorerModal extends Modal {
       card.addEventListener("click", (evt) => {
         evt.preventDefault();
         if (evt.shiftKey) {
-          void this.handleAddAsLayer(tile);
-        } else {
           void this.handleSetBackground(tile);
+        } else {
+          void this.handleAddAsLayer(tile);
         }
       });
 
@@ -462,7 +462,7 @@ export class HydrusExplorerModal extends Modal {
   private async handleAddAsLayer(tile: Tile) {
     try {
       if (mediaTypeOf(tile.mime) !== "image") {
-        new Notice("Image layers only support still images. Use background for videos.", 5000);
+        new Notice("Videos can only be set as background. Shift-click the tile or use the ⋮ menu.", 5000);
         return;
       }
       const entry = await this.ensureCached(tile);
@@ -519,6 +519,15 @@ export class HydrusExplorerModal extends Modal {
       );
     }
     menu.addSeparator();
+
+    menu.addItem((item: any) =>
+      item
+        .setTitle("Set as background")
+        .setIcon("monitor")
+        .onClick(() => {
+          void this.handleSetBackground(tile);
+        })
+    );
 
     if (tile.kind === "remote") {
       menu.addItem((item: any) =>
