@@ -164,6 +164,181 @@ describe("DmControlPanel.addImageLayer dedup", () => {
   });
 });
 
+describe("DmControlPanel.restoreState rebroadcast", () => {
+  function makeServerStub() {
+    const broadcasts: any[] = [];
+    return {
+      lastState: new Map<string, string>(),
+      broadcast: vi.fn((msg: any) => {
+        broadcasts.push(msg);
+      }),
+      _broadcasts: broadcasts,
+    };
+  }
+
+  it("re-broadcasts image-layers-sync after restoring layers when the server is running", () => {
+    const layers = [
+      {
+        id: "l1", label: "Goblin", dataUrl: "data:image/png;base64,X",
+        x: 10, y: 20, width: 30, height: 40, zIndex: 1,
+        rotation: 0, visible: true, fogEnabled: false, fogDataUrl: "", bordered: true,
+      },
+    ];
+    const serverStub = makeServerStub();
+    const plugin = makePlugin({
+      settings: {
+        lastImageLayers: JSON.stringify(layers),
+        lastBroadcastCache: {},
+        lastPlayerScreenWidth: 0,
+        lastPlayerScreenHeight: 0,
+      },
+      server: serverStub as any,
+    });
+    const panel = makePanel(plugin);
+
+    (panel as any).restoreState();
+
+    expect(serverStub.broadcast).toHaveBeenCalledTimes(1);
+    const [msg] = serverStub.broadcast.mock.calls[0];
+    expect(msg.type).toBe("image-layers-sync");
+    expect(msg.payload.layers).toEqual(layers);
+  });
+
+  it("does not broadcast when there are no restored layers", () => {
+    const serverStub = makeServerStub();
+    const plugin = makePlugin({
+      settings: {
+        lastImageLayers: "[]",
+        lastBroadcastCache: {},
+        lastPlayerScreenWidth: 0,
+        lastPlayerScreenHeight: 0,
+      },
+      server: serverStub as any,
+    });
+    const panel = makePanel(plugin);
+
+    (panel as any).restoreState();
+
+    expect(serverStub.broadcast).not.toHaveBeenCalled();
+  });
+
+  it("does not broadcast when the server is not running", () => {
+    const plugin = makePlugin({
+      settings: {
+        lastImageLayers: JSON.stringify([
+          {
+            id: "l1", label: "Goblin", dataUrl: "data:image/png;base64,X",
+            x: 0, y: 0, width: 30, height: 60, zIndex: 1,
+            rotation: 0, visible: true, fogEnabled: false, fogDataUrl: "", bordered: true,
+          },
+        ]),
+        lastBroadcastCache: {},
+        lastPlayerScreenWidth: 0,
+        lastPlayerScreenHeight: 0,
+      },
+      server: null,
+    });
+    const panel = makePanel(plugin);
+
+    expect(() => (panel as any).restoreState()).not.toThrow();
+  });
+});
+
+describe("DmControlPanel.republishToServer", () => {
+  it("broadcasts the current image layers when called and the server is running", () => {
+    const serverStub = {
+      lastState: new Map<string, string>(),
+      broadcast: vi.fn(),
+    };
+    const plugin = makePlugin({
+      settings: {
+        lastImageLayers: "[]",
+        lastBroadcastCache: {},
+        lastPlayerScreenWidth: 0,
+        lastPlayerScreenHeight: 0,
+      },
+      server: serverStub as any,
+    });
+    const panel = makePanel(plugin);
+    panel.imageLayers = [
+      {
+        id: "l1", label: "Goblin", dataUrl: "data:image/png;base64,X",
+        x: 0, y: 0, width: 30, height: 60, zIndex: 1,
+        rotation: 0, visible: true, fogEnabled: false, fogDataUrl: "", bordered: true,
+      } as any,
+    ];
+
+    panel.republishToServer();
+
+    expect(serverStub.broadcast).toHaveBeenCalledTimes(1);
+    const [msg] = (serverStub.broadcast as any).mock.calls[0];
+    expect(msg.type).toBe("image-layers-sync");
+  });
+
+  it("is a no-op when the server is not running", () => {
+    const plugin = makePlugin({ server: null });
+    const panel = makePanel(plugin);
+    panel.imageLayers = [
+      {
+        id: "l1", label: "Goblin", dataUrl: "data:image/png;base64,X",
+        x: 0, y: 0, width: 30, height: 60, zIndex: 1,
+        rotation: 0, visible: true, fogEnabled: false, fogDataUrl: "", bordered: true,
+      } as any,
+    ];
+    expect(() => panel.republishToServer()).not.toThrow();
+  });
+});
+
+describe("DmControlPanel.addImageLayer pixel-derived sizing", () => {
+  function withMockImage(naturalWidth: number, naturalHeight: number, fn: () => void) {
+    class MockImage {
+      onload: () => void = () => {};
+      naturalWidth = naturalWidth;
+      naturalHeight = naturalHeight;
+      set src(_v: string) {
+        this.onload();
+      }
+    }
+    const original = (globalThis as any).Image;
+    (globalThis as any).Image = MockImage as any;
+    try { fn(); } finally { (globalThis as any).Image = original; }
+  }
+
+  function preparePanel(tvW: number, tvH: number) {
+    const panel = makePanel();
+    (panel as any).getEffectiveResolution = () => ({ width: tvW, height: tvH });
+    (panel as any).broadcastAndRender = vi.fn();
+    return panel;
+  }
+
+  it("clamps a wide image larger than the viewport to ≤100% on both axes, preserves aspect ratio, and centres it", () => {
+    const panel = preparePanel(1000, 1000);
+    withMockImage(2000, 500, () => {
+      panel.addImageLayer("wide-big", "data:image/png;base64,Z", "image", true);
+    });
+
+    expect(panel.imageLayers.length).toBe(1);
+    const l = panel.imageLayers[0];
+    expect(l.width).toBeCloseTo(100, 6);
+    expect(l.height).toBeCloseTo(25, 6);
+    expect(l.x).toBeCloseTo(0, 6);
+    expect(l.y).toBeCloseTo(37.5, 6);
+  });
+
+  it("does not upscale an image smaller than the viewport, just centres it", () => {
+    const panel = preparePanel(1000, 1000);
+    withMockImage(500, 500, () => {
+      panel.addImageLayer("small", "data:image/png;base64,Z", "image", true);
+    });
+
+    const l = panel.imageLayers[0];
+    expect(l.width).toBeCloseTo(50, 6);
+    expect(l.height).toBeCloseTo(50, 6);
+    expect(l.x).toBeCloseTo(25, 6);
+    expect(l.y).toBeCloseTo(25, 6);
+  });
+});
+
 describe("DmControlPanel.broadcastManualInitiative round-1 hide", () => {
   it("hides combatants past the active turn during round 1", () => {
     const plugin = makePlugin();

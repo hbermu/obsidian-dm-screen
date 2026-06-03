@@ -23,7 +23,7 @@
 5. When any non-`clear` broadcast is sent, the server shall overwrite the cache entry for `message.type` with the new serialised payload (one entry per type at most).
 6. When the player side receives a message whose `type` is not in its known set, it shall log `[Player Screen] Unknown message type:` and ignore the payload (no throw, no disconnect).
 7. When the player side fails to parse a message as JSON, it shall log the failure and ignore the message.
-8. When the WebSocket closes on the player side, the player shall attempt to reconnect after 3 seconds; on successful reconnect, the player shall re-send `client-info`.
+8. When the WebSocket closes on the player side after the player has connected at least once, the player shall display a full-screen `Disconnected` overlay and attempt to reconnect after 3 seconds. On a successful reconnect that follows a previous disconnect, the player shall reload the page so the server's late-joiner cache replay reconstructs the screen from scratch. On the very first successful connect (no prior disconnect), the player shall hide the overlay if present and send `client-info`.
 
 ## Broadcast / IPC
 

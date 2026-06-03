@@ -168,6 +168,11 @@ export default class DmScreenPlugin extends Plugin {
       }
     };
     this.server.start(this.settings.serverPort);
+    const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
+    for (const leaf of leaves) {
+      const view = leaf.view as DmControlPanel;
+      view.republishToServer?.();
+    }
     new Notice(`Player Screen server started on port ${this.settings.serverPort}`);
   }
 

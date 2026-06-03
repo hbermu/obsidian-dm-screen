@@ -44,6 +44,7 @@ class PlayerScreen {
   private ws: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private lastImageLayers: ImageLayer[] = [];
+  private hasConnectedOnce = false;
 
   constructor() {
     this.connect();
@@ -96,6 +97,12 @@ class PlayerScreen {
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
       }
+      if (this.hasConnectedOnce) {
+        window.location.reload();
+        return;
+      }
+      this.hasConnectedOnce = true;
+      this.hideDisconnectedOverlay();
       this.sendClientInfo();
     });
 
@@ -110,12 +117,34 @@ class PlayerScreen {
 
     this.ws.addEventListener("close", () => {
       console.log("[Player Screen] Disconnected, reconnecting in 3s...");
+      if (this.hasConnectedOnce) this.showDisconnectedOverlay();
       this.reconnectTimer = setTimeout(() => this.connect(), 3000);
     });
 
     this.ws.addEventListener("error", (e) => {
       console.error("[Player Screen] WebSocket error:", e);
     });
+  }
+
+  private showDisconnectedOverlay() {
+    let el = document.getElementById("disconnected-overlay");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "disconnected-overlay";
+      el.innerHTML = `
+        <div class="disconnected-msg">
+          <h2>Disconnected</h2>
+          <p>Lost connection to the DM. Reconnecting…</p>
+          <div class="pulse-dot"></div>
+        </div>`;
+      document.body.appendChild(el);
+    }
+    el.style.display = "flex";
+  }
+
+  private hideDisconnectedOverlay() {
+    const el = document.getElementById("disconnected-overlay");
+    if (el) el.style.display = "none";
   }
 
   private handleMessage(msg: PlayerMessage) {

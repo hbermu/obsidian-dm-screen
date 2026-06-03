@@ -282,3 +282,34 @@ body {
 #fullscreen-btn:hover, #fullscreen-btn:active {
   opacity: 1;
 }
+
+/* Disconnected overlay */
+#disconnected-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 10, 0.85);
+  z-index: 10000;
+  backdrop-filter: blur(6px);
+}
+
+#disconnected-overlay .disconnected-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+#disconnected-overlay h2 {
+  font-size: 2.4rem;
+  color: #c9aa71;
+  text-shadow: 0 0 20px rgba(201, 170, 113, 0.3);
+}
+
+#disconnected-overlay p {
+  font-size: 1.1rem;
+  color: #888;
+}
