@@ -458,6 +458,51 @@ export class DmControlPanel extends ItemView {
     const previewInner = previewArea.createDiv("dm-layer-preview-inner");
     previewInner.style.transform = `translate(${this.dmPanX}%, ${this.dmPanY}%) scale(${this.dmZoom})`;
 
+    // Background media preview — same geometry as the green viewport rect,
+    // only rendered when a connected client matches the effective resolution.
+    const effForBg = this.getEffectiveResolution();
+    const activeClient = this.connectedClients.find(
+      c => c.width === effForBg.width && c.height === effForBg.height
+    );
+    if (this.activeBackgroundUrl && activeClient && activeClient.width > 0 && activeClient.height > 0) {
+      const bgUrl = resolveBackgroundPreviewUrl(
+        this.activeBackgroundUrl,
+        this.plugin.app.vault.adapter as { getResourcePath?: (path: string) => string }
+      );
+      if (bgUrl) {
+        const browserAspect = activeClient.width / activeClient.height;
+        const previewAspect = tvW / tvH;
+        let bgW: number, bgH: number;
+        if (browserAspect > previewAspect) {
+          bgW = 100 / this.playerZoom;
+          bgH = (100 / this.playerZoom) * (previewAspect / browserAspect);
+        } else {
+          bgW = (100 / this.playerZoom) * (browserAspect / previewAspect);
+          bgH = 100 / this.playerZoom;
+        }
+        const bgX = -this.playerPanX + (100 - bgW) / 2;
+        const bgY = -this.playerPanY + (100 - bgH) / 2;
+        const bgWrap = previewInner.createDiv("dm-preview-bg");
+        bgWrap.style.left = `${bgX}%`;
+        bgWrap.style.top = `${bgY}%`;
+        bgWrap.style.width = `${bgW}%`;
+        bgWrap.style.height = `${bgH}%`;
+        if (isVideoBackgroundUrl(bgUrl)) {
+          const v = bgWrap.createEl("video");
+          v.src = bgUrl;
+          v.muted = true;
+          v.loop = true;
+          v.autoplay = true;
+          v.playsInline = true;
+          v.play().catch(() => {});
+        } else {
+          const img = bgWrap.createEl("img");
+          img.src = bgUrl;
+          img.alt = "";
+        }
+      }
+    }
+
     // Draw image layer rectangles (sorted by zIndex ascending)
     const sorted = [...this.imageLayers].sort((a, b) => a.zIndex - b.zIndex);
     for (const layer of sorted) {
@@ -1945,4 +1990,19 @@ export class DmControlPanel extends ItemView {
     }));
     this.plugin.sendInitiativeUpdate(out, this.manualRound);
   }
+}
+
+export function resolveBackgroundPreviewUrl(
+  activeUrl: string | null,
+  adapter: { getResourcePath?: (path: string) => string }
+): string | null {
+  if (!activeUrl) return null;
+  if (!activeUrl.startsWith("/vault/")) return activeUrl;
+  if (typeof adapter.getResourcePath !== "function") return null;
+  const vaultPath = decodeURIComponent(activeUrl.slice("/vault/".length));
+  return adapter.getResourcePath(vaultPath);
+}
+
+export function isVideoBackgroundUrl(url: string): boolean {
+  return /\.(mp4|webm|mov|ogv)(\?|$)/i.test(url);
 }

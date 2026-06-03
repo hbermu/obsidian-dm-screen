@@ -4,11 +4,12 @@
 
 ## Source files
 
-- `src/views/DmControlPanel.ts` — Add BG / Stop BG button, `showBackgroundPicker`, `setImageAsBackground`, `getImagesFromNote`, `activeBackgroundUrl`, `activeVideoPath`
+- `src/views/DmControlPanel.ts` — Add BG / Stop BG button, `showBackgroundPicker`, `setImageAsBackground`, `getImagesFromNote`, `activeBackgroundUrl`, `activeVideoPath`, DM-side preview overlay rendered in `renderPlayerScreenSection`, `resolveBackgroundPreviewUrl`, `isVideoBackgroundUrl`
 - `src/views/HydrusExplorerModal.ts` — `handleSetBackground` broadcasts the Hydrus-cached file as the background; loop and mute come from settings
 - `src/player/player.ts` — `showBackgroundMedia` and `hideBackgroundMedia` handle the `<video>` and `<img>` elements
 - `src/player/player.css` — `#video-background`, `#image-background` styling
 - `src/server.ts` — `buildPlayerHtml` includes `<video id="video-background">` and `<img id="image-background">`
+- `styles.css` — `.dm-preview-bg` overlay styling for the DM-side preview
 
 ## Settings used
 
@@ -31,6 +32,9 @@
 11. When the player receives `show-background-media` with `mediaType: "image"`, it shall pause and clear the video, hide it, set the image `src`, and show the image.
 12. When the player receives `hide-background-media`, it shall pause and clear both `<video>` and `<img>` and hide both.
 13. When the player receives `clear`, it shall additionally hide background media (the broader clear sequence is in `../player-server/websocket-protocol.md`).
+14. While `activeBackgroundUrl` is non-null and a currently-connected client's dimensions match the effective resolution (the "selected client"), the DM preview shall render a background overlay inside that client's viewport rect — same geometry as the green `.dm-player-viewport-rect`, behind the image-layer rectangles (`z-index: 0`). The overlay uses `object-fit: cover` so the preview mirrors what the player browser shows.
+15. The DM preview overlay shall resolve `/vault/<encoded path>` URLs to an `app://…` local resource via `vault.adapter.getResourcePath()`; non-`/vault/` URLs pass through unchanged; videos (extension `.mp4`, `.webm`, `.mov`, `.ogv`) render as `<video muted loop autoplay playsinline>`; everything else renders as `<img>`.
+16. While no client is connected, or no connected client matches the effective resolution, the DM preview shall not render the background overlay.
 
 ## Broadcast / IPC
 
@@ -43,6 +47,7 @@
 
 - `src/__tests__/server-broadcast.test.ts` — `show-background-media` is cached and replayed
 - `src/__tests__/server-bootstrap.integration.test.ts` — wires the DM → player flow
+- `src/__tests__/dm-preview-bg.test.ts` — `resolveBackgroundPreviewUrl` and `isVideoBackgroundUrl` helpers used by the DM-side preview overlay
 
 ## Non-goals
 

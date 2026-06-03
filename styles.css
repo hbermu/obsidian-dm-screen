@@ -840,6 +840,21 @@
   z-index: 99999;
 }
 
+.dm-preview-bg {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dm-preview-bg > img,
+.dm-preview-bg > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .dm-preview-view-controls {
   display: flex;
   align-items: center;
