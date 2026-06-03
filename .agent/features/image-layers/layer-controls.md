@@ -42,9 +42,9 @@
 
 15. The `W` button shall resize the layer to the connected client's viewport width, preserve aspect ratio for the height, and centre vertically inside the viewport. If no client is connected, show a `No player connected` Notice and do nothing.
 16. The `H` button shall resize the layer to the viewport height, preserve aspect ratio for the width, and centre horizontally inside the viewport. Same Notice rule as `W`.
-17. The `◀` button shall set `layer.x` to the viewport's left edge.
-18. The `◆` button shall centre the layer horizontally inside the viewport.
-19. The `▶` button shall set `layer.x` so the layer's right edge sits on the viewport's right edge.
+17. The `◀` button shall set `layer.x` to the viewport's left edge and `layer.y` so the layer is centred vertically inside the viewport.
+18. The `◆` button shall centre the layer both horizontally and vertically inside the viewport.
+19. The `▶` button shall set `layer.x` so the layer's right edge sits on the viewport's right edge and `layer.y` so the layer is centred vertically inside the viewport.
 
 ### Bulk controls (below the layer list)
 

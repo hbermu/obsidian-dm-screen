@@ -728,29 +728,32 @@ export class DmControlPanel extends ItemView {
         });
 
         const alignLeftBtn = posRow.createEl("button", { text: "\u25c0", cls: "dm-layer-btn" });
-        alignLeftBtn.title = "Align to left edge";
+        alignLeftBtn.title = "Align to left edge, centre vertically";
         alignLeftBtn.addEventListener("click", () => {
           const vp = this.getPlayerViewport();
           if (!vp) { new Notice("No player connected"); return; }
           layer.x = vp.vpX;
+          layer.y = vp.vpY + (vp.vpH - layer.height) / 2;
           this.broadcastAndRender();
         });
 
         const centerBtn = posRow.createEl("button", { text: "\u25c6", cls: "dm-layer-btn" });
-        centerBtn.title = "Center horizontally";
+        centerBtn.title = "Centre in viewport";
         centerBtn.addEventListener("click", () => {
           const vp = this.getPlayerViewport();
           if (!vp) { new Notice("No player connected"); return; }
           layer.x = vp.vpX + (vp.vpW - layer.width) / 2;
+          layer.y = vp.vpY + (vp.vpH - layer.height) / 2;
           this.broadcastAndRender();
         });
 
         const alignRightBtn = posRow.createEl("button", { text: "\u25b6", cls: "dm-layer-btn" });
-        alignRightBtn.title = "Align to right edge";
+        alignRightBtn.title = "Align to right edge, centre vertically";
         alignRightBtn.addEventListener("click", () => {
           const vp = this.getPlayerViewport();
           if (!vp) { new Notice("No player connected"); return; }
           layer.x = vp.vpX + vp.vpW - layer.width;
+          layer.y = vp.vpY + (vp.vpH - layer.height) / 2;
           this.broadcastAndRender();
         });
 
