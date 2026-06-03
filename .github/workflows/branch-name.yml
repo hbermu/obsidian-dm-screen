@@ -17,9 +17,9 @@ jobs:
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
-          if ! echo "$HEAD_REF" | grep -qE '^(feature|fix|hotfix|chore|refactor|docs|test|ci)/[a-z0-9][a-z0-9-]*$|^release/v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$'; then
+          if ! echo "$HEAD_REF" | grep -qE '^(feature|fix|hotfix|chore|refactor|docs|test|ci)/[a-z0-9][a-z0-9-]*$'; then
             echo "::error::Branch name '$HEAD_REF' does not match the convention."
-            echo "Allowed prefixes: feature/, fix/, hotfix/, chore/, refactor/, docs/, test/, ci/, release/v<X.Y.Z>[-beta.N]"
+            echo "Allowed prefixes: feature/, fix/, hotfix/, chore/, refactor/, docs/, test/, ci/"
             echo "Slug rules: lowercase a-z, digits 0-9, hyphens; no leading hyphen; no underscores."
             exit 1
           fi
