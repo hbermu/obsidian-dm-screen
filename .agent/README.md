@@ -7,6 +7,13 @@ This directory is the contract between the AI and the codebase. Everything in he
 - `conventions.md` — How specs are written. Defines EARS notation, the spec template, naming, and the update / deletion rules.
 - `features/` — One subdirectory per user-facing feature. Each subdirectory contains an `overview.md` plus zero or more sub-spec files for finer sub-functionalities (e.g. `hydrus-integration/cache.md`).
 
+## Priority and ownership
+
+- `.agent/features/**` is the source of truth for observable behaviour.
+- `AGENTS.md` defines repository-wide implementation workflow and guardrails.
+- `CLAUDE.md` carries only agent-specific additions and must never contradict the two sources above.
+- If any one of these files is updated with globally applicable guidance, update the other affected files in the same PR to keep one coherent IA/AI docs set.
+
 ## What is not here
 
 - Architectural diagrams, design rationale, or "how we got here" prose. The architecture is the source code; the spec describes the observable contract, not the implementation strategy.

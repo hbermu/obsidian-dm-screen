@@ -54,6 +54,8 @@ Examples of compliant PR titles:
 - Anything in `AGENTS.md`, `CLAUDE.md`, or `.agent/` is self-contained — no external URLs, no third-party service links, no references to external standards documents. The only file in the repo that may carry external links is `README.md` (it lives on the public project page for human readers).
 - Every code change that affects observable behaviour MUST update the corresponding `.agent/features/<feature>/<file>.md` in the same commit, using the template at `.agent/features/_template.md`. Spec drift is a bug.
 - When a feature is removed, delete its spec directory in the same commit. No tombstone files.
+- Documentation precedence for AI agents is: `.agent/features/**` (behaviour contract) → `AGENTS.md` (repo rules + workflow) → `CLAUDE.md` (agent-specific deltas).
+- Keep these three sources aligned when one of them changes. If a rule changes in one file and applies globally, mirror it in the others in the same PR.
 
 ## Build, test, typecheck
 
