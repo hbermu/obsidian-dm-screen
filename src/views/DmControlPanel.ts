@@ -178,6 +178,17 @@ export class DmControlPanel extends ItemView {
         this.activeBackgroundUrl = msg.payload?.url ?? null;
       } catch { /* ignore */ }
     }
+
+    if (this.plugin.server && this.imageLayers.length > 0) {
+      this.broadcastImageLayers();
+    }
+  }
+
+  republishToServer() {
+    if (!this.plugin.server) return;
+    if (this.imageLayers.length > 0) {
+      this.broadcastImageLayers();
+    }
   }
 
   saveState() {
@@ -1151,16 +1162,17 @@ export class DmControlPanel extends ItemView {
         x = 35;
         y = 20;
       } else {
-        // Size based on image pixels relative to TV resolution
-        // width/height are percentages of the screen
         width = (img.naturalWidth / tvW) * 100;
         height = (img.naturalHeight / tvH) * 100;
 
-        // If the image fits within the screen, center it
-        if (width <= 100 && height <= 100) {
-          x = (100 - width) / 2;
-          y = (100 - height) / 2;
+        if (width > 100 || height > 100) {
+          const scale = Math.max(width, height) / 100;
+          width /= scale;
+          height /= scale;
         }
+
+        x = (100 - width) / 2;
+        y = (100 - height) / 2;
       }
 
       const layer: ImageLayer = {
@@ -1886,7 +1898,7 @@ export class DmControlPanel extends ItemView {
     }
   }
 
-  private broadcastImageLayers() {
+  broadcastImageLayers() {
     if (!this.plugin.server) return;
     this.plugin.server.broadcast({
       type: "image-layers-sync",

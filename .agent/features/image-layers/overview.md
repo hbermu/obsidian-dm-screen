@@ -18,7 +18,7 @@
 1. The DM panel shall maintain an array of `ImageLayer` objects, each with: `id`, `label`, `dataUrl`, `x`, `y`, `width`, `height` (all four as percentages 0–100), `zIndex`, `rotation` (degrees), `visible`, `fogEnabled`, `fogDataUrl`, `bordered`.
 2. The DM panel shall assign a monotonically increasing `zIndex` to every new layer.
 3. The DM panel shall refuse to add a layer whose `label` (case-insensitive) equals an existing layer's label.
-4. When a layer is added, the DM panel shall load the image off-screen and size the rectangle from the natural image dimensions relative to the effective resolution, then broadcast `image-layers-sync`.
+4. When a layer is added, the DM panel shall load the image off-screen, derive `width` and `height` as percentages from the natural pixel dimensions over the effective resolution, clamp both so neither exceeds 100% while preserving aspect ratio, centre the layer in the viewport, then broadcast `image-layers-sync`.
 5. When `noteType` is `"person"` or `"monster"`, the new layer shall be sized as a portrait (30%×60% at 35,20) instead of pixel-derived dimensions.
 6. The DM panel shall sort layers by `zIndex` ascending when rendering them on the preview and on the player.
 7. Each layer shall be rendered on the player inside a wrapper div positioned `absolute` with `left/top/width/height` percentages relative to a `100vw × 100vh` inner frame.

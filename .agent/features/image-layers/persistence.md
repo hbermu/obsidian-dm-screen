@@ -23,6 +23,8 @@
 5. When the DM Control Panel opens, if `settings.lastPlayerScreenWidth > 0`, the panel shall populate `connectedClients` with a single placeholder entry holding the persisted resolution and set `playerConnected = true`.
 6. When the DM Control Panel opens and the server is running, the panel shall restore each entry of `settings.lastBroadcastCache` back into the server's `lastState` map.
 7. When the DM Control Panel opens and a cached `show-background-media` entry exists, the panel shall extract its URL into `activeBackgroundUrl` so the Stop BG button is shown.
+8. When the DM Control Panel restores state and the server is running with at least one restored layer, the panel shall broadcast a fresh `image-layers-sync` so the server's `lastState` reflects the authoritative current layers (overwriting any stale or missing cache entry). The panel shall also expose a public `republishToServer()` method.
+9. When the player-screen server starts, the plugin shall call `republishToServer()` on every open DM Control Panel so any client that connects later receives the current layer state via the late-joiner cache.
 
 ## Non-goals
 
