@@ -5,8 +5,8 @@ on:
     types: [closed]
     branches: [main]
   push:
-    branches:
-      - 'release/v*'
+    branches-ignore:
+      - main
 
 jobs:
   publish:
@@ -154,7 +154,22 @@ jobs:
               --notes-file notes.md \
               main.js manifest.json styles.css
 
-      # ────────────── Push-to-release/v* path: beta only ──────────────
+      - name: Clean up beta releases and tags for this version
+        if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          prefix="v${VERSION}-beta."
+          gh release list --limit 200 --json tagName --jq '.[] | .tagName' \
+            | while read -r tag; do
+                case "$tag" in
+                  "$prefix"*) echo "Deleting prerelease $tag (superseded by v$VERSION)"
+                              gh release delete "$tag" --yes --cleanup-tag ;;
+                esac
+              done
+
+      # ────────────── Push-to-any-non-main-branch path: beta only ──────────────
 
       - name: Read version from manifest.json (push path)
         if: github.event_name == 'push'
@@ -168,56 +183,13 @@ jobs:
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Decide whether to publish (push path)
-        if: github.event_name == 'push'
-        id: skip_check
-        env:
-          REF: ${{ github.ref }}
-          REF_NAME: ${{ github.ref_name }}
-          IS_PRERELEASE: ${{ steps.ver.outputs.is_prerelease }}
+      - name: Skip non-beta push (manifest has no -beta.N suffix)
+        if: github.event_name == 'push' && steps.ver.outputs.is_prerelease != 'true'
         run: |
-          skip=false
-          reason=""
-          if [ "$IS_PRERELEASE" = "false" ]; then
-            case "$REF_NAME" in
-              release/v*)
-                skip=true
-                reason="Stable version on release/* branch; stable releases publish on merge to main."
-                ;;
-            esac
-          fi
-          if [ "$skip" = "true" ]; then
-            echo "$reason"
-          fi
-          echo "skip=$skip" >> $GITHUB_OUTPUT
-
-      - name: Refuse prerelease publishes from unexpected branches
-        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true' && steps.ver.outputs.is_prerelease == 'true'
-        env:
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          case "$REF_NAME" in
-            release/v*) ;;
-            *)
-              echo "::error::Prereleases live on release/v* branches only. Current ref is '$REF_NAME'."
-              exit 1
-              ;;
-          esac
-
-      - name: Sanity-check prerelease branch name matches version (push path)
-        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true' && steps.ver.outputs.is_prerelease == 'true'
-        env:
-          REF_NAME: ${{ github.ref_name }}
-          VERSION: ${{ steps.ver.outputs.version }}
-        run: |
-          if [ "$REF_NAME" != "release/v$VERSION" ]; then
-            echo "::error::Branch '$REF_NAME' does not match manifest version 'v$VERSION'."
-            echo "Prerelease branches must be named release/v<version>."
-            exit 1
-          fi
+          echo "manifest.json version '${{ steps.ver.outputs.version }}' has no -beta.N suffix on branch '${{ github.ref_name }}'; nothing to publish."
 
       - name: Bail if prerelease tag already exists
-        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true'
+        if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true'
         id: tag_check
         env:
           VERSION: ${{ steps.ver.outputs.version }}
@@ -230,11 +202,11 @@ jobs:
           fi
 
       - name: Build prerelease artefacts
-        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true' && steps.tag_check.outputs.exists == 'false'
+        if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true' && steps.tag_check.outputs.exists == 'false'
         run: make build
 
       - name: Create prerelease tag
-        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true' && steps.tag_check.outputs.exists == 'false'
+        if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true' && steps.tag_check.outputs.exists == 'false'
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
@@ -244,7 +216,7 @@ jobs:
           git push origin "v$VERSION"
 
       - name: Publish prerelease
-        if: github.event_name == 'push' && steps.skip_check.outputs.skip != 'true' && steps.tag_check.outputs.exists == 'false'
+        if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true' && steps.tag_check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.ver.outputs.version }}

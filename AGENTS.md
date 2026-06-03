@@ -31,7 +31,7 @@ DM Screen is an Obsidian plugin for running D&D 5e sessions in-person. It pairs 
 
 ### Branching and PRs
 
-- Create a branch named `<type>/<slug>` where `<type>` is one of `feature`, `fix`, `hotfix`, `chore`, `refactor`, `docs`, `test`, `ci`, or `release/v<X.Y.Z>[-beta.N]`. Slugs are lowercase a–z, 0–9, hyphens only — no underscores, no leading hyphen, no consecutive hyphens.
+- Create a branch named `<type>/<slug>` where `<type>` is one of `feature`, `fix`, `hotfix`, `chore`, `refactor`, `docs`, `test`, `ci`. Slugs are lowercase a–z, 0–9, hyphens only — no underscores, no leading hyphen, no consecutive hyphens.
 - Open the PR via `gh pr create` against `main`. The PR title must follow Conventional Commits: `<type>(<scope>): <subject>` where `<scope>` is a feature directory name under `.agent/features/` (for example `hydrus`, `fog-of-war`, `dm-preview`) or `deps`, `release`, `repo`. The subject is at least 10 characters in imperative mood with no trailing period. Exception: `release:` titles may carry just the version (e.g. `release: v0.9.0`).
 - Apply a bump label on the PR (see `Release process` below). Patch is the default and needs no label; minor / major / skip need `release:minor`, `release:major`, or `release:skip`.
 - Six status checks must pass before merge: `typecheck`, `test`, `build`, `branch-name-lint`, `pr-title-lint`, `spec-update-check`.
@@ -47,7 +47,7 @@ Examples of compliant PR titles:
 - `fix(fog-of-war): preserve canvas size after layer reload`
 - `chore(deps): bump esbuild to 0.25.1`
 - `refactor(combat-tracker): extract round-1 reveal helper`
-- `release: v0.8.5-beta.1`
+- `release: v0.13.0` (used by the release-bot only)
 
 ### AI documentation
 
@@ -140,9 +140,15 @@ Use `release:skip` for purely-internal PRs that ship no observable change (CI re
 
 **Version source of truth.** The latest git tag is authoritative for "what's released". `manifest.json` on `main` stays as it was on the last manual edit and may lag behind — that is fine. The release workflow never pushes to `main`; it creates a detached commit, tags it, and pushes only the tag. The released asset carries the correct bumped version. Local `make build` on `main` produces a bundle stamped with whatever `manifest.json` currently says, so for development you should treat `manifest.json` as "version under development" rather than "version released".
 
-### Beta flow (rare)
+### Beta flow
 
-If you need a prerelease before merging to `main`, cut a `release/vX.Y.Z-beta.N` branch from `main`, bump the three files to the beta version, push. The push triggers the release workflow on the branch and publishes a prerelease attached to the branch HEAD with `main.js`, `manifest.json`, `styles.css`. Betas are never merged to `main` directly; they live on their branch as proof points.
+Prereleases are cut from the working branch — no dedicated `release/v…` branch is needed. On a `feature/…` (or any other non-`main`) branch, bump the three version files to `X.Y.Z-beta.N`, commit, push. The release workflow on the push event reads `manifest.json`, sees the `-beta.N` suffix, and publishes a prerelease tagged `vX.Y.Z-beta.N` with `main.js`, `manifest.json`, `styles.css` attached.
+
+Multiple betas on the same branch: bump to `beta.2`, push; the workflow tags `vX.Y.Z-beta.2`. The previous `vX.Y.Z-beta.1` release is left in place (it remains a valid intermediate proof point). Re-pushing the same beta version is a no-op (the workflow bails when the tag already exists).
+
+When the feature branch eventually squash-merges to `main` as `vX.Y.Z` stable, the release workflow publishes the stable release **and then deletes every `vX.Y.Z-beta.*` GitHub release and its underlying tag**. The Releases page only retains stable releases and the currently-in-flight betas of unrelated lines. BRAT users who were pinned to a beta of the line just released should switch to the stable.
+
+If you push without bumping `manifest.json` to a `-beta.N` value (e.g. you forgot, or the branch carries the last stable version), the workflow logs a notice and publishes nothing. CI (`typecheck`, `test`, `build`) still runs on every push.
 
 ### Version judgement
 
@@ -154,7 +160,7 @@ SemVer applies. Decide bump from the cumulative diff since the last stable tag:
 
 The AI proposes the label when opening the PR via `gh pr create --label`. The user can change the label up to the moment of merge.
 
-To replace a beta or stable, bump to the next version. Never force-move a tag.
+To replace a beta or stable, bump to the next version. Never force-move a tag. Old betas are cleaned up automatically when the stable for the same `vX.Y.Z` ships; do not delete them by hand mid-flow.
 
 ## Known pitfalls
 
