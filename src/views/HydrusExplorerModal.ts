@@ -6,7 +6,7 @@ import { paginate } from "../hydrus/pagination";
 import { filterTags } from "../hydrus/tagFilter";
 import { parseTagQuery } from "../hydrus/tagInput";
 import { TagSuggester } from "./HydrusTagSuggester";
-import { debug, debugWarn } from "../debug";
+import { debugWarn } from "../debug";
 
 interface RemoteTile {
   kind: "remote";
@@ -150,12 +150,14 @@ export class HydrusExplorerModal extends Modal {
       try {
         const serviceKeys = this.plugin.settings.hydrusTagServices;
         if (serviceKeys.length > 0) {
-          const all: string[] = [];
-          for (const key of serviceKeys) {
-            const remote = await this.client.searchTags(prefix, { tagServiceKey: key });
-            all.push(...remote.map((s) => s.value));
+          const settled = await Promise.allSettled(
+            serviceKeys.map((key) => this.client!.searchTags(prefix, { tagServiceKey: key }))
+          );
+          const merged: string[] = [];
+          for (const r of settled) {
+            if (r.status === "fulfilled") merged.push(...r.value.map((s) => s.value));
           }
-          results = [...new Set(all)];
+          results = [...new Set(merged)];
         } else {
           const remote = await this.client.searchTags(prefix, {});
           results = remote.map((s) => s.value);

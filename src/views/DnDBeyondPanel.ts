@@ -297,17 +297,19 @@ export class DnDBeyondPanel {
         return;
       }
 
-      for (const [monsterId, imageUrl] of avatarMap) {
-        const monster = encounter.monsters.find((m) => m.id === monsterId);
-        const name = monster?.name ?? `Monster ${monsterId}`;
-        debug("loadMonsterImages: downloading", name, "id", monsterId, "url", imageUrl);
-        const vaultPath = await cache.getOrDownload(monsterId, imageUrl, name);
-        const dataUrl = await this.plugin.imageToDataUrl(vaultPath);
-        if (dataUrl) {
-          dmPanel.addImageLayer(name, dataUrl, "monster", false);
-          debug("loadMonsterImages: added layer", name);
-        }
-      }
+      await Promise.allSettled(
+        [...avatarMap].map(async ([monsterId, imageUrl]) => {
+          const monster = encounter.monsters.find((m) => m.id === monsterId);
+          const name = monster?.name ?? `Monster ${monsterId}`;
+          debug("loadMonsterImages: downloading", name, "id", monsterId, "url", imageUrl);
+          const vaultPath = await cache.getOrDownload(monsterId, imageUrl, name);
+          const dataUrl = await this.plugin.imageToDataUrl(vaultPath);
+          if (dataUrl) {
+            dmPanel.addImageLayer(name, dataUrl, "monster", false);
+            debug("loadMonsterImages: added layer", name);
+          }
+        })
+      );
     } catch (e) {
       debugWarn("DDB: failed to load monster images:", (e as Error).message);
     }
