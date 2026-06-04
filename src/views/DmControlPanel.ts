@@ -1,10 +1,10 @@
-import { ItemView, WorkspaceLeaf, Notice, TFile } from "obsidian";
+import { ItemView, Menu, WorkspaceLeaf, Notice, TFile } from "obsidian";
 import type DmScreenPlugin from "../main";
 import type { TrackerCombatant, ImageLayer } from "../types";
 import { renderStatblock } from "./StatblockPanel";
 import { DnDBeyondPanel } from "./DnDBeyondPanel";
 import { debug, debugWarn, debugError } from "../debug";
-import { decodeStatus } from "../conditions";
+import { CONDITIONS, decodeStatus, encodeExhaustion } from "../conditions";
 
 export const DM_CONTROL_VIEW_TYPE = "dm-control-panel";
 
@@ -1207,7 +1207,9 @@ export class DmControlPanel extends ItemView {
       });
 
       row.createSpan({ text: `${c.initiative}`, cls: "dm-init-num" });
-      row.createSpan({ text: c.name, cls: "dm-combatant-name" });
+      const nameEl = row.createSpan({ text: c.name, cls: "dm-combatant-name" });
+      nameEl.style.cursor = "pointer";
+      nameEl.addEventListener("click", (evt) => this.openManualConditionMenu(c, evt));
       this.appendStatusIcons(row, c.statuses);
 
       const hpEl = row.createEl("input", { type: "number", cls: "dm-hp-input" });
@@ -2087,6 +2089,54 @@ export class DmControlPanel extends ItemView {
     this.manualCombatants[this.currentTurn].active = true;
     this.broadcastManualInitiative();
     this.render();
+  }
+
+  private openManualConditionMenu(c: ManualCombatant, evt: MouseEvent): void {
+    debug("DmControlPanel: open manual condition menu for", c.name);
+    const current = new Set(c.statuses);
+    const menu = new Menu();
+
+    for (const cond of Object.values(CONDITIONS)) {
+      const active = current.has(cond.id);
+      menu.addItem((item) => {
+        item.setTitle(cond.name).setChecked(active).onClick(() => {
+          if (active) c.statuses = c.statuses.filter((s) => s !== cond.id);
+          else c.statuses = [...c.statuses, cond.id];
+          this.broadcastManualInitiative();
+          this.render();
+        });
+      });
+    }
+
+    menu.addSeparator();
+
+    let currentExhaustion = 0;
+    for (const s of current) {
+      if (s.startsWith("exhaustion:")) {
+        const n = parseInt(s.slice("exhaustion:".length), 10);
+        if (Number.isFinite(n) && n >= 1 && n <= 6) currentExhaustion = n;
+      }
+    }
+    menu.addItem((item) => {
+      item.setTitle(currentExhaustion === 0 ? "Exhaustion — None" : `Exhaustion — Level ${currentExhaustion}`).setDisabled(true);
+    });
+    const setExhaustion = (level: number): void => {
+      c.statuses = c.statuses.filter((s) => !s.startsWith("exhaustion:"));
+      const enc = encodeExhaustion(level);
+      if (enc) c.statuses = [...c.statuses, enc];
+      this.broadcastManualInitiative();
+      this.render();
+    };
+    menu.addItem((item) => {
+      item.setTitle("  Remove exhaustion").setChecked(currentExhaustion === 0).onClick(() => setExhaustion(0));
+    });
+    for (let n = 1; n <= 6; n++) {
+      menu.addItem((item) => {
+        item.setTitle(`  Exhaustion ${n}`).setChecked(currentExhaustion === n).onClick(() => setExhaustion(n));
+      });
+    }
+
+    menu.showAtMouseEvent(evt);
   }
 
   private appendStatusIcons(parent: HTMLElement, statuses: string[]) {

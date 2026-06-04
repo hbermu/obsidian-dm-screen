@@ -251,3 +251,73 @@ describe("DnDBeyondPanel broadcast reveal rule", () => {
     expect((panel as any).showFullTurnOrder).toBe(false);
   });
 });
+
+describe("DnDBeyondPanel monsterStatuses", () => {
+  it("includes monsterStatuses on the broadcast for that monster id", () => {
+    const container = document.createElement("div");
+    const plugin = makePlugin();
+    const panel = new DnDBeyondPanel(plugin, container);
+    (panel as any).showFullTurnOrder = true;
+    const state = makeState({
+      roundNum: 1,
+      turnNum: 1,
+      participants: [{ name: "Goblin", initiative: 12, kind: "monster" }],
+    });
+    // The makeState helper assigns monster ids starting at 100.
+    const monsterId = 100;
+    (panel as any).monsterStatuses.set(monsterId, new Set(["frightened", "exhaustion:2"]));
+
+    (panel as any).broadcastToPlayerScreen(state);
+    const sent = plugin.sendInitiativeUpdate.mock.calls[0][0];
+    expect(sent[0].name).toBe("Goblin");
+    expect(sent[0].statuses).toEqual(expect.arrayContaining(["frightened", "exhaustion:2"]));
+    expect(sent[0].statuses.length).toBe(2);
+  });
+
+  it("emits an empty statuses array when monsterStatuses has no entry for that id", () => {
+    const container = document.createElement("div");
+    const plugin = makePlugin();
+    const panel = new DnDBeyondPanel(plugin, container);
+    (panel as any).showFullTurnOrder = true;
+    const state = makeState({
+      roundNum: 1,
+      turnNum: 1,
+      participants: [{ name: "Goblin", initiative: 12, kind: "monster" }],
+    });
+    (panel as any).broadcastToPlayerScreen(state);
+    const sent = plugin.sendInitiativeUpdate.mock.calls[0][0];
+    expect(sent[0].statuses).toEqual([]);
+  });
+
+  it("propagates PC statuses pulled from the character API", () => {
+    const container = document.createElement("div");
+    const plugin = makePlugin();
+    const panel = new DnDBeyondPanel(plugin, container);
+    (panel as any).showFullTurnOrder = true;
+    (panel as any).showPcHp = true;
+    const state = makeState({
+      roundNum: 1,
+      turnNum: 1,
+      participants: [{ name: "Morrigan", initiative: 20, kind: "player", id: 7 }],
+    });
+    // Inject statuses on the character record the panel reads.
+    (state.characters as Map<number, any>).get(7)!.statuses = ["charmed", "exhaustion:3", "grappled"];
+
+    (panel as any).broadcastToPlayerScreen(state);
+    const sent = plugin.sendInitiativeUpdate.mock.calls[0][0];
+    expect(sent[0].name).toBe("Morrigan");
+    expect(sent[0].isPlayer).toBe(true);
+    expect(sent[0].statuses).toEqual(["charmed", "exhaustion:3", "grappled"]);
+  });
+
+  it("stopTracking clears monsterStatuses", () => {
+    const container = document.createElement("div");
+    const panel = new DnDBeyondPanel(makePlugin(), container);
+    (panel as any).poller = { stop: vi.fn() };
+    (panel as any).selectedEncounterId = "enc-1";
+    (panel as any).monsterStatuses.set(100, new Set(["poisoned"]));
+
+    panel.stopTracking();
+    expect((panel as any).monsterStatuses.size).toBe(0);
+  });
+});

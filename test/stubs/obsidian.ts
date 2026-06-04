@@ -27,6 +27,33 @@ export class Modal {
 export class Notice {
   constructor(_message: string, _timeout?: number) {}
 }
+export class MenuItem {
+  private _title = "";
+  private _checked = false;
+  private _disabled = false;
+  private _onClick: (() => void) | null = null;
+  setTitle(t: string): this { this._title = t; return this; }
+  setIcon(_i: string): this { return this; }
+  setChecked(c: boolean): this { this._checked = c; return this; }
+  setDisabled(d: boolean): this { this._disabled = d; return this; }
+  onClick(fn: () => void): this { this._onClick = fn; return this; }
+  get title(): string { return this._title; }
+  get checked(): boolean { return this._checked; }
+  get disabled(): boolean { return this._disabled; }
+  triggerClick(): void { this._onClick?.(); }
+}
+export class Menu {
+  items: MenuItem[] = [];
+  addItem(cb: (item: MenuItem) => void): this {
+    const item = new MenuItem();
+    cb(item);
+    this.items.push(item);
+    return this;
+  }
+  addSeparator(): this { return this; }
+  showAtMouseEvent(_e: MouseEvent): void {}
+  showAtPosition(_p: { x: number; y: number }): void {}
+}
 export class PluginSettingTab {}
 export class Setting {
   constructor(_containerEl: HTMLElement) {}

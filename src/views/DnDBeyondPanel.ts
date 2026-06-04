@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { Menu, Notice } from "obsidian";
 import type DmScreenPlugin from "../main";
 import { DdbClient } from "../dndbeyond/client";
 import { DdbEncounterPoller, type DdbPolledState } from "../dndbeyond/poller";
@@ -7,7 +7,7 @@ import { debug, debugWarn } from "../debug";
 import type { VaultAdapterLike } from "../hydrus/cache";
 import type { DdbEncounter } from "../dndbeyond/types";
 import { DnDBeyondEncounterModal } from "./DnDBeyondEncounterModal";
-import { decodeStatus } from "../conditions";
+import { CONDITIONS, decodeStatus, encodeExhaustion } from "../conditions";
 
 type PreviewCombatant = {
   name: string;
@@ -20,6 +20,9 @@ type PreviewCombatant = {
   hidden: boolean;
   hideHp: boolean;
   statuses: string[];
+  // Non-null on DDB monster rows — used by the DM preview to wire a
+  // click handler that opens the condition menu.
+  monsterId?: number;
 };
 
 export class DnDBeyondPanel {
@@ -275,6 +278,7 @@ export class DnDBeyondPanel {
           hidden,
           hideHp: false,
           statuses: monsterStatuses ? [...monsterStatuses] : [],
+          monsterId: p.id,
         });
       } else {
         participants.push({
@@ -353,8 +357,74 @@ export class DnDBeyondPanel {
     }
 
     for (const p of participants) {
-      list.appendChild(buildPreviewRow(p));
+      const row = buildPreviewRow(p);
+      if (p.monsterId != null) {
+        const monsterId = p.monsterId;
+        const monsterName = p.name;
+        row.classList.add("dm-ddb-preview-row-clickable");
+        row.addEventListener("click", (evt) =>
+          this.openMonsterConditionMenu(monsterId, monsterName, evt)
+        );
+      }
+      list.appendChild(row);
     }
+  }
+
+  private openMonsterConditionMenu(monsterId: number, monsterName: string, evt: MouseEvent): void {
+    if (!this.polledState) return;
+    const current = this.monsterStatuses.get(monsterId) ?? new Set<string>();
+    debug("DDB Panel: open monster condition menu for", monsterName, "(id", monsterId, ")");
+
+    const menu = new Menu();
+
+    for (const cond of Object.values(CONDITIONS)) {
+      const active = current.has(cond.id);
+      menu.addItem((item) => {
+        item.setTitle(cond.name).setChecked(active).onClick(() => {
+          const set = new Set(this.monsterStatuses.get(monsterId) ?? new Set<string>());
+          if (active) set.delete(cond.id);
+          else set.add(cond.id);
+          this.monsterStatuses.set(monsterId, set);
+          this.applyMonsterStatusChange();
+        });
+      });
+    }
+
+    menu.addSeparator();
+
+    const currentExhaustion = readExhaustionLevel(current);
+    menu.addItem((item) => {
+      item.setTitle(currentExhaustion === 0 ? "Exhaustion — None" : `Exhaustion — Level ${currentExhaustion}`).setDisabled(true);
+    });
+    menu.addItem((item) => {
+      item.setTitle("  Remove exhaustion").setChecked(currentExhaustion === 0).onClick(() => {
+        this.setMonsterExhaustion(monsterId, 0);
+      });
+    });
+    for (let n = 1; n <= 6; n++) {
+      menu.addItem((item) => {
+        item.setTitle(`  Exhaustion ${n}`).setChecked(currentExhaustion === n).onClick(() => {
+          this.setMonsterExhaustion(monsterId, n);
+        });
+      });
+    }
+
+    menu.showAtMouseEvent(evt);
+  }
+
+  private setMonsterExhaustion(monsterId: number, level: number): void {
+    const set = new Set(this.monsterStatuses.get(monsterId) ?? new Set<string>());
+    for (const s of [...set]) if (s.startsWith("exhaustion:")) set.delete(s);
+    const enc = encodeExhaustion(level);
+    if (enc) set.add(enc);
+    this.monsterStatuses.set(monsterId, set);
+    this.applyMonsterStatusChange();
+  }
+
+  private applyMonsterStatusChange(): void {
+    if (!this.polledState) return;
+    this.broadcastToPlayerScreen(this.polledState);
+    this.renderPreview();
   }
 
   private async loadMonsterImages(encounter: DdbEncounter): Promise<void> {
@@ -407,6 +477,16 @@ function classifyHp(hp: number, maxHp: number): { cls: string; label: string } {
   if (pct < 50) return { cls: "init-condition-bloodied", label: "Bloodied" };
   if (pct < 100) return { cls: "init-condition-hurt", label: "Hurt" };
   return { cls: "init-condition-well", label: "Well" };
+}
+
+function readExhaustionLevel(statuses: Iterable<string>): number {
+  for (const s of statuses) {
+    if (s.startsWith("exhaustion:")) {
+      const n = parseInt(s.slice("exhaustion:".length), 10);
+      if (Number.isFinite(n) && n >= 1 && n <= 6) return n;
+    }
+  }
+  return 0;
 }
 
 function buildPreviewRow(c: PreviewCombatant): HTMLLIElement {
