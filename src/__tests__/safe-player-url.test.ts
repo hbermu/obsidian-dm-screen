@@ -22,8 +22,14 @@ describe("safePlayerUrl", () => {
       }
     });
 
-    it("accepts case-insensitive scheme + mime", () => {
-      const url = "DATA:IMAGE/PNG;base64,XX";
+    it("accepts case-insensitive scheme + mime (returns canonicalised href)", () => {
+      // URL parsing lowercases the scheme. MIME case is preserved in the
+      // path but our MIME check is case-insensitive.
+      expect(safePlayerUrl("DATA:IMAGE/PNG;base64,XX", "image")).toBe("data:IMAGE/PNG;base64,XX");
+    });
+
+    it("accepts data:image/png,<data> with no ; separator (just a comma)", () => {
+      const url = "data:image/png,abcd";
       expect(safePlayerUrl(url, "image")).toBe(url);
     });
   });
@@ -75,9 +81,11 @@ describe("safePlayerUrl", () => {
       expect(safePlayerUrl("data:image/png;base64,AA", "video")).toBeNull();
     });
 
-    it("rejects data:image/* with no parameters (no ; separator)", () => {
-      // Our prefix list requires the ; so unparameterised data URLs are out.
-      expect(safePlayerUrl("data:image/png,abcd", "image")).toBeNull();
+    it("rejects data:image/* with no MIME / no separator at all", () => {
+      // Without "," or ";", the MIME can't be extracted, so we reject.
+      expect(safePlayerUrl("data:image/png", "image")).toBeNull();
+      expect(safePlayerUrl("data:", "image")).toBeNull();
+      expect(safePlayerUrl("data:,abc", "image")).toBeNull();
     });
   });
 });
