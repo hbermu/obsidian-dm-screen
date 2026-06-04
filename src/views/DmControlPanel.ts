@@ -3,7 +3,7 @@ import type DmScreenPlugin from "../main";
 import type { TrackerCombatant, ImageLayer } from "../types";
 import { renderStatblock } from "./StatblockPanel";
 import { DnDBeyondPanel } from "./DnDBeyondPanel";
-import { debug, debugError } from "../debug";
+import { debug, debugWarn, debugError } from "../debug";
 
 export const DM_CONTROL_VIEW_TYPE = "dm-control-panel";
 
@@ -90,6 +90,7 @@ export class DmControlPanel extends ItemView {
   // UI state
   expandedCreature: string | null = null;
   private renderDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveStateTimer: ReturnType<typeof setTimeout> | null = null;
   private panZoomAbort: AbortController | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: DmScreenPlugin) {
@@ -212,6 +213,10 @@ export class DmControlPanel extends ItemView {
   }
 
   saveState() {
+    if (this.saveStateTimer) {
+      clearTimeout(this.saveStateTimer);
+      this.saveStateTimer = null;
+    }
     const s = this.plugin.settings;
     s.lastPlayerScreenWidth = this.connectedClients[0]?.width ?? 0;
     s.lastPlayerScreenHeight = this.connectedClients[0]?.height ?? 0;
@@ -225,6 +230,18 @@ export class DmControlPanel extends ItemView {
       s.lastBroadcastCache = cache;
     }
     this.plugin.saveSettings();
+  }
+
+  // Coalesces bursty broadcasts (drag, fog draw, scale slider…) into a
+  // single write. Without this, each broadcastImageLayers fires saveState
+  // synchronously, JSON-stringifying ~1 MB of layer data and writing it to
+  // disk every frame.
+  scheduleSaveState() {
+    if (this.saveStateTimer) return;
+    this.saveStateTimer = setTimeout(() => {
+      this.saveStateTimer = null;
+      this.saveState();
+    }, 1000);
   }
 
   // Called from main.ts when a player screen browser connects or resizes
@@ -535,34 +552,58 @@ export class DmControlPanel extends ItemView {
       rect.style.top = `${layer.y}%`;
       rect.style.width = `${layer.width}%`;
       rect.style.height = `${layer.height}%`;
-      rect.style.backgroundImage = `url(${layer.dataUrl})`;
-      rect.style.backgroundSize = "contain";
-      rect.style.backgroundPosition = "center";
-      rect.style.backgroundRepeat = "no-repeat";
-      rect.style.borderColor = color;
       rect.style.zIndex = String(layer.zIndex);
       if (layer.rotation) {
         rect.style.transform = `rotate(${layer.rotation}deg)`;
       }
-      rect.textContent = layer.label;
       rect.title = layer.label;
-      if (!layer.visible) {
-        rect.style.opacity = "0.25";
-        rect.style.borderStyle = "dashed";
-      }
+      if (!layer.visible) rect.style.opacity = "0.25";
 
-      // Show fog overlay on preview
+      // Frame: holds the colored border, image, fog overlay, and fog-edit
+      // canvas. Sized at image-load time to the visible image rect inside
+      // the broadcast wrapper (mirrors the player-side .image-layer-frame)
+      // so the border hugs the visible content instead of the wrapper.
+      const frame = rect.createDiv("dm-layer-rect-frame");
+      frame.style.backgroundImage = `url(${layer.dataUrl})`;
+      frame.style.backgroundSize = "100% 100%";
+      frame.style.backgroundPosition = "center";
+      frame.style.backgroundRepeat = "no-repeat";
+      frame.style.borderColor = color;
+      if (!layer.visible) frame.style.borderStyle = "dashed";
+
+      const sizeFrame = () => {
+        const bounds = rect.getBoundingClientRect();
+        if (!bounds.width || !bounds.height) return;
+        if (!frameImg.naturalWidth || !frameImg.naturalHeight) return;
+        const imgAspect = frameImg.naturalWidth / frameImg.naturalHeight;
+        const rectAspect = bounds.width / bounds.height;
+        if (imgAspect >= rectAspect) {
+          frame.style.width = "100%";
+          frame.style.height = `${(rectAspect / imgAspect) * 100}%`;
+        } else {
+          frame.style.height = "100%";
+          frame.style.width = `${(imgAspect / rectAspect) * 100}%`;
+        }
+      };
+      const frameImg = new Image();
+      frameImg.onload = () => requestAnimationFrame(sizeFrame);
+      frameImg.src = layer.dataUrl;
+      requestAnimationFrame(sizeFrame);
+
+      // Fog overlay (inside frame so it aligns with the image)
       if (layer.fogEnabled && layer.fogDataUrl) {
-        const fogOverlay = rect.createDiv("dm-layer-fog-overlay");
+        const fogOverlay = frame.createDiv("dm-layer-fog-overlay");
         fogOverlay.style.backgroundImage = `url(${layer.fogDataUrl})`;
       }
 
-      // If fog editing this layer, add drawing overlay
+      // Fog drawing canvas (inside frame, sized to the visible image)
       if (this.fogEditLayerId === layer.id) {
         rect.addClass("dm-fog-editing");
-        const fogDrawCanvas = rect.createEl("canvas", { cls: "dm-fog-draw-canvas-inline" });
-        setTimeout(() => this.initInlineFogCanvas(fogDrawCanvas, layer, rect), 0);
+        const fogDrawCanvas = frame.createEl("canvas", { cls: "dm-fog-draw-canvas-inline" });
+        setTimeout(() => this.initInlineFogCanvas(fogDrawCanvas, layer, frame), 0);
       }
+
+      rect.createSpan({ cls: "dm-layer-rect-label", text: layer.label });
 
       if (this.fogEditLayerId !== layer.id) {
         this.makeDraggable(rect, layer, previewInner);
@@ -1936,6 +1977,10 @@ export class DmControlPanel extends ItemView {
     let startY = 0;
     let startLeft = 0;
     let startTop = 0;
+    // Cached at mousedown so a mid-drag re-render that detaches `preview`
+    // can't poison the math: a detached element returns width/height = 0,
+    // which would otherwise produce Infinity for dx/dy and corrupt layer.x/y.
+    let startBounds: DOMRect | null = null;
 
     const onMouseDown = (e: MouseEvent) => {
       e.preventDefault();
@@ -1944,14 +1989,27 @@ export class DmControlPanel extends ItemView {
       startY = e.clientY;
       startLeft = layer.x;
       startTop = layer.y;
+      startBounds = preview.getBoundingClientRect();
+      debug(
+        "makeDraggable: mousedown layer", layer.id,
+        "startLeft=", startLeft.toFixed(2),
+        "startTop=", startTop.toFixed(2),
+        "bounds=", startBounds.width.toFixed(0), "x", startBounds.height.toFixed(0)
+      );
+      if (!Number.isFinite(startLeft) || !Number.isFinite(startTop)) {
+        debugWarn("makeDraggable: layer has non-finite coords at mousedown — drag will be a no-op until reset");
+      }
+      if (startBounds.width === 0 || startBounds.height === 0) {
+        debugWarn("makeDraggable: preview has zero-size bounds at mousedown — drag will be a no-op");
+      }
       document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onMouseUp);
     };
 
     const onMouseMove = (e: MouseEvent) => {
-      const bounds = preview.getBoundingClientRect();
-      const dx = ((e.clientX - startX) / bounds.width) * 100;
-      const dy = ((e.clientY - startY) / bounds.height) * 100;
+      if (!startBounds || startBounds.width === 0 || startBounds.height === 0) return;
+      const dx = ((e.clientX - startX) / startBounds.width) * 100;
+      const dy = ((e.clientY - startY) / startBounds.height) * 100;
       layer.x = startLeft + dx;
       layer.y = startTop + dy;
       rect.style.left = `${layer.x}%`;
@@ -1961,6 +2019,13 @@ export class DmControlPanel extends ItemView {
     const onMouseUp = () => {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
+      debug(
+        "makeDraggable: mouseup layer", layer.id,
+        "x=", layer.x.toFixed(2),
+        "y=", layer.y.toFixed(2),
+        "finite=", Number.isFinite(layer.x) && Number.isFinite(layer.y)
+      );
+      startBounds = null;
       this.broadcastImageLayers();
     };
 
@@ -1998,7 +2063,7 @@ export class DmControlPanel extends ItemView {
       type: "image-layers-sync",
       payload: { layers: this.imageLayers },
     });
-    this.saveState();
+    this.scheduleSaveState();
   }
 
   private broadcastAndRender() {
