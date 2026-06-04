@@ -552,34 +552,58 @@ export class DmControlPanel extends ItemView {
       rect.style.top = `${layer.y}%`;
       rect.style.width = `${layer.width}%`;
       rect.style.height = `${layer.height}%`;
-      rect.style.backgroundImage = `url(${layer.dataUrl})`;
-      rect.style.backgroundSize = "contain";
-      rect.style.backgroundPosition = "center";
-      rect.style.backgroundRepeat = "no-repeat";
-      rect.style.borderColor = color;
       rect.style.zIndex = String(layer.zIndex);
       if (layer.rotation) {
         rect.style.transform = `rotate(${layer.rotation}deg)`;
       }
-      rect.textContent = layer.label;
       rect.title = layer.label;
-      if (!layer.visible) {
-        rect.style.opacity = "0.25";
-        rect.style.borderStyle = "dashed";
-      }
+      if (!layer.visible) rect.style.opacity = "0.25";
 
-      // Show fog overlay on preview
+      // Frame: holds the colored border, image, fog overlay, and fog-edit
+      // canvas. Sized at image-load time to the visible image rect inside
+      // the broadcast wrapper (mirrors the player-side .image-layer-frame)
+      // so the border hugs the visible content instead of the wrapper.
+      const frame = rect.createDiv("dm-layer-rect-frame");
+      frame.style.backgroundImage = `url(${layer.dataUrl})`;
+      frame.style.backgroundSize = "100% 100%";
+      frame.style.backgroundPosition = "center";
+      frame.style.backgroundRepeat = "no-repeat";
+      frame.style.borderColor = color;
+      if (!layer.visible) frame.style.borderStyle = "dashed";
+
+      const sizeFrame = () => {
+        const bounds = rect.getBoundingClientRect();
+        if (!bounds.width || !bounds.height) return;
+        if (!frameImg.naturalWidth || !frameImg.naturalHeight) return;
+        const imgAspect = frameImg.naturalWidth / frameImg.naturalHeight;
+        const rectAspect = bounds.width / bounds.height;
+        if (imgAspect >= rectAspect) {
+          frame.style.width = "100%";
+          frame.style.height = `${(rectAspect / imgAspect) * 100}%`;
+        } else {
+          frame.style.height = "100%";
+          frame.style.width = `${(imgAspect / rectAspect) * 100}%`;
+        }
+      };
+      const frameImg = new Image();
+      frameImg.onload = () => requestAnimationFrame(sizeFrame);
+      frameImg.src = layer.dataUrl;
+      requestAnimationFrame(sizeFrame);
+
+      // Fog overlay (inside frame so it aligns with the image)
       if (layer.fogEnabled && layer.fogDataUrl) {
-        const fogOverlay = rect.createDiv("dm-layer-fog-overlay");
+        const fogOverlay = frame.createDiv("dm-layer-fog-overlay");
         fogOverlay.style.backgroundImage = `url(${layer.fogDataUrl})`;
       }
 
-      // If fog editing this layer, add drawing overlay
+      // Fog drawing canvas (inside frame, sized to the visible image)
       if (this.fogEditLayerId === layer.id) {
         rect.addClass("dm-fog-editing");
-        const fogDrawCanvas = rect.createEl("canvas", { cls: "dm-fog-draw-canvas-inline" });
-        setTimeout(() => this.initInlineFogCanvas(fogDrawCanvas, layer, rect), 0);
+        const fogDrawCanvas = frame.createEl("canvas", { cls: "dm-fog-draw-canvas-inline" });
+        setTimeout(() => this.initInlineFogCanvas(fogDrawCanvas, layer, frame), 0);
       }
+
+      rect.createSpan({ cls: "dm-layer-rect-label", text: layer.label });
 
       if (this.fogEditLayerId !== layer.id) {
         this.makeDraggable(rect, layer, previewInner);
