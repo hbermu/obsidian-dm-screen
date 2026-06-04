@@ -243,13 +243,13 @@ body {
   /* Sized dynamically by JS to maintain content aspect ratio */
 }
 
-#image-layers-inner > div > img:first-child {
+#image-layers-inner .image-layer-frame {
   border: 2px solid #c9aa71;
   border-radius: 6px;
   box-sizing: border-box;
 }
 
-#image-layers-inner > div > img.no-border:first-child {
+#image-layers-inner .image-layer-frame.no-border {
   border: none;
   border-radius: 0;
 }

@@ -7,7 +7,7 @@
 - `src/types.ts` — `ImageLayer` interface
 - `src/views/DmControlPanel.ts` — preview rendering (drag), layer list rendering (controls), `addImageLayer`, `broadcastImageLayers`, `broadcastAndRender`, `makeDraggable`, `moveLayerUp` / `moveLayerDown`, `showImagePicker`, image-source frontmatter discovery
 - `src/player/player.ts` — `syncImageLayers` renders the layer stack on the player; viewport pan/zoom of the layer container is applied via `updateViewport`
-- `src/player/player.css` — `.no-border` class, gold border on `#image-layers-inner > div > img:first-child`
+- `src/player/player.css` — `.no-border` class, gold border on `.image-layer-frame`
 
 ## Settings used
 
@@ -22,13 +22,14 @@
 5. When `noteType` is `"person"` or `"monster"`, the new layer shall be sized as a portrait (30%×60% at 35,20) instead of pixel-derived dimensions.
 6. The DM panel shall sort layers by `zIndex` ascending when rendering them on the preview and on the player.
 7. Each layer shall be rendered on the player inside a wrapper div positioned `absolute` with `left/top/width/height` percentages relative to a `100vw × 100vh` inner frame.
-8. While `layer.bordered !== false`, the rendered player image shall carry the gold-bordered CSS rule.
-9. If `layer.bordered === false`, then the player image shall carry the `.no-border` class.
-10. The player shall apply `transform: rotate(<rotation>deg)` to the wrapper when `rotation` is non-zero.
-11. While `layer.visible` is false, the player shall not render that layer (filter applied in `syncImageLayers`).
-12. Detailed per-layer DM controls are specified in `layer-controls.md`.
-13. State persistence and restore behaviour are specified in `persistence.md`.
-14. Fog of war on a per-layer basis is specified in `../fog-of-war/overview.md`.
+8. Inside each wrapper, the player shall render an `.image-layer-frame` div that contains the layer image (and the fog overlay when enabled). On image load, the frame shall be resized to the rectangle the image actually occupies inside the wrapper — preserving the image's natural aspect ratio — so the gold border hugs the visible image content and the fog overlay aligns with the image. The frame is centred inside the wrapper via flex.
+9. While `layer.bordered !== false`, the `.image-layer-frame` shall carry the gold-bordered CSS rule.
+10. If `layer.bordered === false`, the `.image-layer-frame` shall carry the `.no-border` class.
+11. The player shall apply `transform: rotate(<rotation>deg)` to the wrapper when `rotation` is non-zero.
+12. While `layer.visible` is false, the player shall not render that layer (filter applied in `syncImageLayers`).
+13. Detailed per-layer DM controls are specified in `layer-controls.md`.
+14. State persistence and restore behaviour are specified in `persistence.md`.
+15. Fog of war on a per-layer basis is specified in `../fog-of-war/overview.md`.
 
 ## Broadcast / IPC
 
