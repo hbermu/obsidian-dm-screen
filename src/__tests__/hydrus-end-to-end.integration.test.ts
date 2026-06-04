@@ -136,7 +136,7 @@ describe("Hydrus client + cache end-to-end", () => {
     const second = await cache.fetchAndCache(client, file);
     expect(second.isFresh).toBe(false);
 
-    const downloadCalls = requestSpy.mock.calls.filter(([param]) => {
+    const downloadCalls = requestSpy.mock.calls.filter(([param]: [unknown]) => {
       const url = typeof param === "string" ? param : (param as { url: string }).url;
       return url.includes("/get_files/file?hash=") || url.includes("/get_files/thumbnail?hash=");
     });
