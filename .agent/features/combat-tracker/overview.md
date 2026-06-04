@@ -25,7 +25,7 @@
    - For D&D Beyond: `<encounter name> — Round <n>` from the poller status.
    - For plugin sync: `<encounter name> — Round <n>` from the last `save-state`.
    - For manual / no combat: empty string.
-6. The broadcast toggle (red dot in the header) shall be active (`dm-emit-active`) while any source is broadcasting. Clicking it while active shall call `stopAllCombatBroadcast`.
+6. The broadcast button (`.dm-emit-toggle`, label `● Live`) in the COMBAT section header shall carry the `dm-emit-active` class and be enabled (green, clickable) while any source is broadcasting; clicking it shall call `stopAllCombatBroadcast`. When no source is broadcasting, the button shall carry the HTML `disabled` attribute (greyed out via CSS, not clickable).
 7. `isCombatBroadcasting` shall return true if any of: plugin combatants present, manual combatants present, or D&D Beyond tracking active.
 8. `stopAllCombatBroadcast` shall: stop the D&D Beyond poller (if any), clear manual combatants and round, set `trackerSource = "manual"`, clear plugin combatants and encounter name, send an empty `initiative-update`, and re-render.
 9. Tracker scale controls (`−`, `1×`, `+`) shall adjust `combatTrackerScale` by ±0.1 (clamped `[0.5, 2.0]`, rounded to 1 decimal) or reset to `1`, persist to settings, and broadcast `combat-scale`.

@@ -40,7 +40,7 @@
 ### Tracking lifecycle
 
 11. `startTracking(encounterId)` shall instantiate a `DdbEncounterPoller` with `onUpdate = onPollUpdate` and `onError = onPollError`, and call its `start`.
-12. `stopTracking` shall stop the poller, clear `selectedEncounterId` and `polledState`, send an empty `initiative-update`, re-render, and call `onTrackingChange`.
+12. `stopTracking` shall stop the poller, clear `selectedEncounterId` and `polledState`, send an empty `initiative-update`, re-render, and call `onTrackingChange`. The tab itself does not expose a dedicated "stop" button; stopping is driven from `DmControlPanel.stopAllCombatBroadcast` (the `● Live` button in the COMBAT section header) and from `DnDBeyondPanel.destroy()`.
 13. `isTracking` shall return true when both `poller` and `selectedEncounterId` are set.
 14. `getActiveEncounterStatus` shall return `{ id, name, roundNum }` while tracking, else `null`.
 

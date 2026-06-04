@@ -106,19 +106,23 @@
 }
 
 .dm-emit-toggle {
-  width: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
   height: 22px;
-  border-radius: 50%;
+  border-radius: 12px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   line-height: 1;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
+}
+
+.dm-emit-toggle .dm-emit-dot {
+  font-size: 0.7rem;
+  line-height: 1;
 }
 
 .dm-emit-toggle.dm-emit-active {
@@ -126,6 +130,16 @@
   color: white;
   border-color: #4caf50;
   box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+}
+
+.dm-emit-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+  box-shadow: none;
+}
+
+.dm-emit-toggle:disabled:hover {
+  background: var(--background-secondary);
 }
 
 .dm-combat-name-row {

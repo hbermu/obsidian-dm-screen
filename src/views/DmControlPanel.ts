@@ -883,17 +883,17 @@ export class DmControlPanel extends ItemView {
     const broadcasting = this.isCombatBroadcasting();
     const emitToggle = header.createEl("button", {
       cls: broadcasting ? "dm-emit-toggle dm-emit-active" : "dm-emit-toggle",
-      text: "●",
       attr: {
         "aria-label": broadcasting ? "Stop broadcasting combat" : "No combat being broadcast",
         title: broadcasting ? "Stop broadcasting combat" : "No combat being broadcast",
       },
     });
-    emitToggle.addEventListener("click", () => {
-      if (this.isCombatBroadcasting()) {
-        this.stopAllCombatBroadcast();
-      }
-    });
+    emitToggle.createSpan({ cls: "dm-emit-dot", text: "●" });
+    emitToggle.createSpan({ cls: "dm-emit-label", text: "Live" });
+    if (!broadcasting) {
+      (emitToggle as HTMLButtonElement).disabled = true;
+    }
+    emitToggle.addEventListener("click", () => this.stopAllCombatBroadcast());
 
     // Tabs: Local Track + (optionally) D&D Beyond, full-width
     const ddbActive = this.plugin.settings.ddbEnabled && this.plugin.settings.ddbCobaltSession;

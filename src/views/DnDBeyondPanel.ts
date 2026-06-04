@@ -128,8 +128,6 @@ export class DnDBeyondPanel {
       const selectedRow = this.container.createDiv({ cls: "dm-ddb-selected" });
       const label = this.polledState?.encounter.name ?? "Loading…";
       selectedRow.createSpan({ cls: "dm-ddb-selected-name", text: `Tracking: ${label}` });
-      const stopBtn = selectedRow.createEl("button", { text: "Disconnect" });
-      stopBtn.addEventListener("click", () => this.stopTracking());
     }
 
     this.previewEl = this.container.createDiv({ cls: "dm-ddb-preview" });
