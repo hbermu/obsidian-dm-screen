@@ -38,6 +38,14 @@
 16. The player-screen tracker panel (`#initiative-tracker`) shall be rendered with a translucent dark background (`rgba(10, 10, 10, 0.55)`) layered over `backdrop-filter: blur(10px)` so the player-screen background remains partly visible through the panel while combatant text stays legible.
 17. Stopping the Player Screen server (via the Stop Server button, the `Toggle Player Screen Server` command, or plugin unload) shall invoke `stopAllCombatBroadcast` on every open DM Control Panel view *before* tearing down the server. This guarantees the D&D Beyond poller is cancelled and no further encounter/character requests fire once there is no player screen to receive the broadcast.
 
+### Conditions
+
+18. Every combatant carries a `statuses: string[]` channel. Each entry is either a D&D 5e condition id from `src/conditions.ts` (`"blinded"`, `"charmed"`, …, 14 total) or the encoded form `"exhaustion:N"` with N in [1, 6]. Any other string is preserved and rendered as a plain-text badge (backwards-compat with the Initiative Tracker plugin source).
+19. The player screen and the DM views shall render known status strings as inline SVG icons sourced from `CONDITIONS[id].iconSvg`, using the condition name as the native `title` for hover tooltips. Exhaustion shall additionally render the level number as a small badge in the bottom-right corner of the icon.
+20. PC conditions originating from D&D Beyond shall be populated from the `DdbCharacterSummary.statuses` field (parsed from `data.conditions[]` on the character sheet — see `../dndbeyond-integration/encounters-and-tracking.md`). They are read-only from the DM's perspective: re-derived on every poll cycle.
+21. The DM may add or remove conditions on D&D Beyond monster rows and on local manual combatants by clicking the row, which opens an Obsidian `Menu` with 14 toggle items plus an Exhaustion section (Remove, Level 1..6). Toggling triggers an immediate broadcast and a re-render.
+22. DM-assigned conditions are ephemeral: D&D Beyond monster conditions live in `DnDBeyondPanel.monsterStatuses` (a `Map<monsterId, Set<status>>`) and are cleared by `selectEncounter` and `stopTracking`. Local manual conditions live on `ManualCombatant.statuses` and persist with the manual combatant for the lifetime of the panel, but they are not written to disk.
+
 ## Broadcast / IPC
 
 | Message type | Direction | Payload | When |
