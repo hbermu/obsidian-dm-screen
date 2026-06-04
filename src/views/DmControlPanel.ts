@@ -90,6 +90,7 @@ export class DmControlPanel extends ItemView {
   // UI state
   expandedCreature: string | null = null;
   private renderDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveStateTimer: ReturnType<typeof setTimeout> | null = null;
   private panZoomAbort: AbortController | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: DmScreenPlugin) {
@@ -212,6 +213,10 @@ export class DmControlPanel extends ItemView {
   }
 
   saveState() {
+    if (this.saveStateTimer) {
+      clearTimeout(this.saveStateTimer);
+      this.saveStateTimer = null;
+    }
     const s = this.plugin.settings;
     s.lastPlayerScreenWidth = this.connectedClients[0]?.width ?? 0;
     s.lastPlayerScreenHeight = this.connectedClients[0]?.height ?? 0;
@@ -225,6 +230,18 @@ export class DmControlPanel extends ItemView {
       s.lastBroadcastCache = cache;
     }
     this.plugin.saveSettings();
+  }
+
+  // Coalesces bursty broadcasts (drag, fog draw, scale slider…) into a
+  // single write. Without this, each broadcastImageLayers fires saveState
+  // synchronously, JSON-stringifying ~1 MB of layer data and writing it to
+  // disk every frame.
+  scheduleSaveState() {
+    if (this.saveStateTimer) return;
+    this.saveStateTimer = setTimeout(() => {
+      this.saveStateTimer = null;
+      this.saveState();
+    }, 1000);
   }
 
   // Called from main.ts when a player screen browser connects or resizes
@@ -2004,7 +2021,7 @@ export class DmControlPanel extends ItemView {
       type: "image-layers-sync",
       payload: { layers: this.imageLayers },
     });
-    this.saveState();
+    this.scheduleSaveState();
   }
 
   private broadcastAndRender() {
