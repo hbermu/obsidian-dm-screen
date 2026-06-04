@@ -7,6 +7,7 @@ import { debug, debugWarn } from "../debug";
 import type { VaultAdapterLike } from "../hydrus/cache";
 import type { DdbEncounter } from "../dndbeyond/types";
 import { DnDBeyondEncounterModal } from "./DnDBeyondEncounterModal";
+import { decodeStatus } from "../conditions";
 
 type PreviewCombatant = {
   name: string;
@@ -18,6 +19,7 @@ type PreviewCombatant = {
   isPlayer: boolean;
   hidden: boolean;
   hideHp: boolean;
+  statuses: string[];
 };
 
 export class DnDBeyondPanel {
@@ -31,6 +33,10 @@ export class DnDBeyondPanel {
   private container: HTMLElement;
   private previewEl: HTMLElement | null = null;
   private previewHeaderEl: HTMLElement | null = null;
+  // Ephemeral DM-assigned conditions for DDB monsters, keyed by monster id.
+  // Cleared on encounter switch and on stopTracking (per the "ephemeral"
+  // persistence decision — no settings, no disk).
+  private monsterStatuses = new Map<number, Set<string>>();
   onTrackingChange: (() => void) | null = null;
 
   constructor(private plugin: DmScreenPlugin, container: HTMLElement) {
@@ -155,6 +161,7 @@ export class DnDBeyondPanel {
     this.polledState = null;
     this.showFullTurnOrderUserSet = false;
     this.showFullTurnOrder = false;
+    this.monsterStatuses.clear();
     this.startTracking(id);
     this.render();
     this.onTrackingChange?.();
@@ -183,6 +190,7 @@ export class DnDBeyondPanel {
     }
     this.selectedEncounterId = null;
     this.polledState = null;
+    this.monsterStatuses.clear();
     this.plugin.sendInitiativeUpdate([], 0);
     this.render();
     this.onTrackingChange?.();
@@ -252,6 +260,21 @@ export class DnDBeyondPanel {
           isPlayer: true,
           hidden,
           hideHp: !this.showPcHp,
+          statuses: char?.statuses ?? [],
+        });
+      } else if (p.kind === "monster") {
+        const monsterStatuses = this.monsterStatuses.get(p.id);
+        participants.push({
+          name: p.name,
+          hp: (p as { currentHitPoints: number }).currentHitPoints,
+          maxHp: (p as { maximumHitPoints: number }).maximumHitPoints,
+          initiative: p.initiative,
+          active: isActive,
+          friendly: false,
+          isPlayer: false,
+          hidden,
+          hideHp: false,
+          statuses: monsterStatuses ? [...monsterStatuses] : [],
         });
       } else {
         participants.push({
@@ -264,6 +287,7 @@ export class DnDBeyondPanel {
           isPlayer: false,
           hidden,
           hideHp: false,
+          statuses: [],
         });
       }
     }
@@ -283,7 +307,7 @@ export class DnDBeyondPanel {
       isPlayer: p.isPlayer,
       hidden: p.hidden,
       hideHp: p.hideHp,
-      statuses: [] as string[],
+      statuses: p.statuses,
     }));
     this.plugin.sendInitiativeUpdate(combatants, state.encounter.roundNum);
   }
@@ -402,6 +426,37 @@ function buildPreviewRow(c: PreviewCombatant): HTMLLIElement {
     nameEl.appendChild(tag);
   }
   li.appendChild(nameEl);
+
+  if (c.statuses && c.statuses.length > 0) {
+    const wrap = document.createElement("span");
+    wrap.className = "init-statuses";
+    for (const status of c.statuses) {
+      const d = decodeStatus(status);
+      if (d.kind === "condition") {
+        const icon = document.createElement("span");
+        icon.className = "dm-status-icon";
+        icon.title = d.def.name;
+        icon.innerHTML = d.def.iconSvg;
+        wrap.appendChild(icon);
+      } else if (d.kind === "exhaustion") {
+        const icon = document.createElement("span");
+        icon.className = "dm-status-icon dm-status-exhaustion";
+        icon.title = `Exhaustion (Level ${d.level})`;
+        icon.innerHTML = d.iconSvg;
+        const level = document.createElement("span");
+        level.className = "dm-status-level";
+        level.textContent = String(d.level);
+        icon.appendChild(level);
+        wrap.appendChild(icon);
+      } else {
+        const badge = document.createElement("span");
+        badge.className = "dm-status-badge";
+        badge.textContent = d.text;
+        wrap.appendChild(badge);
+      }
+    }
+    li.appendChild(wrap);
+  }
 
   const showHp = (c.friendly || c.isPlayer) && !c.hideHp;
   if (showHp) {

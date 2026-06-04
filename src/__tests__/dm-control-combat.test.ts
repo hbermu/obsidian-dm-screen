@@ -52,6 +52,7 @@ describe("DmControlPanel.isCombatBroadcasting", () => {
       maxHp: 7,
       initiative: 12,
       active: true,
+      statuses: [],
     });
     expect(panel.isCombatBroadcasting()).toBe(true);
   });
@@ -92,6 +93,7 @@ describe("DmControlPanel.stopAllCombatBroadcast", () => {
       maxHp: 7,
       initiative: 12,
       active: true,
+      statuses: [],
     });
     panel.currentTurn = 3;
 
@@ -135,6 +137,7 @@ describe("DmControlPanel.stopAllCombatBroadcast", () => {
       maxHp: 7,
       initiative: 12,
       active: false,
+      statuses: [],
     });
 
     panel.stopAllCombatBroadcast();
@@ -453,9 +456,9 @@ describe("DmControlPanel.broadcastManualInitiative round-1 hide", () => {
     const panel = makePanel(plugin);
     panel.manualRound = 1;
     panel.manualCombatants = [
-      { name: "A", hp: 10, maxHp: 10, initiative: 20, active: false },
-      { name: "B", hp: 10, maxHp: 10, initiative: 15, active: true },
-      { name: "C", hp: 10, maxHp: 10, initiative: 10, active: false },
+      { name: "A", hp: 10, maxHp: 10, initiative: 20, active: false, statuses: [] },
+      { name: "B", hp: 10, maxHp: 10, initiative: 15, active: true, statuses: [] },
+      { name: "C", hp: 10, maxHp: 10, initiative: 10, active: false, statuses: [] },
     ];
 
     (panel as any).broadcastManualInitiative();
@@ -471,9 +474,9 @@ describe("DmControlPanel.broadcastManualInitiative round-1 hide", () => {
     const panel = makePanel(plugin);
     panel.manualRound = 2;
     panel.manualCombatants = [
-      { name: "A", hp: 10, maxHp: 10, initiative: 20, active: false },
-      { name: "B", hp: 10, maxHp: 10, initiative: 15, active: true },
-      { name: "C", hp: 10, maxHp: 10, initiative: 10, active: false },
+      { name: "A", hp: 10, maxHp: 10, initiative: 20, active: false, statuses: [] },
+      { name: "B", hp: 10, maxHp: 10, initiative: 15, active: true, statuses: [] },
+      { name: "C", hp: 10, maxHp: 10, initiative: 10, active: false, statuses: [] },
     ];
 
     (panel as any).broadcastManualInitiative();
