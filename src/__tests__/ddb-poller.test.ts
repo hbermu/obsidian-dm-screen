@@ -31,7 +31,7 @@ function createMockClient(opts?: {
     }),
     getCharacter: vi.fn(async (id: number): Promise<DdbCharacterSummary> => {
       if (opts?.characterFails) throw new Error("char fetch failed");
-      return { id, name: `Player-${id}`, currentHitPoints: 30, maxHitPoints: 40, temporaryHitPoints: 0 };
+      return { id, name: `Player-${id}`, currentHitPoints: 30, maxHitPoints: 40, temporaryHitPoints: 0, statuses: [] };
     }),
   } as any;
 }
