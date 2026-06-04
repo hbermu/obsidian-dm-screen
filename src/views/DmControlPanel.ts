@@ -3,7 +3,7 @@ import type DmScreenPlugin from "../main";
 import type { TrackerCombatant, ImageLayer } from "../types";
 import { renderStatblock } from "./StatblockPanel";
 import { DnDBeyondPanel } from "./DnDBeyondPanel";
-import { debugError } from "../debug";
+import { debug, debugError } from "../debug";
 
 export const DM_CONTROL_VIEW_TYPE = "dm-control-panel";
 
@@ -32,6 +32,7 @@ export class DmControlPanel extends ItemView {
   // Image layers state
   imageLayers: ImageLayer[] = [];
   private nextZIndex = 1;
+  private nextLayerSeq = 1;
   private activeVideoPath: string | null = null;
   activeBackgroundUrl: string | null = null;
   private static LAYER_COLORS = [
@@ -89,6 +90,7 @@ export class DmControlPanel extends ItemView {
   // UI state
   expandedCreature: string | null = null;
   private renderDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private panZoomAbort: AbortController | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: DmScreenPlugin) {
     super(leaf);
@@ -115,13 +117,17 @@ export class DmControlPanel extends ItemView {
   };
 
   async onOpen() {
+    debug("DmControlPanel: onOpen");
     document.addEventListener("keydown", this.escHandler);
     this.restoreState();
     this.render();
   }
 
   async onClose() {
+    debug("DmControlPanel: onClose");
     document.removeEventListener("keydown", this.escHandler);
+    this.panZoomAbort?.abort();
+    this.panZoomAbort = null;
     if (this.ddbPanel) {
       this.ddbPanel.destroy();
       this.ddbPanel = null;
@@ -179,6 +185,11 @@ export class DmControlPanel extends ItemView {
       } catch { /* ignore */ }
     }
 
+    debug(
+      "DmControlPanel: restoreState — layers:", this.imageLayers.length,
+      "cache entries:", Object.keys(s.lastBroadcastCache ?? {}).length,
+      "bg:", this.activeBackgroundUrl ?? "(none)"
+    );
     if (this.plugin.server && this.imageLayers.length > 0) {
       this.broadcastImageLayers();
     }
@@ -187,6 +198,7 @@ export class DmControlPanel extends ItemView {
   republishToServer() {
     if (!this.plugin.server) return;
     if (this.imageLayers.length > 0) {
+      debug("DmControlPanel: republishToServer — layers:", this.imageLayers.length);
       this.broadcastImageLayers();
     }
   }
@@ -212,6 +224,7 @@ export class DmControlPanel extends ItemView {
     const wasConnected = this.playerConnected;
     this.connectedClients = clients;
     this.playerConnected = clients.length > 0;
+    debug("DmControlPanel: onPlayerConnected — clients:", clients.length, "was:", wasConnected);
     if (!wasConnected && this.playerConnected) {
       this.debouncedRender();
     } else {
@@ -548,36 +561,24 @@ export class DmControlPanel extends ItemView {
       }
     }
 
-    // Player viewport indicator (green rectangle)
-    // When exactly one screen is connected, show its viewport. Multiple screens: skip.
+    // Player viewport indicator (green rectangle): only shown when exactly one
+    // client is connected — multi-client viewports are ambiguous.
     const singleClient = this.connectedClients.length === 1 ? this.connectedClients[0] : null;
-    if (singleClient && singleClient.width > 0 && singleClient.height > 0) {
+    const vp = singleClient && singleClient.width > 0 && singleClient.height > 0
+      ? this.getPlayerViewport()
+      : null;
+    if (vp) {
       const vpRect = previewInner.createDiv("dm-player-viewport-rect");
-      const browserAspect = singleClient.width / singleClient.height;
-      const previewAspect = tvW / tvH;
+      vpRect.style.left = `${vp.vpX}%`;
+      vpRect.style.top = `${vp.vpY}%`;
+      vpRect.style.width = `${vp.vpW}%`;
+      vpRect.style.height = `${vp.vpH}%`;
 
-      let vpW: number, vpH: number;
-      if (browserAspect > previewAspect) {
-        // Browser is wider than content — full width, less height
-        vpW = 100 / this.playerZoom;
-        vpH = (100 / this.playerZoom) * (previewAspect / browserAspect);
-      } else {
-        // Browser is taller than content — full height, less width
-        vpW = (100 / this.playerZoom) * (browserAspect / previewAspect);
-        vpH = 100 / this.playerZoom;
-      }
-      const vpX = -this.playerPanX + (100 - vpW) / 2;
-      const vpY = -this.playerPanY + (100 - vpH) / 2;
-      vpRect.style.left = `${vpX}%`;
-      vpRect.style.top = `${vpY}%`;
-      vpRect.style.width = `${vpW}%`;
-      vpRect.style.height = `${vpH}%`;
-
-      // Scale visibility with zoom — more prominent when zoomed out further
-      // Divide by dmZoom to compensate for the CSS transform scale on previewInner
-      const zoomFactor = Math.max(0, Math.min(1, 1 - this.dmZoom)); // 0 at 100%, 1 at 0%
+      // Scale visibility with zoom — more prominent when zoomed out further.
+      // Divide by dmZoom to compensate for the CSS transform scale on previewInner.
+      const zoomFactor = Math.max(0, Math.min(1, 1 - this.dmZoom));
       const baseBorder = 2 + zoomFactor * 4;
-      const borderWidth = baseBorder / this.dmZoom; // compensate for scale
+      const borderWidth = baseBorder / this.dmZoom;
       const fillOpacity = 0.02 + zoomFactor * 0.2;
       vpRect.style.borderWidth = `${borderWidth}px`;
       vpRect.style.backgroundColor = `rgba(0, 255, 0, ${fillOpacity})`;
@@ -595,7 +596,7 @@ export class DmControlPanel extends ItemView {
     zoomSlider.max = "500";
     zoomSlider.value = String(Math.round(this.dmZoom * 100));
     zoomSlider.addEventListener("input", () => {
-      this.dmZoom = parseInt(zoomSlider.value) / 100;
+      this.dmZoom = parseInt(zoomSlider.value, 10) / 100;
       zoomLabel.textContent = `${zoomSlider.value}%`;
       previewInner.style.transform = `translate(${this.dmPanX}%, ${this.dmPanY}%) scale(${this.dmZoom})`;
     });
@@ -677,7 +678,7 @@ export class DmControlPanel extends ItemView {
         scaleSlider.addEventListener("keydown", (e: KeyboardEvent) => {
           if (e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
             e.preventDefault();
-            const current = parseInt(scaleSlider.value);
+            const current = parseInt(scaleSlider.value, 10);
             let newVal: number;
             if (e.key === "ArrowLeft") {
               newVal = Math.floor((current - 1) / 10) * 10;
@@ -690,7 +691,7 @@ export class DmControlPanel extends ItemView {
           }
         });
         scaleSlider.addEventListener("input", () => {
-          const scale = parseInt(scaleSlider.value);
+          const scale = parseInt(scaleSlider.value, 10);
           const centerX = layer.x + layer.width / 2;
           const centerY = layer.y + layer.height / 2;
           const aspectRatio = layer.height / layer.width;
@@ -949,6 +950,7 @@ export class DmControlPanel extends ItemView {
   }
 
   stopAllCombatBroadcast(): void {
+    debug("DmControlPanel: stopAllCombatBroadcast");
     if (this.ddbPanel) this.ddbPanel.stopTracking();
     this.manualCombatants = [];
     this.currentTurn = 0;
@@ -1124,8 +1126,8 @@ export class DmControlPanel extends ItemView {
     const addBtn = addRow.createEl("button", { text: "+", cls: "mod-cta" });
     addBtn.addEventListener("click", () => {
       const name = nameInput.value.trim();
-      const initiative = parseInt(initInput.value) || 0;
-      const hp = parseInt(hpInput.value) || 0;
+      const initiative = parseInt(initInput.value, 10) || 0;
+      const hp = parseInt(hpInput.value, 10) || 0;
       if (name) {
         this.manualCombatants.push({ name, initiative, hp, maxHp: hp, active: false });
         this.sortManualCombatants();
@@ -1148,7 +1150,7 @@ export class DmControlPanel extends ItemView {
       hpEl.value = String(c.hp);
       hpEl.style.width = "60px";
       hpEl.addEventListener("change", () => {
-        c.hp = parseInt(hpEl.value) || 0;
+        c.hp = parseInt(hpEl.value, 10) || 0;
         this.broadcastManualInitiative();
       });
 
@@ -1224,7 +1226,7 @@ export class DmControlPanel extends ItemView {
       }
 
       const layer: ImageLayer = {
-        id: `layer-${Date.now()}`,
+        id: `layer-${Date.now()}-${this.nextLayerSeq++}`,
         label,
         dataUrl,
         x,
@@ -1240,6 +1242,13 @@ export class DmControlPanel extends ItemView {
       };
 
       this.imageLayers.push(layer);
+      debug(
+        "DmControlPanel: addImageLayer pushed", layer.id,
+        "label:", layer.label,
+        "noteType:", noteType ?? "(none)",
+        "visible:", visible,
+        "total:", this.imageLayers.length
+      );
       this.broadcastAndRender();
     };
     img.src = dataUrl;
@@ -1479,15 +1488,21 @@ export class DmControlPanel extends ItemView {
   }
 
   private setupPreviewPanZoom(previewArea: HTMLElement, previewInner: HTMLElement) {
-    // Scroll wheel = DM zoom only (not broadcast to players)
+    // render() runs frequently and re-binds these listeners. Without an abort
+    // signal, the document-level mousemove/mouseup handlers accumulate every
+    // render and leak. The previewArea-bound listeners are GC'd with the old
+    // DOM, but we route them through the same controller for symmetry.
+    this.panZoomAbort?.abort();
+    this.panZoomAbort = new AbortController();
+    const { signal } = this.panZoomAbort;
+
     previewArea.addEventListener("wheel", (e) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
       this.dmZoom = Math.max(0.1, Math.min(10, this.dmZoom + delta));
       previewInner.style.transform = `translate(${this.dmPanX}%, ${this.dmPanY}%) scale(${this.dmZoom})`;
-    });
+    }, { signal });
 
-    // Middle-click drag = DM pan only (not broadcast to players)
     let panning = false;
     let panStartX = 0;
     let panStartY = 0;
@@ -1503,7 +1518,7 @@ export class DmControlPanel extends ItemView {
         panStartPanX = this.dmPanX;
         panStartPanY = this.dmPanY;
       }
-    });
+    }, { signal });
 
     document.addEventListener("mousemove", (e) => {
       if (!panning) return;
@@ -1513,13 +1528,13 @@ export class DmControlPanel extends ItemView {
       this.dmPanX = panStartPanX + dx;
       this.dmPanY = panStartPanY + dy;
       previewInner.style.transform = `translate(${this.dmPanX}%, ${this.dmPanY}%) scale(${this.dmZoom})`;
-    });
+    }, { signal });
 
     document.addEventListener("mouseup", (e) => {
       if (panning && e.button === 1) {
         panning = false;
       }
-    });
+    }, { signal });
   }
 
   private resetDmView() {
@@ -1791,14 +1806,17 @@ export class DmControlPanel extends ItemView {
       menu.addItem((item: any) => {
         item.setTitle(`Add all ${images.length} images`);
         item.onClick(async () => {
+          const dataUrls = await Promise.all(
+            images.map((img) => this.plugin.imageToDataUrl(img.path))
+          );
           let added = 0;
-          for (const img of images) {
-            const dataUrl = await this.plugin.imageToDataUrl(img.path);
+          dataUrls.forEach((dataUrl, i) => {
             if (dataUrl) {
+              const img = images[i];
               this.addImageLayer(`${activeFile.basename} (${img.source})`, dataUrl, noteType, false);
               added++;
             }
-          }
+          });
           new Notice(`Added ${added} image${added > 1 ? "s" : ""} (hidden)`);
         });
       });
@@ -1838,6 +1856,7 @@ export class DmControlPanel extends ItemView {
 
   private setImageAsBackground(img: { path: string; label: string }): void {
     const url = `/vault/${encodeURIComponent(img.path)}`;
+    debug("DmControlPanel: setImageAsBackground", img.path);
     this.activeBackgroundUrl = url;
     this.activeVideoPath = null;
     if (this.plugin.server) {
@@ -1948,6 +1967,7 @@ export class DmControlPanel extends ItemView {
 
   broadcastImageLayers() {
     if (!this.plugin.server) return;
+    debug("DmControlPanel: broadcastImageLayers —", this.imageLayers.length, "layer(s)");
     this.plugin.server.broadcast({
       type: "image-layers-sync",
       payload: { layers: this.imageLayers },

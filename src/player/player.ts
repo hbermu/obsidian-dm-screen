@@ -40,6 +40,60 @@ interface PlayerMessage {
   payload: Record<string, unknown>;
 }
 
+function classifyHp(hp: number, maxHp: number): { text: string; cssClass: string } {
+  if (hp <= 0) return { text: "Down", cssClass: "init-condition-down" };
+  const pct = maxHp > 0 ? (hp / maxHp) * 100 : 100;
+  if (pct <= 50) return { text: "Bloodied", cssClass: "init-condition-bloodied" };
+  if (pct < 100) return { text: "Hurt", cssClass: "init-condition-hurt" };
+  return { text: "Well", cssClass: "init-condition-well" };
+}
+
+function buildInitiativeRow(c: Combatant): HTMLLIElement {
+  const li = document.createElement("li");
+  const classes = ["init-entry"];
+  if (c.active) classes.push("init-active");
+  if (c.friendly || c.isPlayer) classes.push("init-friendly");
+  li.className = classes.join(" ");
+
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "init-name";
+  nameSpan.textContent = c.name;
+  if (c.isPlayer) {
+    const pc = document.createElement("span");
+    pc.className = "init-pc-tag";
+    pc.textContent = "PC";
+    nameSpan.appendChild(pc);
+  }
+  li.appendChild(nameSpan);
+
+  if (c.statuses && c.statuses.length > 0) {
+    const wrap = document.createElement("div");
+    wrap.className = "init-statuses";
+    for (const status of c.statuses) {
+      const badge = document.createElement("span");
+      badge.className = "init-status-badge";
+      badge.textContent = status;
+      wrap.appendChild(badge);
+    }
+    li.appendChild(wrap);
+  }
+
+  const cond = classifyHp(c.hp, c.maxHp);
+  const isAlly = c.friendly || c.isPlayer;
+  if (isAlly && !c.hideHp) {
+    const hpText = document.createElement("span");
+    hpText.className = "init-hp-text";
+    hpText.textContent = `${c.hp}/${c.maxHp}`;
+    li.appendChild(hpText);
+  }
+  const condSpan = document.createElement("span");
+  condSpan.className = `init-condition ${cond.cssClass}`;
+  condSpan.textContent = cond.text;
+  li.appendChild(condSpan);
+
+  return li;
+}
+
 class PlayerScreen {
   private ws: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -203,61 +257,14 @@ class PlayerScreen {
     }
 
     tracker.style.display = "block";
-    list.innerHTML = "";
-
-    // Update heading with round number
+    list.replaceChildren();
     heading.textContent = payload.round
       ? `Initiative — Round ${payload.round}`
       : "Initiative";
 
-    payload.combatants.forEach((c) => {
-      const li = document.createElement("li");
-
-      const classes = ["init-entry"];
-      if (c.active) classes.push("init-active");
-      if (c.friendly || c.isPlayer) classes.push("init-friendly");
-      li.className = classes.join(" ");
-
-      // Build status badges HTML
-      let statusHtml = "";
-      if (c.statuses && c.statuses.length > 0) {
-        statusHtml = `<div class="init-statuses">${c.statuses.map(s => `<span class="init-status-badge">${s}</span>`).join("")}</div>`;
-      }
-
-      // HP condition: "Well", "Hurt" (< 100%), "Bloodied" (<= 50%)
-      const hpPercent = c.maxHp > 0 ? (c.hp / c.maxHp) * 100 : 100;
-      let conditionText: string;
-      let conditionClass: string;
-      if (c.hp <= 0) {
-        conditionText = "Down";
-        conditionClass = "init-condition-down";
-      } else if (hpPercent <= 50) {
-        conditionText = "Bloodied";
-        conditionClass = "init-condition-bloodied";
-      } else if (hpPercent < 100) {
-        conditionText = "Hurt";
-        conditionClass = "init-condition-hurt";
-      } else {
-        conditionText = "Well";
-        conditionClass = "init-condition-well";
-      }
-
-      const isAlly = c.friendly || c.isPlayer;
-      let hpDisplay: string;
-      if (isAlly && !c.hideHp) {
-        hpDisplay = `<span class="init-hp-text">${c.hp}/${c.maxHp}</span><span class="init-condition ${conditionClass}">${conditionText}</span>`;
-      } else {
-        hpDisplay = `<span class="init-condition ${conditionClass}">${conditionText}</span>`;
-      }
-
-      li.innerHTML = `
-        <span class="init-name">${c.name}${c.isPlayer ? '<span class="init-pc-tag">PC</span>' : ""}</span>
-        ${statusHtml}
-        ${hpDisplay}
-      `;
-
-      list.appendChild(li);
-    });
+    for (const c of payload.combatants) {
+      list.appendChild(buildInitiativeRow(c));
+    }
 
     const activeLi = list.querySelector<HTMLLIElement>("li.init-active");
     if (activeLi) {

@@ -100,20 +100,22 @@ export class DdbClient {
     if (validIds.length === 0) return new Map();
     debug("getMonsterImages: fetching", validIds.length, "monsters:", validIds);
     const result = new Map<number, string>();
-    for (const id of validIds) {
-      try {
-        const url = `${MONSTER_SERVICE_URL}/${id}`;
-        debug("getMonsterImages: GET", url);
-        const res = await this.authedGet(url);
+    const settled = await Promise.allSettled(
+      validIds.map(async (id) => {
+        const res = await this.authedGet(`${MONSTER_SERVICE_URL}/${id}`);
         const body = res.json as { data?: Record<string, unknown> };
         const m = body.data ?? (body as unknown as Record<string, unknown>);
         const avatar = (m.largeAvatarUrl as string) || (m.avatarUrl as string) || "";
-        debug("getMonsterImages: id", id, "avatar", avatar ? avatar.slice(0, 60) + "..." : "(none)");
-        if (avatar) result.set(id, avatar);
-      } catch (e) {
-        debug("getMonsterImages: failed for id", id, (e as Error).message);
+        return { id, avatar };
+      })
+    );
+    settled.forEach((r, idx) => {
+      if (r.status === "fulfilled" && r.value.avatar) {
+        result.set(r.value.id, r.value.avatar);
+      } else if (r.status === "rejected") {
+        debug("getMonsterImages: failed for id", validIds[idx], (r.reason as Error)?.message);
       }
-    }
+    });
     return result;
   }
 

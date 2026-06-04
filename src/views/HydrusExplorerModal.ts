@@ -150,12 +150,14 @@ export class HydrusExplorerModal extends Modal {
       try {
         const serviceKeys = this.plugin.settings.hydrusTagServices;
         if (serviceKeys.length > 0) {
-          const all: string[] = [];
-          for (const key of serviceKeys) {
-            const remote = await this.client.searchTags(prefix, { tagServiceKey: key });
-            all.push(...remote.map((s) => s.value));
+          const settled = await Promise.allSettled(
+            serviceKeys.map((key) => this.client!.searchTags(prefix, { tagServiceKey: key }))
+          );
+          const merged: string[] = [];
+          for (const r of settled) {
+            if (r.status === "fulfilled") merged.push(...r.value.map((s) => s.value));
           }
-          results = [...new Set(all)];
+          results = [...new Set(merged)];
         } else {
           const remote = await this.client.searchTags(prefix, {});
           results = remote.map((s) => s.value);
@@ -189,15 +191,18 @@ export class HydrusExplorerModal extends Modal {
     if (!this.client) {
       this.setBanner("Hydrus is not configured. Open Settings → DM Screen to set the URL and key.");
       this.mode = "offline";
+      debug("HydrusExplorer: resolveMode → offline (no client)");
       return;
     }
     try {
       await this.client.verifyAccess();
       this.mode = "online";
       this.clearBanner();
+      debug("HydrusExplorer: resolveMode → online");
     } catch (err) {
       this.mode = "offline";
       this.setBanner(`Hydrus offline — showing local cache only. (${(err as Error).message})`);
+      debug("HydrusExplorer: resolveMode → offline (verifyAccess failed:", (err as Error).message, ")");
     }
   }
 
@@ -241,14 +246,17 @@ export class HydrusExplorerModal extends Modal {
       return;
     }
 
+    debug("HydrusExplorer: runSearch tags:", tags, "mode:", this.mode, "localOnly:", this.localOnly);
     try {
       if (this.localOnly || this.mode === "offline" || !this.client) {
         this.tiles = await this.searchLocal(tags);
       } else {
         this.tiles = await this.searchMerged(this.client, tags);
       }
+      debug("HydrusExplorer: runSearch returned", this.tiles.length, "tile(s)");
       this.renderPage();
     } catch (err) {
+      debugWarn("HydrusExplorer: runSearch failed:", (err as Error).message);
       this.setStatus(`Error: ${(err as Error).message}`);
       this.tiles = [];
       this.renderPage();
@@ -438,6 +446,7 @@ export class HydrusExplorerModal extends Modal {
       // localhost breaks any client that isn't on the DM machine.
       const url = `/vault/${encodeForVaultUrl(entry.vaultPath)}`;
       const mediaType = mediaTypeOf(entry.mime);
+      debug("HydrusExplorer: handleSetBackground", entry.hash.slice(0, 12), mediaType, entry.vaultPath);
       this.plugin.server.broadcast({
         type: "show-background-media",
         payload: {
@@ -474,6 +483,7 @@ export class HydrusExplorerModal extends Modal {
       }
       const base = layerLabelFromTags(tile.knownTags, entry.hash);
       const label = uniqueLayerLabel(panel.imageLayers, base);
+      debug("HydrusExplorer: handleAddAsLayer", entry.hash.slice(0, 12), "as", label);
       panel.addImageLayer(label, dataUrl, "hydrus", false);
       await this.cache.markUsed(entry.hash);
       new Notice("Added as image layer.");

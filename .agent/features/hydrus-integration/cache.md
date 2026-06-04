@@ -61,6 +61,7 @@
 - `src/__tests__/hydrus-cache.test.ts` — basic round-trip, paths, get, markUsed
 - `src/__tests__/hydrus-cache-extra.test.ts` — sweep, clear, write-queue concurrency, corrupted-index recovery
 - `src/__tests__/settings-migration.test.ts` — legacy `hydrusCacheFolder` → `cacheBaseFolder` migration cases
+- `src/__tests__/hydrus-end-to-end.integration.test.ts` — client + cache wired end-to-end with mocked `requestUrl`: search → metadata → `fetchAndCache`, idempotent re-fetch, non-2xx surfacing
 
 ## Non-goals
 

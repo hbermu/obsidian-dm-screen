@@ -49,6 +49,7 @@
 ## Tests covering this
 
 - `src/__tests__/main.test.ts` — event registration, `CreatureState` mapping, `sendInitiativeUpdate` filtering, statblock lookup fallback and caching, `onInitiativeStop` disconnect propagation
+- `src/__tests__/initiative-tracker-fs-roundtrip.integration.test.ts` — end-to-end roundtrip through the plugin: happy path, FS-not-installed, name-fallback, stop-viewing reset, round-2 reveal, multi-panel sync, lookup caching across consecutive syncs
 
 ## Non-goals
 
