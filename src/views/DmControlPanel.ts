@@ -3,7 +3,7 @@ import type DmScreenPlugin from "../main";
 import type { TrackerCombatant, ImageLayer } from "../types";
 import { renderStatblock } from "./StatblockPanel";
 import { DnDBeyondPanel } from "./DnDBeyondPanel";
-import { debug, debugError } from "../debug";
+import { debug, debugWarn, debugError } from "../debug";
 
 export const DM_CONTROL_VIEW_TYPE = "dm-control-panel";
 
@@ -1966,6 +1966,18 @@ export class DmControlPanel extends ItemView {
       startLeft = layer.x;
       startTop = layer.y;
       startBounds = preview.getBoundingClientRect();
+      debug(
+        "makeDraggable: mousedown layer", layer.id,
+        "startLeft=", startLeft.toFixed(2),
+        "startTop=", startTop.toFixed(2),
+        "bounds=", startBounds.width.toFixed(0), "x", startBounds.height.toFixed(0)
+      );
+      if (!Number.isFinite(startLeft) || !Number.isFinite(startTop)) {
+        debugWarn("makeDraggable: layer has non-finite coords at mousedown — drag will be a no-op until reset");
+      }
+      if (startBounds.width === 0 || startBounds.height === 0) {
+        debugWarn("makeDraggable: preview has zero-size bounds at mousedown — drag will be a no-op");
+      }
       document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onMouseUp);
     };
@@ -1983,6 +1995,12 @@ export class DmControlPanel extends ItemView {
     const onMouseUp = () => {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
+      debug(
+        "makeDraggable: mouseup layer", layer.id,
+        "x=", layer.x.toFixed(2),
+        "y=", layer.y.toFixed(2),
+        "finite=", Number.isFinite(layer.x) && Number.isFinite(layer.y)
+      );
       startBounds = null;
       this.broadcastImageLayers();
     };
