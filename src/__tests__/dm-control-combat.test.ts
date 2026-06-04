@@ -419,6 +419,34 @@ describe("DmControlPanel.addImageLayer pixel-derived sizing", () => {
   });
 });
 
+describe("DmControlPanel.getActiveCombatLabel — DDB title clickability", () => {
+  it("returns ddbId when active source is DnDBeyondPanel with a tracked encounter", () => {
+    const panel = makePanel();
+    (panel as any).combatTab = "dndbeyond";
+    (panel as any).ddbPanel = {
+      getActiveEncounterStatus: () => ({ id: "enc-42", name: "Goblin Ambush", roundNum: 2 }),
+    };
+    const label = (panel as any).getActiveCombatLabel();
+    expect(label).toEqual({ text: "Goblin Ambush — Round 2", ddbId: "enc-42" });
+  });
+
+  it("returns null ddbId for plugin source", () => {
+    const panel = makePanel();
+    (panel as any).combatTab = "initiative";
+    (panel as any).trackerSource = "plugin";
+    (panel as any).encounterName = "Manual Combat";
+    (panel as any).pluginRound = 3;
+    const label = (panel as any).getActiveCombatLabel();
+    expect(label).toEqual({ text: "Manual Combat — Round 3", ddbId: null });
+  });
+
+  it("returns empty/null when nothing is active", () => {
+    const panel = makePanel();
+    const label = (panel as any).getActiveCombatLabel();
+    expect(label).toEqual({ text: "", ddbId: null });
+  });
+});
+
 describe("DmControlPanel.broadcastManualInitiative round-1 hide", () => {
   it("hides combatants past the active turn during round 1", () => {
     const plugin = makePlugin();

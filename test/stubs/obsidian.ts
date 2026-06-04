@@ -3,7 +3,27 @@
 export class Plugin {}
 export class ItemView {}
 export class WorkspaceLeaf {}
-export class Modal {}
+export class Modal {
+  app: unknown;
+  modalEl: HTMLElement;
+  titleEl: HTMLElement;
+  contentEl: HTMLElement;
+  closeSpy?: () => void;
+  constructor(app: unknown) {
+    this.app = app;
+    this.modalEl = document.createElement("div");
+    this.titleEl = document.createElement("div");
+    this.contentEl = document.createElement("div");
+    this.modalEl.appendChild(this.titleEl);
+    this.modalEl.appendChild(this.contentEl);
+  }
+  open(): void {}
+  close(): void {
+    if (this.closeSpy) this.closeSpy();
+  }
+  onOpen(): void {}
+  onClose(): void {}
+}
 export class Notice {
   constructor(_message: string, _timeout?: number) {}
 }

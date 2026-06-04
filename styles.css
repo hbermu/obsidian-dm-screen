@@ -1263,17 +1263,8 @@
   gap: 8px;
 }
 
-.dm-ddb-search {
-  flex: 1;
-  padding: 4px 8px;
-  font-size: 0.85em;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 4px;
-  background: var(--background-primary);
-  color: var(--text-normal);
-}
-
-.dm-ddb-hp-toggle {
+.dm-ddb-hp-toggle,
+.dm-ddb-reveal-toggle {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1281,12 +1272,20 @@
   white-space: nowrap;
 }
 
-.dm-ddb-encounter-list {
-  max-height: 300px;
-  overflow-y: auto;
+.dm-ddb-choose-btn {
+  white-space: nowrap;
+}
+
+.dm-ddb-selected {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.dm-ddb-selected-name {
+  flex: 1;
 }
 
 .dm-ddb-encounter-row {
@@ -1303,27 +1302,10 @@
   background: var(--background-modifier-hover);
 }
 
-.dm-ddb-encounter-selected {
-  background: rgba(76, 175, 80, 0.15);
-  border: 1px solid rgba(76, 175, 80, 0.4);
-}
-
-.dm-ddb-check {
-  font-size: 0.9em;
-  width: 16px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
 .dm-ddb-encounter-name {
   flex: 1;
   color: var(--text-accent);
   text-decoration: none;
-  cursor: pointer;
-}
-
-.dm-ddb-encounter-name:hover {
-  text-decoration: underline;
 }
 
 .dm-ddb-badge {
@@ -1333,5 +1315,150 @@
   padding: 2px 6px;
   border-radius: 4px;
   white-space: nowrap;
+}
+
+/* ─── DDB Encounter Modal ─── */
+
+.dm-ddb-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 480px;
+}
+
+.dm-ddb-modal-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.dm-ddb-modal-search {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.dm-ddb-modal-status {
+  color: var(--text-muted);
+  font-size: 0.8em;
+}
+
+.dm-ddb-modal-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ─── DDB Player Preview (DM-side mirror of player initiative list) ─── */
+
+.dm-ddb-preview {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+}
+
+.dm-ddb-preview-header {
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.dm-ddb-preview-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.85em;
+  padding: 6px 0;
+}
+
+.dm-ddb-preview-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dm-ddb-preview .init-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--background-primary);
+  font-size: 0.85em;
+}
+
+.dm-ddb-preview .init-entry.init-active {
+  background: rgba(201, 170, 113, 0.15);
+  border-left: 3px solid #c9aa71;
+  padding-left: 5px;
+}
+
+.dm-ddb-preview .init-entry.init-friendly {
+  border-left: 3px solid #4169E1;
+}
+
+.dm-ddb-preview .init-entry.init-friendly .init-name {
+  color: #7EB3FF;
+}
+
+.dm-ddb-preview .init-entry.init-hidden {
+  opacity: 0.4;
+}
+
+.dm-ddb-preview .init-name {
+  flex: 1;
+  color: var(--text-normal);
+}
+
+.dm-ddb-preview .init-pc-tag {
+  font-size: 0.7em;
+  background: rgba(65, 105, 225, 0.2);
+  color: #4169E1;
+  padding: 1px 4px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+.dm-ddb-preview .init-hp-text {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  min-width: 50px;
+  text-align: right;
+}
+
+.dm-ddb-preview .init-condition {
+  font-size: 0.75em;
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+}
+
+.dm-ddb-preview .init-condition-well { color: #4caf50; }
+.dm-ddb-preview .init-condition-hurt { color: #ff9800; }
+.dm-ddb-preview .init-condition-bloodied { color: #f44336; }
+.dm-ddb-preview .init-condition-down {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+/* DDB combat title is a link to the encounter */
+.dm-combat-name-link {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.dm-combat-name-link:hover {
+  text-decoration: underline;
+  color: var(--text-accent);
 }
 

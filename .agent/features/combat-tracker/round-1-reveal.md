@@ -1,6 +1,6 @@
-# Round-1 Reveal Rule
+# Reveal Rule
 
-> The single rule shared by every initiative source: in round 1, combatants whose turn has not yet come are hidden from the player screen, so the players discover the encounter as it unfolds.
+> Hide combatants whose turn has not yet come in the current round so the players discover the encounter as it unfolds. The rule is forced for manual mode and the Initiative Tracker plugin source; for the D&D Beyond source it is DM-controlled via the `Show full turn order` toggle.
 
 ## Source files
 
@@ -15,21 +15,32 @@
 
 ## Requirements
 
+### Shared
+
 1. Each source shall sort its combatant list by initiative DESC before applying the rule.
-2. Let `activeIdx` be the index of the active combatant in the sorted list. Let `isRoundOne` be `round === 1`.
-3. While `isRoundOne` and `activeIdx >= 0`, the source shall set `hidden = true` for every combatant at index `> activeIdx` (preserving any pre-existing `hidden` for combatants at earlier indices).
-4. When `round > 1`, the source shall NOT add any hidden flag from this rule (existing `hidden` from upstream metadata still applies).
-5. `sendInitiativeUpdate` shall filter the combatant array to only include entries with `hidden !== true` before broadcasting.
-6. The DM panel itself shall continue to render hidden combatants (with a `[hidden]` badge) so the DM sees the full picture; only the broadcast is filtered.
+2. Let `activeIdx` be the index of the active combatant in the sorted list.
+3. `sendInitiativeUpdate` shall filter the combatant array to only include entries with `hidden !== true` before broadcasting.
+4. The DM panel itself shall continue to render hidden combatants (with a `[hidden]` badge or, for D&D Beyond, the dimmed `init-hidden` row in the preview) so the DM sees the full picture; only the broadcast is filtered.
+
+### Per-source behaviour
+
+5. **Initiative Tracker plugin (`main.ts onInitiativeStateChange`)**: while `round === 1` and `activeIdx >= 0`, the source shall set `hidden = true` for every combatant at index `> activeIdx`. When `round > 1`, no new hidden flag is added.
+6. **Manual mode (`DmControlPanel.broadcastManualInitiative`)**: identical behaviour to req 5.
+7. **D&D Beyond (`DnDBeyondPanel.broadcastToPlayerScreen`)**: the panel exposes a `showFullTurnOrder: boolean` field controlling the rule across all rounds.
+   - When `showFullTurnOrder === false`, the source shall set `hidden = true` for every combatant at index `> currentTurnIdx`, regardless of round number.
+   - When `showFullTurnOrder === true`, the source shall not add any hidden flag.
+   - On `selectEncounter`, both `showFullTurnOrder` and `showFullTurnOrderUserSet` are reset to `false`.
+   - On the first poll for a new selection, if the DM has not toggled the checkbox (`showFullTurnOrderUserSet === false`) and `roundNum >= 2`, the panel shall auto-set `showFullTurnOrder = true` and sync the checkbox.
+   - Once the DM toggles the checkbox manually, the value is sticky: it does NOT auto-flip on subsequent round transitions.
 
 ## Tests covering this
 
-- `src/__tests__/main.test.ts` — the round-1 reveal rule applied by `onInitiativeStateChange`, hidden filter in `sendInitiativeUpdate`
-- `src/__tests__/ddb-panel-tracking-state.test.ts` — the same rule applied by the D&D Beyond panel
-- `src/__tests__/dm-control-combat.test.ts` — manual broadcast applies the rule
+- `src/__tests__/main.test.ts` — round-1 reveal applied by `onInitiativeStateChange`, hidden filter in `sendInitiativeUpdate`
+- `src/__tests__/ddb-panel-tracking-state.test.ts` — DDB reveal rule with `showFullTurnOrder` toggle, defaults by round, sticky override
+- `src/__tests__/dm-control-combat.test.ts` — manual broadcast applies the round-1 rule
 
 ## Non-goals
 
-- Configurable round-1 reveal (it is always on).
-- Per-combatant manual override of the round-1 hide. The DM cannot mark a specific combatant as "revealed early" — they roll past it by advancing the turn.
-- Hiding by anything other than position relative to the active combatant in round 1.
+- Per-combatant manual override of the hide. The DM cannot mark a specific combatant as "revealed early" — they roll past it by advancing the turn (or toggle `Show full turn order` for D&D Beyond).
+- Per-source override beyond D&D Beyond. Manual mode and Initiative Tracker plugin retain the forced round-1 rule.
+- Hiding by anything other than position relative to the active combatant.
