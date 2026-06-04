@@ -1,6 +1,8 @@
 // Player Screen - WebSocket client and rendering logic
 // This runs in the browser on the player's TV/screen
 
+import { safePlayerUrl } from "./safeUrl";
+
 interface Combatant {
   name: string;
   hp: number;
@@ -306,6 +308,11 @@ class PlayerScreen {
 
     const sorted = [...layers].filter(l => l.visible !== false).sort((a, b) => a.zIndex - b.zIndex);
     for (const layer of sorted) {
+      const safeLayerSrc = safePlayerUrl(layer.dataUrl, "image");
+      if (!safeLayerSrc) {
+        console.warn("[Player Screen] Rejected layer dataUrl, skipping layer");
+        continue;
+      }
       const wrapper = document.createElement("div");
       wrapper.style.position = "absolute";
       wrapper.style.left = `${layer.x}%`;
@@ -355,19 +362,24 @@ class PlayerScreen {
       };
 
       img.onload = () => requestAnimationFrame(sizeFrame);
-      img.src = layer.dataUrl;
+      img.src = safeLayerSrc;
       frame.appendChild(img);
 
       if (layer.fogEnabled && layer.fogDataUrl) {
-        const fogImg = document.createElement("img");
-        fogImg.src = layer.fogDataUrl;
-        fogImg.style.position = "absolute";
-        fogImg.style.top = "0";
-        fogImg.style.left = "0";
-        fogImg.style.width = "100%";
-        fogImg.style.height = "100%";
-        fogImg.style.pointerEvents = "none";
-        frame.appendChild(fogImg);
+        const safeFogSrc = safePlayerUrl(layer.fogDataUrl, "image");
+        if (safeFogSrc) {
+          const fogImg = document.createElement("img");
+          fogImg.src = safeFogSrc;
+          fogImg.style.position = "absolute";
+          fogImg.style.top = "0";
+          fogImg.style.left = "0";
+          fogImg.style.width = "100%";
+          fogImg.style.height = "100%";
+          fogImg.style.pointerEvents = "none";
+          frame.appendChild(fogImg);
+        } else {
+          console.warn("[Player Screen] Rejected fog dataUrl, skipping fog overlay");
+        }
       }
 
       wrapper.appendChild(frame);
@@ -392,18 +404,28 @@ class PlayerScreen {
     const video = document.getElementById("video-background") as HTMLVideoElement;
     const image = document.getElementById("image-background") as HTMLImageElement;
     if (payload.mediaType === "video") {
+      const safeVideoSrc = safePlayerUrl(payload.url, "video");
+      if (!safeVideoSrc) {
+        console.warn("[Player Screen] Rejected background video URL");
+        return;
+      }
       image.style.display = "none";
       image.src = "";
       video.loop = payload.loop ?? true;
       video.muted = payload.muted ?? true;
-      video.src = payload.url;
+      video.src = safeVideoSrc;
       video.style.display = "block";
       video.play().catch((e) => console.error("[Player Screen] Video autoplay failed:", e));
     } else {
+      const safeImageSrc = safePlayerUrl(payload.url, "image");
+      if (!safeImageSrc) {
+        console.warn("[Player Screen] Rejected background image URL");
+        return;
+      }
       video.pause();
       video.src = "";
       video.style.display = "none";
-      image.src = payload.url;
+      image.src = safeImageSrc;
       image.style.display = "block";
     }
   }
