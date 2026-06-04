@@ -28,6 +28,7 @@
 - `src/__tests__/tag-input.test.ts` — comma split, trim, empty filtering
 - `src/__tests__/hydrus-client.test.ts`, `hydrus-client-extra.test.ts` — `searchFiles` URL construction and error mapping
 - `src/__tests__/pagination.test.ts` — paging
+- `src/__tests__/hydrus-end-to-end.integration.test.ts` — search → metadata → cache flow end-to-end with mocked `requestUrl`
 
 ## Non-goals
 
