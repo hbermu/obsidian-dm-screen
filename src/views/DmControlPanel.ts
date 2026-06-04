@@ -1936,6 +1936,10 @@ export class DmControlPanel extends ItemView {
     let startY = 0;
     let startLeft = 0;
     let startTop = 0;
+    // Cached at mousedown so a mid-drag re-render that detaches `preview`
+    // can't poison the math: a detached element returns width/height = 0,
+    // which would otherwise produce Infinity for dx/dy and corrupt layer.x/y.
+    let startBounds: DOMRect | null = null;
 
     const onMouseDown = (e: MouseEvent) => {
       e.preventDefault();
@@ -1944,14 +1948,15 @@ export class DmControlPanel extends ItemView {
       startY = e.clientY;
       startLeft = layer.x;
       startTop = layer.y;
+      startBounds = preview.getBoundingClientRect();
       document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onMouseUp);
     };
 
     const onMouseMove = (e: MouseEvent) => {
-      const bounds = preview.getBoundingClientRect();
-      const dx = ((e.clientX - startX) / bounds.width) * 100;
-      const dy = ((e.clientY - startY) / bounds.height) * 100;
+      if (!startBounds || startBounds.width === 0 || startBounds.height === 0) return;
+      const dx = ((e.clientX - startX) / startBounds.width) * 100;
+      const dy = ((e.clientY - startY) / startBounds.height) * 100;
       layer.x = startLeft + dx;
       layer.y = startTop + dy;
       rect.style.left = `${layer.x}%`;
@@ -1961,6 +1966,7 @@ export class DmControlPanel extends ItemView {
     const onMouseUp = () => {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
+      startBounds = null;
       this.broadcastImageLayers();
     };
 
