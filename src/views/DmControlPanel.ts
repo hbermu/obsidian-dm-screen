@@ -201,6 +201,14 @@ export class DmControlPanel extends ItemView {
       debug("DmControlPanel: republishToServer — layers:", this.imageLayers.length);
       this.broadcastImageLayers();
     }
+    if (this.activeBackgroundUrl) {
+      debug("DmControlPanel: republishToServer — background:", this.activeBackgroundUrl);
+      const mediaType = isVideoBackgroundUrl(this.activeBackgroundUrl) ? "video" : "image";
+      this.plugin.server.broadcast({
+        type: "show-background-media",
+        payload: { url: this.activeBackgroundUrl, mediaType },
+      });
+    }
   }
 
   saveState() {

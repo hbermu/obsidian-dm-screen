@@ -28,6 +28,7 @@
 7. When the Hydrus modal pushes a file as background, it shall set `activeBackgroundUrl` on the open DM panel and broadcast `show-background-media` with `mediaType` derived from MIME (`video/*` → `"video"`, otherwise `"image"`) and `loop` / `muted` from settings.
 8. While `activeBackgroundUrl` is non-null, the Add BG button shall render as Stop BG.
 9. When the Stop BG button is clicked, the DM panel shall clear `activeBackgroundUrl` and `activeVideoPath`, broadcast `hide-background-media`, and re-render.
+9b. When `republishToServer()` is called (on server start) and `activeBackgroundUrl` is non-null, the DM panel shall re-broadcast `show-background-media` so clients connecting after server start receive the current background without the DM re-selecting it.
 10. When the player receives `show-background-media` with `mediaType: "video"`, it shall set `<video>.loop = payload.loop ?? true`, `<video>.muted = payload.muted ?? true`, set the `src`, show the video, hide the image, and call `play()`.
 11. When the player receives `show-background-media` with `mediaType: "image"`, it shall pause and clear the video, hide it, set the image `src`, and show the image.
 12. When the player receives `hide-background-media`, it shall pause and clear both `<video>` and `<img>` and hide both.
@@ -40,7 +41,7 @@
 
 | Message type | Direction | Payload | When |
 |--------------|-----------|---------|------|
-| `show-background-media` | DM → player | `{ url: string, mediaType: "image" \| "video", loop?: boolean, muted?: boolean }` | Add BG selects an image; Hydrus modal sets a file |
+| `show-background-media` | DM → player | `{ url: string, mediaType: "image" \| "video", loop?: boolean, muted?: boolean }` | Add BG selects an image; Hydrus modal sets a file; server start via `republishToServer()` when a background is already loaded |
 | `hide-background-media` | DM → player | `{}` | Stop BG button |
 
 ## Tests covering this
