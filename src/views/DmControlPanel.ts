@@ -883,17 +883,17 @@ export class DmControlPanel extends ItemView {
     const broadcasting = this.isCombatBroadcasting();
     const emitToggle = header.createEl("button", {
       cls: broadcasting ? "dm-emit-toggle dm-emit-active" : "dm-emit-toggle",
-      text: "●",
       attr: {
         "aria-label": broadcasting ? "Stop broadcasting combat" : "No combat being broadcast",
         title: broadcasting ? "Stop broadcasting combat" : "No combat being broadcast",
       },
     });
-    emitToggle.addEventListener("click", () => {
-      if (this.isCombatBroadcasting()) {
-        this.stopAllCombatBroadcast();
-      }
-    });
+    emitToggle.createSpan({ cls: "dm-emit-dot", text: "●" });
+    emitToggle.createSpan({ cls: "dm-emit-label", text: "Live" });
+    if (!broadcasting) {
+      (emitToggle as HTMLButtonElement).disabled = true;
+    }
+    emitToggle.addEventListener("click", () => this.stopAllCombatBroadcast());
 
     // Tabs: Local Track + (optionally) D&D Beyond, full-width
     const ddbActive = this.plugin.settings.ddbEnabled && this.plugin.settings.ddbCobaltSession;
@@ -921,7 +921,25 @@ export class DmControlPanel extends ItemView {
 
     // Active combat name + scale controls row
     const nameRow = section.createDiv("dm-combat-name-row");
-    nameRow.createDiv({ cls: "dm-combat-name", text: this.getActiveCombatLabel() });
+    const combatLabel = this.getActiveCombatLabel();
+    if (combatLabel.ddbId) {
+      const url = `https://www.dndbeyond.com/encounters/${combatLabel.ddbId}`;
+      const link = nameRow.createEl("a", {
+        cls: "dm-combat-name dm-combat-name-link",
+        text: combatLabel.text,
+        attr: { href: url, target: "_blank", rel: "noopener" },
+      });
+      link.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        try {
+          require("electron").shell.openExternal(url);
+        } catch {
+          window.open(url, "_blank");
+        }
+      });
+    } else {
+      nameRow.createDiv({ cls: "dm-combat-name", text: combatLabel.text });
+    }
     const scaleButtons = nameRow.createDiv("dm-tracker-scale-buttons");
     const decBtn = scaleButtons.createEl("button", { text: "−", attr: { title: "Smaller tracker" } });
     decBtn.addEventListener("click", () => this.adjustCombatTrackerScale(-0.1));
@@ -990,15 +1008,15 @@ export class DmControlPanel extends ItemView {
     }
   }
 
-  private getActiveCombatLabel(): string {
+  private getActiveCombatLabel(): { text: string; ddbId: string | null } {
     if (this.combatTab === "dndbeyond" && this.ddbPanel) {
       const status = this.ddbPanel.getActiveEncounterStatus();
-      if (status) return `${status.name} — Round ${status.roundNum}`;
+      if (status) return { text: `${status.name} — Round ${status.roundNum}`, ddbId: status.id };
     }
     if (this.trackerSource === "plugin" && this.encounterName) {
-      return `${this.encounterName} — Round ${this.pluginRound}`;
+      return { text: `${this.encounterName} — Round ${this.pluginRound}`, ddbId: null };
     }
-    return "";
+    return { text: "", ddbId: null };
   }
 
   // ─── Plugin-Synced Tracker ─────────────────────────────────────────

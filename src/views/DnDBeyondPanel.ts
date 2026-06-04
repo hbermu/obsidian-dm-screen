@@ -6,25 +6,41 @@ import { DdbImageCache } from "../dndbeyond/imageCache";
 import { debug, debugWarn } from "../debug";
 import type { VaultAdapterLike } from "../hydrus/cache";
 import type { DdbEncounter } from "../dndbeyond/types";
+import { DnDBeyondEncounterModal } from "./DnDBeyondEncounterModal";
+
+type PreviewCombatant = {
+  name: string;
+  hp: number;
+  maxHp: number;
+  initiative: number;
+  active: boolean;
+  friendly: boolean;
+  isPlayer: boolean;
+  hidden: boolean;
+  hideHp: boolean;
+};
 
 export class DnDBeyondPanel {
   private client: DdbClient | null = null;
   private poller: DdbEncounterPoller | null = null;
-  private encounters: DdbEncounter[] = [];
   private selectedEncounterId: string | null = null;
-  private searchFilter = "";
   private showPcHp = true;
+  private showFullTurnOrder = false;
+  private showFullTurnOrderUserSet = false;
   private polledState: DdbPolledState | null = null;
   private container: HTMLElement;
+  private previewEl: HTMLElement | null = null;
+  private previewHeaderEl: HTMLElement | null = null;
   onTrackingChange: (() => void) | null = null;
 
   constructor(private plugin: DmScreenPlugin, container: HTMLElement) {
     this.container = container;
   }
 
-  getActiveEncounterStatus(): { name: string; roundNum: number } | null {
-    if (!this.poller || !this.polledState) return null;
+  getActiveEncounterStatus(): { id: string; name: string; roundNum: number } | null {
+    if (!this.poller || !this.polledState || !this.selectedEncounterId) return null;
     return {
+      id: this.selectedEncounterId,
       name: this.polledState.encounter.name,
       roundNum: this.polledState.encounter.roundNum,
     };
@@ -33,7 +49,6 @@ export class DnDBeyondPanel {
   setContainer(el: HTMLElement): void {
     this.container = el;
     this.render();
-    this.loadEncounters().then(() => this.render());
   }
 
   async initialize(): Promise<void> {
@@ -48,8 +63,6 @@ export class DnDBeyondPanel {
       if (!valid) {
         this.client = null;
         new Notice("D&D Beyond session expired. Update cookie in settings.", 6000);
-      } else {
-        await this.loadEncounters();
       }
     } catch {
       this.client = null;
@@ -67,6 +80,8 @@ export class DnDBeyondPanel {
 
   render(): void {
     this.container.empty();
+    this.previewEl = null;
+    this.previewHeaderEl = null;
 
     if (!this.client) {
       const msg = this.container.createDiv({ cls: "dm-ddb-message" });
@@ -74,18 +89,13 @@ export class DnDBeyondPanel {
       return;
     }
 
-    // Controls row: search + show PC HP toggle
     const controlsRow = this.container.createDiv({ cls: "dm-ddb-controls" });
 
-    const searchInput = controlsRow.createEl("input", {
-      cls: "dm-ddb-search",
-      attr: { type: "text", placeholder: "Search encounters..." },
+    const chooseBtn = controlsRow.createEl("button", {
+      cls: "mod-cta dm-ddb-choose-btn",
+      text: "Choose Encounter",
     });
-    searchInput.value = this.searchFilter;
-    searchInput.addEventListener("input", () => {
-      this.searchFilter = searchInput.value;
-      this.renderList();
-    });
+    chooseBtn.addEventListener("click", () => this.openEncounterModal());
 
     const hpToggle = controlsRow.createDiv({ cls: "dm-ddb-hp-toggle" });
     const hpCheck = hpToggle.createEl("input", { type: "checkbox" }) as HTMLInputElement;
@@ -94,88 +104,61 @@ export class DnDBeyondPanel {
     hpCheck.addEventListener("change", () => {
       this.showPcHp = hpCheck.checked;
       if (this.polledState) this.broadcastToPlayerScreen(this.polledState);
+      this.renderPreview();
     });
     hpToggle.createEl("label", { text: "Show PC HP", attr: { for: "dm-ddb-show-pc-hp" } });
 
-    // Encounter list container
-    this.container.createDiv({ cls: "dm-ddb-encounter-list" });
-    this.renderList();
-  }
+    const revealToggle = controlsRow.createDiv({ cls: "dm-ddb-reveal-toggle" });
+    const revealCheck = revealToggle.createEl("input", { type: "checkbox" }) as HTMLInputElement;
+    revealCheck.checked = this.showFullTurnOrder;
+    revealCheck.id = "dm-ddb-show-full-turn-order";
+    revealCheck.addEventListener("change", () => {
+      this.showFullTurnOrder = revealCheck.checked;
+      this.showFullTurnOrderUserSet = true;
+      debug("DDB Panel: showFullTurnOrder toggled to", this.showFullTurnOrder, "(user)");
+      if (this.polledState) this.broadcastToPlayerScreen(this.polledState);
+      this.renderPreview();
+    });
+    revealToggle.createEl("label", {
+      text: "Show full turn order",
+      attr: { for: "dm-ddb-show-full-turn-order" },
+    });
 
-  private renderList(): void {
-    const listEl = this.container.querySelector(".dm-ddb-encounter-list") as HTMLElement;
-    if (!listEl) return;
-    listEl.empty();
-
-    const filtered = this.encounters.filter((e) =>
-      e.name.toLowerCase().includes(this.searchFilter.toLowerCase())
-    );
-
-    if (filtered.length === 0) {
-      listEl.createDiv({ cls: "dm-ddb-message", text: "No encounters found" });
-      return;
+    if (this.selectedEncounterId) {
+      const selectedRow = this.container.createDiv({ cls: "dm-ddb-selected" });
+      const label = this.polledState?.encounter.name ?? "Loading…";
+      selectedRow.createSpan({ cls: "dm-ddb-selected-name", text: `Tracking: ${label}` });
     }
 
-    for (const enc of filtered) {
-      const row = listEl.createDiv({ cls: "dm-ddb-encounter-row" });
-      if (enc.id === this.selectedEncounterId) {
-        row.addClass("dm-ddb-encounter-selected");
-      }
-
-      // Select/deselect button
-      const selectBtn = row.createEl("button", {
-        cls: "dm-ddb-check",
-        text: enc.id === this.selectedEncounterId ? "✓" : "○",
-      });
-      selectBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (this.selectedEncounterId === enc.id) {
-          this.stopTracking();
-        } else {
-          this.selectEncounter(enc.id);
-        }
-      });
-
-      // Encounter name (clicking opens in external browser)
-      const nameEl = row.createEl("span", { cls: "dm-ddb-encounter-name", text: enc.name });
-      nameEl.addEventListener("click", (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const url = `https://www.dndbeyond.com/encounters/${enc.id}`;
-        try {
-          require("electron").shell.openExternal(url);
-        } catch {
-          window.open(url, "_blank");
-        }
-      });
-
-      // In progress badge
-      if (enc.inProgress) {
-        row.createEl("span", { cls: "dm-ddb-badge", text: "In Progress" });
-      }
-    }
+    this.previewEl = this.container.createDiv({ cls: "dm-ddb-preview" });
+    this.previewHeaderEl = this.previewEl.createDiv({ cls: "dm-ddb-preview-header" });
+    this.previewEl.createEl("ul", { cls: "dm-ddb-preview-list" });
+    this.updatePreviewHeader();
+    this.renderPreview();
   }
 
-  private async loadEncounters(): Promise<void> {
+  private openEncounterModal(): void {
     if (!this.client) return;
-    try {
-      this.encounters = await this.client.getEncounters();
-    } catch (e) {
-      new Notice(`Failed to load encounters: ${(e as Error).message}`, 6000);
-    }
+    debug("DDB Panel: open encounter modal");
+    new DnDBeyondEncounterModal(this.plugin.app, this.plugin, this.client, (id) =>
+      this.selectEncounter(id)
+    ).open();
   }
 
   private selectEncounter(id: string): void {
+    debug("DDB Panel: selectEncounter", id);
     if (this.poller) {
       this.poller.stop();
       this.poller = null;
     }
     this.selectedEncounterId = id;
+    this.polledState = null;
+    this.showFullTurnOrderUserSet = false;
+    this.showFullTurnOrder = false;
     this.startTracking(id);
-    this.renderList();
+    this.render();
     this.onTrackingChange?.();
 
-    // Load monster images in the background
     if (this.client) {
       this.client.getEncounter(id).then((enc) => this.loadMonsterImages(enc)).catch(() => {});
     }
@@ -193,6 +176,7 @@ export class DnDBeyondPanel {
   }
 
   stopTracking(): void {
+    debug("DDB Panel: stopTracking");
     if (this.poller) {
       this.poller.stop();
       this.poller = null;
@@ -200,28 +184,44 @@ export class DnDBeyondPanel {
     this.selectedEncounterId = null;
     this.polledState = null;
     this.plugin.sendInitiativeUpdate([], 0);
-    this.renderList();
+    this.render();
     this.onTrackingChange?.();
   }
 
   private onPollUpdate(state: DdbPolledState): void {
+    const firstPoll = this.polledState === null;
     this.polledState = state;
+    if (firstPoll && !this.showFullTurnOrderUserSet && state.encounter.roundNum >= 2) {
+      this.showFullTurnOrder = true;
+      debug(
+        "DDB Panel: auto-set showFullTurnOrder=true (roundNum=",
+        state.encounter.roundNum,
+        ")"
+      );
+      this.syncRevealCheckbox();
+    }
     this.broadcastToPlayerScreen(state);
+    this.updatePreviewHeader();
+    this.renderPreview();
     this.onTrackingChange?.();
+  }
+
+  private syncRevealCheckbox(): void {
+    const check = this.container.querySelector(
+      "#dm-ddb-show-full-turn-order"
+    ) as HTMLInputElement | null;
+    if (check) check.checked = this.showFullTurnOrder;
   }
 
   private onPollError(err: Error): void {
     debugWarn("DDB Poller error:", err.message);
   }
 
-  private broadcastToPlayerScreen(state: DdbPolledState): void {
+  private buildParticipants(state: DdbPolledState): {
+    participants: PreviewCombatant[];
+    currentTurnIdx: number;
+  } {
     const { encounter, characters } = state;
-    const combatants: Array<{
-      name: string; hp: number; maxHp: number; initiative: number;
-      active: boolean; friendly?: boolean; isPlayer?: boolean;
-      hidden?: boolean; hideHp?: boolean; statuses?: string[];
-    }> = [];
-
     const players = encounter.players ?? [];
     const monsters = encounter.monsters ?? [];
     const manualEntries = encounter.manualEntries ?? [];
@@ -232,18 +232,17 @@ export class DnDBeyondPanel {
       ...manualEntries.map((e) => ({ ...e, kind: "manual" as const })),
     ].sort((a, b) => b.initiative - a.initiative);
 
-    // DDB turnNum is 1-indexed
     const currentTurnIdx = encounter.inProgress ? encounter.turnNum - 1 : -1;
-    const isRoundOne = encounter.roundNum === 1;
+    const participants: PreviewCombatant[] = [];
 
     for (let i = 0; i < allParticipants.length; i++) {
       const p = allParticipants[i];
       const isActive = i === currentTurnIdx;
-      const hidden = isRoundOne && i > currentTurnIdx;
+      const hidden = !this.showFullTurnOrder && i > currentTurnIdx;
 
       if (p.kind === "player") {
         const char = characters.get(p.id);
-        combatants.push({
+        participants.push({
           name: char?.name ?? p.name,
           hp: char?.currentHitPoints ?? 0,
           maxHp: char?.maxHitPoints ?? 0,
@@ -253,10 +252,9 @@ export class DnDBeyondPanel {
           isPlayer: true,
           hidden,
           hideHp: !this.showPcHp,
-          statuses: [],
         });
       } else {
-        combatants.push({
+        participants.push({
           name: p.name,
           hp: (p as { currentHitPoints: number }).currentHitPoints,
           maxHp: (p as { maximumHitPoints: number }).maximumHitPoints,
@@ -265,12 +263,74 @@ export class DnDBeyondPanel {
           friendly: false,
           isPlayer: false,
           hidden,
-          statuses: [],
+          hideHp: false,
         });
       }
     }
 
-    this.plugin.sendInitiativeUpdate(combatants, encounter.roundNum);
+    return { participants, currentTurnIdx };
+  }
+
+  private broadcastToPlayerScreen(state: DdbPolledState): void {
+    const { participants } = this.buildParticipants(state);
+    const combatants = participants.map((p) => ({
+      name: p.name,
+      hp: p.hp,
+      maxHp: p.maxHp,
+      initiative: p.initiative,
+      active: p.active,
+      friendly: p.friendly,
+      isPlayer: p.isPlayer,
+      hidden: p.hidden,
+      hideHp: p.hideHp,
+      statuses: [] as string[],
+    }));
+    this.plugin.sendInitiativeUpdate(combatants, state.encounter.roundNum);
+  }
+
+  private updatePreviewHeader(): void {
+    if (!this.previewHeaderEl) return;
+    if (!this.polledState) {
+      this.previewHeaderEl.setText("Player preview");
+      return;
+    }
+    const { encounter } = this.polledState;
+    if (!encounter.inProgress) {
+      this.previewHeaderEl.setText("Player preview — Encounter idle");
+      return;
+    }
+    this.previewHeaderEl.setText(`Player preview — Round ${encounter.roundNum}`);
+  }
+
+  private renderPreview(): void {
+    if (!this.previewEl) return;
+    const list = this.previewEl.querySelector(".dm-ddb-preview-list") as HTMLElement | null;
+    if (!list) return;
+    list.empty();
+
+    const existingEmpty = this.previewEl.querySelector(".dm-ddb-preview-empty");
+    if (existingEmpty) existingEmpty.remove();
+
+    if (!this.polledState) {
+      this.previewEl.createDiv({
+        cls: "dm-ddb-preview-empty",
+        text: "No encounter selected. Click Choose Encounter to begin.",
+      });
+      return;
+    }
+
+    const { participants } = this.buildParticipants(this.polledState);
+    if (participants.length === 0) {
+      this.previewEl.createDiv({
+        cls: "dm-ddb-preview-empty",
+        text: "Encounter has no combatants.",
+      });
+      return;
+    }
+
+    for (const p of participants) {
+      list.appendChild(buildPreviewRow(p));
+    }
   }
 
   private async loadMonsterImages(encounter: DdbEncounter): Promise<void> {
@@ -314,4 +374,48 @@ export class DnDBeyondPanel {
       debugWarn("DDB: failed to load monster images:", (e as Error).message);
     }
   }
+}
+
+function classifyHp(hp: number, maxHp: number): { cls: string; label: string } {
+  if (hp <= 0) return { cls: "init-condition-down", label: "Down" };
+  if (maxHp <= 0) return { cls: "init-condition-well", label: "Well" };
+  const pct = (hp / maxHp) * 100;
+  if (pct < 50) return { cls: "init-condition-bloodied", label: "Bloodied" };
+  if (pct < 100) return { cls: "init-condition-hurt", label: "Hurt" };
+  return { cls: "init-condition-well", label: "Well" };
+}
+
+function buildPreviewRow(c: PreviewCombatant): HTMLLIElement {
+  const li = document.createElement("li");
+  li.className = "init-entry";
+  if (c.active) li.classList.add("init-active");
+  if (c.friendly || c.isPlayer) li.classList.add("init-friendly");
+  if (c.hidden) li.classList.add("init-hidden");
+
+  const nameEl = document.createElement("span");
+  nameEl.className = "init-name";
+  nameEl.textContent = c.name;
+  if (c.isPlayer) {
+    const tag = document.createElement("span");
+    tag.className = "init-pc-tag";
+    tag.textContent = "PC";
+    nameEl.appendChild(tag);
+  }
+  li.appendChild(nameEl);
+
+  const showHp = (c.friendly || c.isPlayer) && !c.hideHp;
+  if (showHp) {
+    const hpEl = document.createElement("span");
+    hpEl.className = "init-hp-text";
+    hpEl.textContent = `${c.hp}/${c.maxHp}`;
+    li.appendChild(hpEl);
+  }
+
+  const cond = classifyHp(c.hp, c.maxHp);
+  const condEl = document.createElement("span");
+  condEl.className = `init-condition ${cond.cls}`;
+  condEl.textContent = cond.label;
+  li.appendChild(condEl);
+
+  return li;
 }

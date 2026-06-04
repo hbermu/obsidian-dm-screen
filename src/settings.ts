@@ -31,6 +31,9 @@ export interface DmScreenSettings {
   combatTrackerScale: number;
   // Server limits
   maxClients: number;
+  // Waiting screen (player-side)
+  waitingTitle: string;
+  waitingSubtitle: string;
   // Debug
   debugMode: boolean;
 }
@@ -64,6 +67,8 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   ddbCobaltSession: "",
   combatTrackerScale: 1,
   maxClients: 10,
+  waitingTitle: "Player Screen",
+  waitingSubtitle: "Waiting for DM to push content...",
   debugMode: false,
 };
 
@@ -113,6 +118,34 @@ export class DmScreenSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.maxClients = parseInt(value, 10) || 10;
             await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Waiting screen title")
+      .setDesc("Big text shown on the player screen while nothing is being broadcast. Leave empty to hide.")
+      .addText((text) =>
+        text
+          .setPlaceholder("Player Screen")
+          .setValue(this.plugin.settings.waitingTitle)
+          .onChange(async (value) => {
+            this.plugin.settings.waitingTitle = value;
+            await this.plugin.saveSettings();
+            this.plugin.broadcastWaitingScreen();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Waiting screen subtitle")
+      .setDesc("Smaller text below the title. Leave empty to hide.")
+      .addText((text) =>
+        text
+          .setPlaceholder("Waiting for DM to push content...")
+          .setValue(this.plugin.settings.waitingSubtitle)
+          .onChange(async (value) => {
+            this.plugin.settings.waitingSubtitle = value;
+            await this.plugin.saveSettings();
+            this.plugin.broadcastWaitingScreen();
           })
       );
 

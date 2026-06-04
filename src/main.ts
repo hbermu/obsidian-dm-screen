@@ -168,12 +168,25 @@ export default class DmScreenPlugin extends Plugin {
       }
     };
     this.server.start(this.settings.serverPort);
+    this.broadcastWaitingScreen();
     const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
     for (const leaf of leaves) {
       const view = leaf.view as DmControlPanel;
       view.republishToServer?.();
     }
     new Notice(`Player Screen server started on port ${this.settings.serverPort}`);
+  }
+
+  broadcastWaitingScreen(): void {
+    if (!this.server) return;
+    debug("broadcastWaitingScreen: title=", this.settings.waitingTitle, "subtitle=", this.settings.waitingSubtitle);
+    this.server.broadcast({
+      type: "waiting-screen",
+      payload: {
+        title: this.settings.waitingTitle,
+        subtitle: this.settings.waitingSubtitle,
+      },
+    });
   }
 
   private onPlayerClientInfo(_info: { width: number; height: number; devicePixelRatio: number }) {

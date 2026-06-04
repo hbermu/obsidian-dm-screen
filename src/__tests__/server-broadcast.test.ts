@@ -60,6 +60,20 @@ describe("PlayerScreenServer.broadcast", () => {
     expect(cache.size).toBe(0);
   });
 
+  it("caches waiting-screen so late joiners receive it", () => {
+    server.broadcast({
+      type: "waiting-screen",
+      payload: { title: "Calradia", subtitle: "The Battanians prepare..." },
+    });
+
+    const cache = (server as any).lastState as Map<string, string>;
+    expect(cache.has("waiting-screen")).toBe(true);
+    expect(JSON.parse(cache.get("waiting-screen")!).payload).toEqual({
+      title: "Calradia",
+      subtitle: "The Battanians prepare...",
+    });
+  });
+
   it("sends to all connected clients", () => {
     const ws1 = makeWsStub();
     const ws2 = makeWsStub();

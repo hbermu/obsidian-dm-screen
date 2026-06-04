@@ -223,6 +223,9 @@ class PlayerScreen {
       case "viewport-update":
         this.updateViewport(msg.payload as { panX: number; panY: number; zoom: number });
         break;
+      case "waiting-screen":
+        this.applyWaitingScreen(msg.payload as { title: string; subtitle: string });
+        break;
       case "clear":
         this.showWaiting();
         this.clearImageLayers();
@@ -236,6 +239,14 @@ class PlayerScreen {
   private showWaiting() {
     document.getElementById("initiative-tracker")!.style.display = "none";
     document.getElementById("waiting-screen")!.style.display = "flex";
+  }
+
+  private applyWaitingScreen(payload: { title: string; subtitle: string }) {
+    const screen = document.getElementById("waiting-screen");
+    if (!screen) return;
+    const pulseDot = screen.querySelector(".pulse-dot");
+    upsertWaitingChild(screen, "h1", payload.title, pulseDot);
+    upsertWaitingChild(screen, "p", payload.subtitle, pulseDot);
   }
 
   private applyCombatScale(scale: number) {
@@ -295,7 +306,6 @@ class PlayerScreen {
 
     const sorted = [...layers].filter(l => l.visible !== false).sort((a, b) => a.zIndex - b.zIndex);
     for (const layer of sorted) {
-      // Wrap image + fog in a container div
       const wrapper = document.createElement("div");
       wrapper.style.position = "absolute";
       wrapper.style.left = `${layer.x}%`;
@@ -310,18 +320,44 @@ class PlayerScreen {
         wrapper.style.transform = `rotate(${layer.rotation}deg)`;
       }
 
+      // Frame: holds the gold border and aligns img + fog. Sized at load time
+      // to the image's actual rendered rect (preserving its natural aspect
+      // ratio inside the wrapper) so the border hugs the visible content and
+      // the fog overlay aligns with the image.
+      const frame = document.createElement("div");
+      frame.className = "image-layer-frame";
+      frame.style.position = "relative";
+      frame.style.width = "100%";
+      frame.style.height = "100%";
+      frame.style.flexShrink = "0";
+      if (layer.bordered === false) {
+        frame.classList.add("no-border");
+      }
+
       const img = document.createElement("img");
-      img.src = layer.dataUrl;
+      img.style.display = "block";
       img.style.width = "100%";
       img.style.height = "100%";
-      img.style.objectFit = "contain";
-      img.style.display = "block";
-      if (layer.bordered === false) {
-        img.classList.add("no-border");
-      }
-      wrapper.appendChild(img);
 
-      // Fog overlay
+      const sizeFrame = () => {
+        const ww = wrapper.clientWidth;
+        const wh = wrapper.clientHeight;
+        if (!ww || !wh || !img.naturalWidth || !img.naturalHeight) return;
+        const imgAspect = img.naturalWidth / img.naturalHeight;
+        const wrapperAspect = ww / wh;
+        if (imgAspect >= wrapperAspect) {
+          frame.style.width = "100%";
+          frame.style.height = `${(wrapperAspect / imgAspect) * 100}%`;
+        } else {
+          frame.style.height = "100%";
+          frame.style.width = `${(imgAspect / wrapperAspect) * 100}%`;
+        }
+      };
+
+      img.onload = () => requestAnimationFrame(sizeFrame);
+      img.src = layer.dataUrl;
+      frame.appendChild(img);
+
       if (layer.fogEnabled && layer.fogDataUrl) {
         const fogImg = document.createElement("img");
         fogImg.src = layer.fogDataUrl;
@@ -331,10 +367,12 @@ class PlayerScreen {
         fogImg.style.width = "100%";
         fogImg.style.height = "100%";
         fogImg.style.pointerEvents = "none";
-        wrapper.appendChild(fogImg);
+        frame.appendChild(fogImg);
       }
 
+      wrapper.appendChild(frame);
       inner.appendChild(wrapper);
+      requestAnimationFrame(sizeFrame);
     }
   }
 
@@ -386,6 +424,21 @@ class PlayerScreen {
     if (container) container.innerHTML = "";
   }
 
+}
+
+function upsertWaitingChild(parent: HTMLElement, tag: "h1" | "p", text: string, before: Element | null) {
+  const existing = parent.querySelector(tag);
+  if (!text) {
+    if (existing) existing.remove();
+    return;
+  }
+  if (existing) {
+    existing.textContent = text;
+    return;
+  }
+  const el = document.createElement(tag);
+  el.textContent = text;
+  parent.insertBefore(el, before);
 }
 
 // Initialize

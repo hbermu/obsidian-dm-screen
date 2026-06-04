@@ -204,6 +204,10 @@ export class PlayerScreenServer {
   }
 
   private buildPlayerHtml(): string {
+    const waitingTitle = this.plugin.settings.waitingTitle;
+    const waitingSubtitle = this.plugin.settings.waitingSubtitle;
+    const titleHtml = waitingTitle ? `<h1>${escapeHtml(waitingTitle)}</h1>` : "";
+    const subtitleHtml = waitingSubtitle ? `<p>${escapeHtml(waitingSubtitle)}</p>` : "";
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -215,8 +219,8 @@ export class PlayerScreenServer {
 <body>
   <div id="app">
     <div id="waiting-screen">
-      <h1>Player Screen</h1>
-      <p>Waiting for DM to push content...</p>
+      ${titleHtml}
+      ${subtitleHtml}
       <div class="pulse-dot"></div>
     </div>
     <video id="video-background" muted loop playsinline></video>
@@ -232,6 +236,14 @@ export class PlayerScreenServer {
 </body>
 </html>`;
   }
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 interface AppLike {
