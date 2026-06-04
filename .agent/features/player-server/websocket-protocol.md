@@ -24,6 +24,7 @@
 6. When the player side receives a message whose `type` is not in its known set, it shall log `[Player Screen] Unknown message type:` and ignore the payload (no throw, no disconnect).
 7. When the player side fails to parse a message as JSON, it shall log the failure and ignore the message.
 8. When the WebSocket closes on the player side after the player has connected at least once, the player shall display a full-screen `Disconnected` overlay and attempt to reconnect after 3 seconds. On a successful reconnect that follows a previous disconnect, the player shall reload the page so the server's late-joiner cache replay reconstructs the screen from scratch. On the very first successful connect (no prior disconnect), the player shall hide the overlay if present and send `client-info`.
+9. Player-side code shall not assign a payload URL field (`show-background-media.payload.url`, `image-layers-sync.payload.layers[].dataUrl`, `image-layers-sync.payload.layers[].fogDataUrl`) to a DOM URL sink without first validating it with `safePlayerUrl(url, kind)` from `src/player/safeUrl.ts`. The helper accepts only `/vault/...` paths and `data:image/...` / `data:video/...` URLs of an allowlisted MIME family (no `image/svg+xml`, no `text/*`, no absolute HTTP URLs, no `javascript:`). Rejected URLs shall be logged via `console.warn` and the affected element (layer image, fog overlay, background) shall be skipped — no throw, no disconnect.
 
 ## Broadcast / IPC
 
