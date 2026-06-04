@@ -287,6 +287,56 @@ describe("DmControlPanel.republishToServer", () => {
     ];
     expect(() => panel.republishToServer()).not.toThrow();
   });
+
+  it("broadcasts show-background-media when activeBackgroundUrl is set", () => {
+    const serverStub = {
+      lastState: new Map<string, string>(),
+      broadcast: vi.fn(),
+    };
+    const plugin = makePlugin({
+      settings: {
+        lastImageLayers: "[]",
+        lastBroadcastCache: {},
+        lastPlayerScreenWidth: 0,
+        lastPlayerScreenHeight: 0,
+      },
+      server: serverStub as any,
+    });
+    const panel = makePanel(plugin);
+    panel.activeBackgroundUrl = "/vault/maps%2Fdungeon.png";
+
+    panel.republishToServer();
+
+    expect(serverStub.broadcast).toHaveBeenCalledTimes(1);
+    const [msg] = (serverStub.broadcast as any).mock.calls[0];
+    expect(msg.type).toBe("show-background-media");
+    expect(msg.payload.url).toBe("/vault/maps%2Fdungeon.png");
+    expect(msg.payload.mediaType).toBe("image");
+  });
+
+  it("broadcasts show-background-media with mediaType video for video URLs", () => {
+    const serverStub = {
+      lastState: new Map<string, string>(),
+      broadcast: vi.fn(),
+    };
+    const plugin = makePlugin({
+      settings: {
+        lastImageLayers: "[]",
+        lastBroadcastCache: {},
+        lastPlayerScreenWidth: 0,
+        lastPlayerScreenHeight: 0,
+      },
+      server: serverStub as any,
+    });
+    const panel = makePanel(plugin);
+    panel.activeBackgroundUrl = "/vault/videos%2Fintro.mp4";
+
+    panel.republishToServer();
+
+    const [msg] = (serverStub.broadcast as any).mock.calls[0];
+    expect(msg.type).toBe("show-background-media");
+    expect(msg.payload.mediaType).toBe("video");
+  });
 });
 
 describe("DmControlPanel.addImageLayer id uniqueness", () => {

@@ -4,11 +4,12 @@
 
 ## Source files
 
-- `src/views/DmControlPanel.ts` — Add BG / Stop BG button, `showBackgroundPicker`, `setImageAsBackground`, `getImagesFromNote`, `activeBackgroundUrl`, `activeVideoPath`
+- `src/views/DmControlPanel.ts` — Add BG / Stop BG button, `showBackgroundPicker`, `setImageAsBackground`, `getImagesFromNote`, `activeBackgroundUrl`, `activeVideoPath`, DM-side preview overlay rendered in `renderPlayerScreenSection`, `resolveBackgroundPreviewUrl`, `isVideoBackgroundUrl`
 - `src/views/HydrusExplorerModal.ts` — `handleSetBackground` broadcasts the Hydrus-cached file as the background; loop and mute come from settings
 - `src/player/player.ts` — `showBackgroundMedia` and `hideBackgroundMedia` handle the `<video>` and `<img>` elements
 - `src/player/player.css` — `#video-background`, `#image-background` styling
 - `src/server.ts` — `buildPlayerHtml` includes `<video id="video-background">` and `<img id="image-background">`
+- `styles.css` — `.dm-preview-bg` overlay styling for the DM-side preview
 
 ## Settings used
 
@@ -27,22 +28,27 @@
 7. When the Hydrus modal pushes a file as background, it shall set `activeBackgroundUrl` on the open DM panel and broadcast `show-background-media` with `mediaType` derived from MIME (`video/*` → `"video"`, otherwise `"image"`) and `loop` / `muted` from settings.
 8. While `activeBackgroundUrl` is non-null, the Add BG button shall render as Stop BG.
 9. When the Stop BG button is clicked, the DM panel shall clear `activeBackgroundUrl` and `activeVideoPath`, broadcast `hide-background-media`, and re-render.
+9b. When `republishToServer()` is called (on server start) and `activeBackgroundUrl` is non-null, the DM panel shall re-broadcast `show-background-media` so clients connecting after server start receive the current background without the DM re-selecting it.
 10. When the player receives `show-background-media` with `mediaType: "video"`, it shall set `<video>.loop = payload.loop ?? true`, `<video>.muted = payload.muted ?? true`, set the `src`, show the video, hide the image, and call `play()`.
 11. When the player receives `show-background-media` with `mediaType: "image"`, it shall pause and clear the video, hide it, set the image `src`, and show the image.
 12. When the player receives `hide-background-media`, it shall pause and clear both `<video>` and `<img>` and hide both.
 13. When the player receives `clear`, it shall additionally hide background media (the broader clear sequence is in `../player-server/websocket-protocol.md`).
+14. While `activeBackgroundUrl` is non-null and a currently-connected client's dimensions match the effective resolution (the "selected client"), the DM preview shall render a background overlay inside that client's viewport rect — same geometry as the green `.dm-player-viewport-rect`, behind the image-layer rectangles (`z-index: 0`). The overlay uses `object-fit: cover` so the preview mirrors what the player browser shows.
+15. The DM preview overlay shall resolve `/vault/<encoded path>` URLs to an `app://…` local resource via `vault.adapter.getResourcePath()`; non-`/vault/` URLs pass through unchanged; videos (extension `.mp4`, `.webm`, `.mov`, `.ogv`) render as `<video muted loop autoplay playsinline>`; everything else renders as `<img>`.
+16. While no client is connected, or no connected client matches the effective resolution, the DM preview shall not render the background overlay.
 
 ## Broadcast / IPC
 
 | Message type | Direction | Payload | When |
 |--------------|-----------|---------|------|
-| `show-background-media` | DM → player | `{ url: string, mediaType: "image" \| "video", loop?: boolean, muted?: boolean }` | Add BG selects an image; Hydrus modal sets a file |
+| `show-background-media` | DM → player | `{ url: string, mediaType: "image" \| "video", loop?: boolean, muted?: boolean }` | Add BG selects an image; Hydrus modal sets a file; server start via `republishToServer()` when a background is already loaded |
 | `hide-background-media` | DM → player | `{}` | Stop BG button |
 
 ## Tests covering this
 
 - `src/__tests__/server-broadcast.test.ts` — `show-background-media` is cached and replayed
 - `src/__tests__/server-bootstrap.integration.test.ts` — wires the DM → player flow
+- `src/__tests__/dm-preview-bg.test.ts` — `resolveBackgroundPreviewUrl` and `isVideoBackgroundUrl` helpers used by the DM-side preview overlay
 
 ## Non-goals
 
