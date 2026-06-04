@@ -22,6 +22,7 @@ DM Screen is an Obsidian plugin for running D&D 5e sessions in-person. It pairs 
 - No error handling for cases that cannot happen. Trust internal callers; validate only at system boundaries (user input, external services).
 - No backwards-compat shims, deprecated re-exports, no `// removed` comments. Dead code is deleted.
 - No new helpers that are used once.
+- Use `debug()` / `debugWarn()` / `debugError()` from `src/debug.ts` to instrument non-trivial code paths so issues are diagnosable from the Debug mode toggle without code changes. Cover at least: outgoing network calls, cache hits and misses, lifecycle transitions (server start/stop, view open/close, restore/save), broadcast emissions, and the "this happened but probably shouldn't" branches. These helpers are no-ops when Debug mode is off, so there is no production cost. Do not log per-frame events or large payloads verbatim — summarise (counts, sizes, first few bytes/hashes). The player-side bundle (`src/player/player.ts`) runs in the browser and cannot reach the plugin's Debug setting, so it uses `console.log/warn/error` directly — that is intentional and the only exception.
 
 ### Git
 

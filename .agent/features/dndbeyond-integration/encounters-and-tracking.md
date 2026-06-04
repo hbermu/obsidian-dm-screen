@@ -53,7 +53,7 @@
 - `src/__tests__/ddb-client.test.ts` — `parseEncounter` (hidden filter, abstract filter, id coercion)
 - `src/__tests__/ddb-panel-tracking-state.test.ts` — broadcast shape, sort, active-turn calc, round-1 reveal, PC HP toggle
 - `src/__tests__/ddb-to-player.integration.test.ts` — end-to-end poll → broadcast → `ws` client
-- `src/__tests__/ddb-fixture-replay.integration.test.ts` — fixture replay produces matching `initiative-update`
+- `src/__tests__/ddb-fixture-replay.integration.test.ts` — fixture replay: happy path, encounter not in progress (`roundNum=0`, `turnNum=0`), `manualEntries` parse alongside players and monsters
 
 ## Non-goals
 

@@ -223,4 +223,71 @@ describe("Initiative Tracker + Fantasy Statblocks roundtrip", () => {
     expect(panel.expandedCreature).toBeNull();
     expect((panel as any).render).toHaveBeenCalled();
   });
+
+  it("E. round-2 broadcast carries every combatant (round-1 reveal filter is off)", () => {
+    const plugin = makePlugin();
+    plugin.server = makeFakeServer() as any;
+    const panel = makePanel(plugin);
+    wirePanel(plugin, panel);
+
+    const round2: InitiativeViewState = { ...baseState, round: 2 };
+    (plugin as any).onInitiativeStateChange(round2);
+
+    expect(panel.pluginRound).toBe(2);
+    const broadcast = (plugin.server as any).broadcast.mock.calls[0][0];
+    expect(broadcast.type).toBe("initiative-update");
+    expect(broadcast.payload.round).toBe(2);
+    expect(broadcast.payload.combatants.map((c: any) => c.name)).toEqual([
+      "Aria the Wizard",
+      "Goblin Chief",
+      "Skeleton 2",
+    ]);
+  });
+
+  it("F. multiple open DM panels each receive the sync", () => {
+    const plugin = makePlugin();
+    plugin.server = makeFakeServer() as any;
+    const panelA = makePanel(plugin);
+    const panelB = makePanel(plugin);
+    (plugin as any).app.workspace.getLeavesOfType = vi.fn(() => [
+      { view: panelA },
+      { view: panelB },
+    ]);
+
+    (plugin as any).onInitiativeStateChange(baseState);
+
+    for (const panel of [panelA, panelB]) {
+      expect(panel.trackerSource).toBe("plugin");
+      expect(panel.pluginRound).toBe(1);
+      expect(panel.encounterName).toBe("Ambush in the Pass");
+      expect(panel.pluginCombatants).toHaveLength(3);
+    }
+    // sendInitiativeUpdate is invoked once per state change, not per panel.
+    expect((plugin.server as any).broadcast).toHaveBeenCalledTimes(1);
+  });
+
+  it("G. lookupStatblock caches both hits and misses across syncs", () => {
+    const plugin = makePlugin();
+    plugin.server = makeFakeServer() as any;
+    const panel = makePanel(plugin);
+    wirePanel(plugin, panel);
+
+    const goblinStatblock: StatblockCreature = { name: "Goblin Chief", ac: 15, hp: 22 };
+    const fsLookup = vi.fn((name: string) =>
+      name === "Goblin Chief" ? goblinStatblock : undefined
+    );
+    (window as any).FantasyStatblocks = { getCreatureFromBestiary: fsLookup };
+
+    (plugin as any).onInitiativeStateChange(baseState);
+    const callsAfterFirst = fsLookup.mock.calls.length;
+    expect(callsAfterFirst).toBeGreaterThan(0);
+
+    // Same state again — every name + baseName should resolve from the cache,
+    // not by re-asking Fantasy Statblocks.
+    (plugin as any).onInitiativeStateChange(baseState);
+    expect(fsLookup.mock.calls.length).toBe(callsAfterFirst);
+
+    const goblin = panel.pluginCombatants.find((c) => c.name === "Goblin Chief")!;
+    expect(goblin.statblock).toBe(goblinStatblock);
+  });
 });

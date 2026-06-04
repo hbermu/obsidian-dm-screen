@@ -289,6 +289,36 @@ describe("DmControlPanel.republishToServer", () => {
   });
 });
 
+describe("DmControlPanel.addImageLayer id uniqueness", () => {
+  it("assigns distinct ids even when several layers are added in the same millisecond", () => {
+    class MockImage {
+      onload: () => void = () => {};
+      naturalWidth = 100;
+      naturalHeight = 100;
+      set src(_v: string) {
+        this.onload();
+      }
+    }
+    const originalImage = (globalThis as any).Image;
+    (globalThis as any).Image = MockImage as any;
+    const originalNow = Date.now;
+    Date.now = () => 1000;
+    try {
+      const panel = makePanel();
+      (panel as any).getEffectiveResolution = () => ({ width: 1000, height: 1000 });
+      (panel as any).broadcastAndRender = vi.fn();
+      panel.addImageLayer("A", "data:image/png;base64,1", "image", true);
+      panel.addImageLayer("B", "data:image/png;base64,2", "image", true);
+      panel.addImageLayer("C", "data:image/png;base64,3", "image", true);
+      const ids = panel.imageLayers.map((l) => l.id);
+      expect(new Set(ids).size).toBe(3);
+    } finally {
+      (globalThis as any).Image = originalImage;
+      Date.now = originalNow;
+    }
+  });
+});
+
 describe("DmControlPanel.addImageLayer pixel-derived sizing", () => {
   function withMockImage(naturalWidth: number, naturalHeight: number, fn: () => void) {
     class MockImage {

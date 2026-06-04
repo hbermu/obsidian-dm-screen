@@ -89,7 +89,7 @@ export class DmScreenSettingTab extends PluginSettingTab {
           .setPlaceholder("3000")
           .setValue(String(this.plugin.settings.serverPort))
           .onChange(async (value) => {
-            this.plugin.settings.serverPort = parseInt(value) || 3000;
+            this.plugin.settings.serverPort = parseInt(value, 10) || 3000;
             await this.plugin.saveSettings();
           })
       );
@@ -111,7 +111,7 @@ export class DmScreenSettingTab extends PluginSettingTab {
         text
           .setValue(String(this.plugin.settings.maxClients))
           .onChange(async (value) => {
-            this.plugin.settings.maxClients = parseInt(value) || 10;
+            this.plugin.settings.maxClients = parseInt(value, 10) || 10;
             await this.plugin.saveSettings();
           })
       );
