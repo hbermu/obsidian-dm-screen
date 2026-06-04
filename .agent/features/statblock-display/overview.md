@@ -32,6 +32,7 @@
 ## Tests covering this
 
 - `src/__tests__/statblock-panel.test.ts` — every rendered section, ability modifier formatting, fallback for missing data, empty-section omission, polyfilled DOM methods
+- `src/__tests__/initiative-tracker-fs-roundtrip.integration.test.ts` — Fantasy Statblocks roundtrip: lookup falls back from `"Goblin 1"` → `"Goblin"`, cache is reused across consecutive Initiative Tracker syncs
 
 ## Non-goals
 
