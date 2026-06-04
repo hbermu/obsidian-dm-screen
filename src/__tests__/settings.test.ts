@@ -14,6 +14,11 @@ describe("DEFAULT_SETTINGS", () => {
     expect(DEFAULT_SETTINGS.tvHeight).toBe(1080);
   });
 
+  it("has expected waiting-screen defaults", () => {
+    expect(DEFAULT_SETTINGS.waitingTitle).toBe("Player Screen");
+    expect(DEFAULT_SETTINGS.waitingSubtitle).toBe("Waiting for DM to push content...");
+  });
+
   it("has expected hydrus defaults", () => {
     expect(DEFAULT_SETTINGS.hydrusEnabled).toBe(false);
     expect(DEFAULT_SETTINGS.hydrusApiUrl).toBe("");

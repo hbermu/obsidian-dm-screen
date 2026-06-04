@@ -15,6 +15,8 @@
 - `autoStartServer` — start the server automatically on plugin load
 - `maxClients` — maximum number of simultaneous WebSocket clients (default `10`)
 - `lastBroadcastCache` — persisted late-joiner cache restored on plugin load
+- `waitingTitle` — big text rendered on the waiting screen (default `"Player Screen"`)
+- `waitingSubtitle` — smaller text below the title (default `"Waiting for DM to push content..."`)
 
 ## Requirements
 
@@ -36,6 +38,9 @@
 16. If `autoStartServer` is true, then on plugin load the server shall start.
 17. If the workspace contains an open DM Control Panel, when the connected-client count changes the server shall trigger that panel to re-render so it can reflect the new count and resolutions.
 18. The server shall expose a `clientCount` accessor and a `getConnectedClients()` accessor returning the array of `ClientInfo` payloads.
+19. `buildPlayerHtml()` shall inline the current `waitingTitle` and `waitingSubtitle` into the `#waiting-screen` markup, HTML-escaping the values. Empty values shall cause the corresponding `<h1>` or `<p>` to be omitted entirely.
+20. After `startServer()` succeeds, the plugin shall call `broadcastWaitingScreen()` to seed the late-joiner cache with the current waiting-screen text.
+21. When either `waitingTitle` or `waitingSubtitle` changes in settings, the plugin shall broadcast `waiting-screen` immediately so already-connected clients update without a reload.
 
 ## Broadcast / IPC
 

@@ -223,6 +223,9 @@ class PlayerScreen {
       case "viewport-update":
         this.updateViewport(msg.payload as { panX: number; panY: number; zoom: number });
         break;
+      case "waiting-screen":
+        this.applyWaitingScreen(msg.payload as { title: string; subtitle: string });
+        break;
       case "clear":
         this.showWaiting();
         this.clearImageLayers();
@@ -236,6 +239,14 @@ class PlayerScreen {
   private showWaiting() {
     document.getElementById("initiative-tracker")!.style.display = "none";
     document.getElementById("waiting-screen")!.style.display = "flex";
+  }
+
+  private applyWaitingScreen(payload: { title: string; subtitle: string }) {
+    const screen = document.getElementById("waiting-screen");
+    if (!screen) return;
+    const pulseDot = screen.querySelector(".pulse-dot");
+    upsertWaitingChild(screen, "h1", payload.title, pulseDot);
+    upsertWaitingChild(screen, "p", payload.subtitle, pulseDot);
   }
 
   private applyCombatScale(scale: number) {
@@ -413,6 +424,21 @@ class PlayerScreen {
     if (container) container.innerHTML = "";
   }
 
+}
+
+function upsertWaitingChild(parent: HTMLElement, tag: "h1" | "p", text: string, before: Element | null) {
+  const existing = parent.querySelector(tag);
+  if (!text) {
+    if (existing) existing.remove();
+    return;
+  }
+  if (existing) {
+    existing.textContent = text;
+    return;
+  }
+  const el = document.createElement(tag);
+  el.textContent = text;
+  parent.insertBefore(el, before);
 }
 
 // Initialize
