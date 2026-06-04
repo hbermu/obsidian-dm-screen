@@ -3,7 +3,7 @@ import type DmScreenPlugin from "../main";
 import type { TrackerCombatant, ImageLayer } from "../types";
 import { renderStatblock } from "./StatblockPanel";
 import { DnDBeyondPanel } from "./DnDBeyondPanel";
-import { debugError } from "../debug";
+import { debug, debugError } from "../debug";
 
 export const DM_CONTROL_VIEW_TYPE = "dm-control-panel";
 
@@ -117,12 +117,14 @@ export class DmControlPanel extends ItemView {
   };
 
   async onOpen() {
+    debug("DmControlPanel: onOpen");
     document.addEventListener("keydown", this.escHandler);
     this.restoreState();
     this.render();
   }
 
   async onClose() {
+    debug("DmControlPanel: onClose");
     document.removeEventListener("keydown", this.escHandler);
     this.panZoomAbort?.abort();
     this.panZoomAbort = null;
@@ -183,6 +185,11 @@ export class DmControlPanel extends ItemView {
       } catch { /* ignore */ }
     }
 
+    debug(
+      "DmControlPanel: restoreState — layers:", this.imageLayers.length,
+      "cache entries:", Object.keys(s.lastBroadcastCache ?? {}).length,
+      "bg:", this.activeBackgroundUrl ?? "(none)"
+    );
     if (this.plugin.server && this.imageLayers.length > 0) {
       this.broadcastImageLayers();
     }
@@ -191,6 +198,7 @@ export class DmControlPanel extends ItemView {
   republishToServer() {
     if (!this.plugin.server) return;
     if (this.imageLayers.length > 0) {
+      debug("DmControlPanel: republishToServer — layers:", this.imageLayers.length);
       this.broadcastImageLayers();
     }
   }
@@ -216,6 +224,7 @@ export class DmControlPanel extends ItemView {
     const wasConnected = this.playerConnected;
     this.connectedClients = clients;
     this.playerConnected = clients.length > 0;
+    debug("DmControlPanel: onPlayerConnected — clients:", clients.length, "was:", wasConnected);
     if (!wasConnected && this.playerConnected) {
       this.debouncedRender();
     } else {
@@ -893,6 +902,7 @@ export class DmControlPanel extends ItemView {
   }
 
   stopAllCombatBroadcast(): void {
+    debug("DmControlPanel: stopAllCombatBroadcast");
     if (this.ddbPanel) this.ddbPanel.stopTracking();
     this.manualCombatants = [];
     this.currentTurn = 0;
@@ -1184,6 +1194,13 @@ export class DmControlPanel extends ItemView {
       };
 
       this.imageLayers.push(layer);
+      debug(
+        "DmControlPanel: addImageLayer pushed", layer.id,
+        "label:", layer.label,
+        "noteType:", noteType ?? "(none)",
+        "visible:", visible,
+        "total:", this.imageLayers.length
+      );
       this.broadcastAndRender();
     };
     img.src = dataUrl;
@@ -1791,6 +1808,7 @@ export class DmControlPanel extends ItemView {
 
   private setImageAsBackground(img: { path: string; label: string }): void {
     const url = `/vault/${encodeURIComponent(img.path)}`;
+    debug("DmControlPanel: setImageAsBackground", img.path);
     this.activeBackgroundUrl = url;
     this.activeVideoPath = null;
     if (this.plugin.server) {
@@ -1901,6 +1919,7 @@ export class DmControlPanel extends ItemView {
 
   broadcastImageLayers() {
     if (!this.plugin.server) return;
+    debug("DmControlPanel: broadcastImageLayers —", this.imageLayers.length, "layer(s)");
     this.plugin.server.broadcast({
       type: "image-layers-sync",
       payload: { layers: this.imageLayers },
