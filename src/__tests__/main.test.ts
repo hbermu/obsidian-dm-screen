@@ -173,12 +173,14 @@ describe("DmScreenPlugin", () => {
   // ─── saveSettings ────────────────────────────────────────────
 
   describe("saveSettings", () => {
-    it("persists settings and reinitializes hydrus cache", async () => {
+    it("persists settings without rebuilding the hydrus cache", async () => {
       const plugin = makePlugin();
       const initSpy = vi.spyOn(plugin as any, "initHydrusCache").mockImplementation(() => {});
       await plugin.saveSettings();
       expect((plugin as any).saveData).toHaveBeenCalledWith(plugin.settings);
-      expect(initSpy).toHaveBeenCalled();
+      // initHydrusCache is now only triggered by Hydrus-specific setting
+      // onChange handlers, not by every saveSettings call.
+      expect(initSpy).not.toHaveBeenCalled();
     });
   });
 

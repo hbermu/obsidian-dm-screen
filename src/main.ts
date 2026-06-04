@@ -117,11 +117,14 @@ export default class DmScreenPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
-    // Reflect any settings change in the live cache instance.
-    this.initHydrusCache();
   }
 
-  private initHydrusCache() {
+  // Re-init the Hydrus/DDB caches when their settings change (folder,
+  // TTL, enable toggle). Used by the settings tab; do NOT call from
+  // bulk state-persistence paths like DmControlPanel.saveState — those
+  // fire on every layer broadcast and we don't want to rebuild caches
+  // on every drag.
+  initHydrusCache() {
     const base = this.settings.cacheBaseFolder.replace(/^\/+|\/+$/g, "") || ".dm-screen";
     debug("initHydrusCache: base=", base, "ttl=", this.settings.hydrusCacheTtlDays, "days");
     this.hydrusCache = new HydrusCache(this.app, {

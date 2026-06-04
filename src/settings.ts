@@ -158,6 +158,7 @@ export class DmScreenSettingTab extends PluginSettingTab {
         toggle.setValue(this.plugin.settings.hydrusEnabled).onChange(async (value) => {
           this.plugin.settings.hydrusEnabled = value;
           await this.plugin.saveSettings();
+          this.plugin.initHydrusCache();
         })
       );
 
@@ -282,6 +283,7 @@ export class DmScreenSettingTab extends PluginSettingTab {
             }
             this.plugin.settings.cacheBaseFolder = normalized || ".dm-screen";
             await this.plugin.saveSettings();
+            this.plugin.initHydrusCache();
           })
       );
 
@@ -295,6 +297,7 @@ export class DmScreenSettingTab extends PluginSettingTab {
             const n = parseInt(value, 10);
             this.plugin.settings.hydrusCacheTtlDays = Number.isFinite(n) && n > 0 ? n : 30;
             await this.plugin.saveSettings();
+            this.plugin.initHydrusCache();
           })
       );
 
