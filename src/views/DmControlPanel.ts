@@ -343,30 +343,11 @@ export class DmControlPanel extends ItemView {
       });
 
       const port = this.plugin.settings.serverPort;
-      const localUrl = `http://localhost:${port}`;
       const lanIp = this.getLanIp();
       const lanUrl = lanIp ? `http://${lanIp}:${port}` : null;
 
-      // Local URL
-      const urlRow = section.createDiv("dm-server-url");
-      const urlLink = urlRow.createEl("a", {
-        text: localUrl,
-        href: localUrl,
-        cls: "dm-server-url-link",
-      });
-      urlLink.setAttr("target", "_blank");
-
-      const copyBtn = urlRow.createEl("button", {
-        text: "Copy",
-        cls: "dm-copy-url-btn",
-      });
-      copyBtn.addEventListener("click", () => {
-        navigator.clipboard.writeText(localUrl);
-        copyBtn.textContent = "Copied!";
-        setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
-      });
-
-      // LAN URL
+      // LAN URL — localhost row removed (it doesn't help any LAN client and
+      // ate vertical space on narrow panels).
       if (lanUrl) {
         const lanRow = section.createDiv("dm-server-url");
         const lanLink = lanRow.createEl("a", {

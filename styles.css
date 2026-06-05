@@ -4,6 +4,10 @@
 
 .dm-control-panel {
   padding: 12px;
+  /* Drive responsive rules off the panel's own width, not the window's.
+     Side panels in Obsidian can be narrow even when the window is wide. */
+  container-type: inline-size;
+  container-name: dm-panel;
 }
 
 .dm-section {
@@ -749,6 +753,7 @@
 
 .dm-layer-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 6px;
   padding: 4px 8px;
@@ -923,6 +928,7 @@
 
 .dm-preview-view-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 4px 0;
@@ -1335,6 +1341,7 @@
 
 .dm-ddb-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -1536,5 +1543,48 @@
 .dm-combat-name-link:hover {
   text-decoration: underline;
   color: var(--text-accent);
+}
+
+/* ─── Responsive (narrow side panel) ───────────────────────────────
+   When the DM Control Panel is parked on a narrow side dock, rows
+   that normally fit horizontally collapse onto a second line so
+   nothing gets clipped or hidden by overflow.                       */
+
+@container dm-panel (max-width: 380px) {
+  /* Reset View drops below the zoom slider and spans the full width. */
+  .dm-preview-view-controls .dm-layer-btn {
+    flex-basis: 100%;
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Combat tabs stack so the D&D Beyond tab is fully visible. */
+  .dm-combat-tabs {
+    flex-direction: column;
+  }
+  .dm-combat-tabs button {
+    width: 100%;
+  }
+
+  /* Layer row: the 8/10-button right column drops below the
+     mid column (name + slider) instead of being clipped. */
+  .dm-layer-right-col {
+    flex-basis: 100%;
+    margin-top: 4px;
+  }
+  .dm-layer-right-col .dm-layer-controls,
+  .dm-layer-right-col .dm-layer-position-row {
+    justify-content: center;
+  }
+
+  /* DDB tab: Choose Encounter takes its own row, the two toggles
+     share the next row underneath. */
+  .dm-ddb-choose-btn {
+    flex-basis: 100%;
+  }
+  .dm-ddb-hp-toggle,
+  .dm-ddb-reveal-toggle {
+    flex: 1 0 auto;
+  }
 }
 
