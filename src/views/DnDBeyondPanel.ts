@@ -21,8 +21,10 @@ type PreviewCombatant = {
   hideHp: boolean;
   statuses: string[];
   // Non-null on DDB monster rows — used by the DM preview to wire a
-  // click handler that opens the condition menu.
-  monsterId?: number;
+  // click handler that opens the condition menu. This is the per-instance
+  // key (uniqueId from DDB, or `${id}:${name}` when uniqueId is empty),
+  // NOT the template `id` which is shared across A/B/C duplicates.
+  monsterKey?: string;
 };
 
 export class DnDBeyondPanel {
@@ -36,10 +38,13 @@ export class DnDBeyondPanel {
   private container: HTMLElement;
   private previewEl: HTMLElement | null = null;
   private previewHeaderEl: HTMLElement | null = null;
-  // Ephemeral DM-assigned conditions for DDB monsters, keyed by monster id.
-  // Cleared on encounter switch and on stopTracking (per the "ephemeral"
-  // persistence decision — no settings, no disk).
-  private monsterStatuses = new Map<number, Set<string>>();
+  // Ephemeral DM-assigned conditions for DDB monsters, keyed by the
+  // per-instance unique id from DDB (or a synthetic id:name fallback when
+  // DDB doesn't return one). DDB shares the template `id` across multiple
+  // instances of the same monster — "Goblin (A)" and "Goblin (B)" have the
+  // same numeric id and would otherwise share statuses. Cleared on encounter
+  // switch and on stopTracking.
+  private monsterStatuses = new Map<string, Set<string>>();
   onTrackingChange: (() => void) | null = null;
 
   constructor(private plugin: DmScreenPlugin, container: HTMLElement) {
@@ -266,7 +271,8 @@ export class DnDBeyondPanel {
           statuses: char?.statuses ?? [],
         });
       } else if (p.kind === "monster") {
-        const monsterStatuses = this.monsterStatuses.get(p.id);
+        const key = monsterInstanceKey(p);
+        const monsterStatuses = this.monsterStatuses.get(key);
         participants.push({
           name: p.name,
           hp: (p as { currentHitPoints: number }).currentHitPoints,
@@ -278,7 +284,7 @@ export class DnDBeyondPanel {
           hidden,
           hideHp: false,
           statuses: monsterStatuses ? [...monsterStatuses] : [],
-          monsterId: p.id,
+          monsterKey: key,
         });
       } else {
         participants.push({
@@ -358,22 +364,22 @@ export class DnDBeyondPanel {
 
     for (const p of participants) {
       const row = buildPreviewRow(p);
-      if (p.monsterId != null) {
-        const monsterId = p.monsterId;
+      if (p.monsterKey != null) {
+        const key = p.monsterKey;
         const monsterName = p.name;
         row.classList.add("dm-ddb-preview-row-clickable");
         row.addEventListener("click", (evt) =>
-          this.openMonsterConditionMenu(monsterId, monsterName, evt)
+          this.openMonsterConditionMenu(key, monsterName, evt)
         );
       }
       list.appendChild(row);
     }
   }
 
-  private openMonsterConditionMenu(monsterId: number, monsterName: string, evt: MouseEvent): void {
+  private openMonsterConditionMenu(monsterKey: string, monsterName: string, evt: MouseEvent): void {
     if (!this.polledState) return;
-    const current = this.monsterStatuses.get(monsterId) ?? new Set<string>();
-    debug("DDB Panel: open monster condition menu for", monsterName, "(id", monsterId, ")");
+    const current = this.monsterStatuses.get(monsterKey) ?? new Set<string>();
+    debug("DDB Panel: open monster condition menu for", monsterName, "(key", monsterKey, ")");
 
     const menu = new Menu();
 
@@ -381,7 +387,7 @@ export class DnDBeyondPanel {
     menu.addItem((item) => {
       item.setTitle("Remove all conditions").setDisabled(!hasAny).onClick(() => {
         if (!hasAny) return;
-        this.monsterStatuses.delete(monsterId);
+        this.monsterStatuses.delete(monsterKey);
         this.applyMonsterStatusChange();
       });
     });
@@ -391,10 +397,10 @@ export class DnDBeyondPanel {
       const active = current.has(cond.id);
       menu.addItem((item) => {
         item.setTitle(cond.name).setChecked(active).onClick(() => {
-          const set = new Set(this.monsterStatuses.get(monsterId) ?? new Set<string>());
+          const set = new Set(this.monsterStatuses.get(monsterKey) ?? new Set<string>());
           if (active) set.delete(cond.id);
           else set.add(cond.id);
-          this.monsterStatuses.set(monsterId, set);
+          this.monsterStatuses.set(monsterKey, set);
           this.applyMonsterStatusChange();
         });
       });
@@ -408,13 +414,13 @@ export class DnDBeyondPanel {
     });
     menu.addItem((item) => {
       item.setTitle("  Remove exhaustion").setChecked(currentExhaustion === 0).onClick(() => {
-        this.setMonsterExhaustion(monsterId, 0);
+        this.setMonsterExhaustion(monsterKey, 0);
       });
     });
     for (let n = 1; n <= 6; n++) {
       menu.addItem((item) => {
         item.setTitle(`  Exhaustion ${n}`).setChecked(currentExhaustion === n).onClick(() => {
-          this.setMonsterExhaustion(monsterId, n);
+          this.setMonsterExhaustion(monsterKey, n);
         });
       });
     }
@@ -422,12 +428,12 @@ export class DnDBeyondPanel {
     menu.showAtMouseEvent(evt);
   }
 
-  private setMonsterExhaustion(monsterId: number, level: number): void {
-    const set = new Set(this.monsterStatuses.get(monsterId) ?? new Set<string>());
+  private setMonsterExhaustion(monsterKey: string, level: number): void {
+    const set = new Set(this.monsterStatuses.get(monsterKey) ?? new Set<string>());
     for (const s of [...set]) if (s.startsWith("exhaustion:")) set.delete(s);
     const enc = encodeExhaustion(level);
     if (enc) set.add(enc);
-    this.monsterStatuses.set(monsterId, set);
+    this.monsterStatuses.set(monsterKey, set);
     this.applyMonsterStatusChange();
   }
 
@@ -487,6 +493,15 @@ function classifyHp(hp: number, maxHp: number): { cls: string; label: string } {
   if (pct < 50) return { cls: "init-condition-bloodied", label: "Bloodied" };
   if (pct < 100) return { cls: "init-condition-hurt", label: "Hurt" };
   return { cls: "init-condition-well", label: "Well" };
+}
+
+function monsterInstanceKey(m: { uniqueId?: string; id: number; name: string }): string {
+  const uid = (m.uniqueId ?? "").trim();
+  if (uid.length > 0) return uid;
+  // Fallback when DDB didn't return uniqueId (e.g. old encounters or tests):
+  // use a composite of template id + display name so A/B/C suffixes still
+  // disambiguate.
+  return `${m.id}:${m.name}`;
 }
 
 function readExhaustionLevel(statuses: Iterable<string>): number {

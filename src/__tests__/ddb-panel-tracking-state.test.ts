@@ -83,6 +83,7 @@ function makeState(opts: {
       initiative: p.initiative,
       currentHitPoints: p.hp ?? 10,
       maximumHitPoints: p.maxHp ?? 10,
+      uniqueId: `monster-uid-${i}`,
     }));
   const characters = new Map<number, any>(
     players.map((p) => [p.id, { id: p.id, name: p.name, currentHitPoints: 20, maxHitPoints: 20 }])
@@ -253,7 +254,7 @@ describe("DnDBeyondPanel broadcast reveal rule", () => {
 });
 
 describe("DnDBeyondPanel monsterStatuses", () => {
-  it("includes monsterStatuses on the broadcast for that monster id", () => {
+  it("includes monsterStatuses on the broadcast for that monster instance key", () => {
     const container = document.createElement("div");
     const plugin = makePlugin();
     const panel = new DnDBeyondPanel(plugin, container);
@@ -263,15 +264,38 @@ describe("DnDBeyondPanel monsterStatuses", () => {
       turnNum: 1,
       participants: [{ name: "Goblin", initiative: 12, kind: "monster" }],
     });
-    // The makeState helper assigns monster ids starting at 100.
-    const monsterId = 100;
-    (panel as any).monsterStatuses.set(monsterId, new Set(["frightened", "exhaustion:2"]));
+    // makeState assigns synthetic uniqueIds "monster-uid-0", "-1", ...
+    (panel as any).monsterStatuses.set("monster-uid-0", new Set(["frightened", "exhaustion:2"]));
 
     (panel as any).broadcastToPlayerScreen(state);
     const sent = plugin.sendInitiativeUpdate.mock.calls[0][0];
     expect(sent[0].name).toBe("Goblin");
     expect(sent[0].statuses).toEqual(expect.arrayContaining(["frightened", "exhaustion:2"]));
     expect(sent[0].statuses.length).toBe(2);
+  });
+
+  it("keeps statuses per-instance for duplicate monsters that share template id", () => {
+    const container = document.createElement("div");
+    const plugin = makePlugin();
+    const panel = new DnDBeyondPanel(plugin, container);
+    (panel as any).showFullTurnOrder = true;
+    const state = makeState({
+      roundNum: 1,
+      turnNum: 1,
+      participants: [
+        { name: "Goblin (A)", initiative: 12, kind: "monster" },
+        { name: "Goblin (B)", initiative: 11, kind: "monster" },
+      ],
+    });
+    // makeState uses unique uniqueIds for each — only set the condition on the first.
+    (panel as any).monsterStatuses.set("monster-uid-0", new Set(["poisoned"]));
+
+    (panel as any).broadcastToPlayerScreen(state);
+    const sent = plugin.sendInitiativeUpdate.mock.calls[0][0];
+    expect(sent[0].name).toBe("Goblin (A)");
+    expect(sent[0].statuses).toEqual(["poisoned"]);
+    expect(sent[1].name).toBe("Goblin (B)");
+    expect(sent[1].statuses).toEqual([]);
   });
 
   it("emits an empty statuses array when monsterStatuses has no entry for that id", () => {
@@ -315,7 +339,7 @@ describe("DnDBeyondPanel monsterStatuses", () => {
     const panel = new DnDBeyondPanel(makePlugin(), container);
     (panel as any).poller = { stop: vi.fn() };
     (panel as any).selectedEncounterId = "enc-1";
-    (panel as any).monsterStatuses.set(100, new Set(["poisoned"]));
+    (panel as any).monsterStatuses.set("monster-uid-0", new Set(["poisoned"]));
 
     panel.stopTracking();
     expect((panel as any).monsterStatuses.size).toBe(0);
