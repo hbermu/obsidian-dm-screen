@@ -35,7 +35,7 @@
 
 ### Sweep and TTL
 
-8. `sweep` shall iterate the index and remove entries whose `lastUsedAt` is older than `ttlDays` ago; for each removed entry, the file and thumbnail on disk shall be deleted.
+8. `sweep` shall iterate the index and remove entries whose effective age exceeds `ttlDays`. Effective age is `lastUsedAt` when the entry has been touched, falling back to `downloadedAt` when `lastUsedAt === 0` (so cached downloads the DM never pushed eventually leave the cache too). For each removed entry, the file and thumbnail on disk shall be deleted.
 9. `sweep` shall return the count of entries removed.
 10. The plugin shall run `sweep` once on load when Hydrus is enabled.
 11. The plugin shall schedule `sweep` to run every 24 hours while Hydrus is enabled.
