@@ -54,4 +54,8 @@ export interface DdbCharacterSummary {
   // (`data.conditions[]`). Format defined in `src/conditions.ts`:
   // condition ids (e.g. "charmed") plus "exhaustion:1".."exhaustion:6".
   statuses: string[];
+  // Mirrors `data.inspiration` (top-level boolean) from the character
+  // sheet. Surfaces heroic inspiration on the player-screen tracker so
+  // players can remind each other; never written back.
+  inspired: boolean;
 }

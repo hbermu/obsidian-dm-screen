@@ -980,6 +980,9 @@ export class DmControlPanel extends ItemView {
 
     if (ddbActive && this.combatTab === "dndbeyond") {
       const ddbContainer = section.createDiv("dm-ddb-panel");
+      if (this.plugin.settings.ddbInspirationPulse) {
+        ddbContainer.addClass("dm-inspired-pulse-on");
+      }
       if (!this.ddbPanel) {
         this.ddbPanel = new DnDBeyondPanel(this.plugin, ddbContainer);
         this.ddbPanel.onTrackingChange = () => this.debouncedRender();

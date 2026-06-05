@@ -46,14 +46,22 @@
 21. The DM may add or remove conditions on D&D Beyond monster rows (click anywhere on the row) and on local manual combatants (click on the combatant's name span), opening an Obsidian `Menu` with 14 toggle items plus an Exhaustion section (Remove, Level 1..6). Toggling triggers an immediate broadcast and a re-render.
 22. DM-assigned conditions are ephemeral: D&D Beyond monster conditions live in `DnDBeyondPanel.monsterStatuses` (a `Map<instanceKey, Set<status>>` keyed by the per-instance `uniqueId` returned by D&D Beyond, falling back to `${monster.id}:${monster.name}` when `uniqueId` is empty — this disambiguates "Goblin (A)" vs "Goblin (B)" that share a template id). The map is cleared by `selectEncounter` and `stopTracking`. Local manual conditions live on `ManualCombatant.statuses` and persist with the manual combatant for the lifetime of the panel, but they are not written to disk.
 
+### Heroic Inspiration
+
+23. Combatants carry an `inspired: boolean` channel. While `inspired === true`, the player view and the DM-side preview shall add the `init-inspired` class to the combatant's `<li>`. The class renders a red `box-shadow` glow (no `border-left`/`background` interference, so the glow stacks orthogonally with `init-active`, `init-friendly`, and `init-hidden`).
+24. Only the D&D Beyond source populates `inspired` (sourced from `data.inspiration` on the character sheet — see `../dndbeyond-integration/encounters-and-tracking.md` Req 20). Initiative Tracker plugin sync and manual mode shall leave `inspired` undefined (treated as `false`).
+25. While `settings.ddbInspirationPulse === true`, the player shall additionally animate `.init-inspired` with the `dm-inspired-pulse` keyframes (1.5 s ease-in-out infinite). The DM-side preview shall animate the same way when its container `.dm-ddb-panel` carries the `dm-inspired-pulse-on` class. When the setting is `false`, the glow is static and characteristic but does not pulse.
+26. Toggling `ddbInspirationPulse` in settings shall (a) call `plugin.broadcastInspirationStyle()` to broadcast `inspiration-style` to every connected client and (b) call `plugin.refreshOpenDmPanels()` so the DM panel re-renders with the new container class.
+
 ## Broadcast / IPC
 
 | Message type | Direction | Payload | When |
 |--------------|-----------|---------|------|
 | `initiative-update` | DM → player | `{ combatants: Combatant[], round: number }` | Manual turn change; Initiative Tracker plugin save-state; D&D Beyond poll cycle |
 | `combat-scale` | DM → player | `{ scale: number }` | Scale +/-/1× pressed; first render after panel open |
+| `inspiration-style` | DM → player | `{ pulse: boolean }` | Server start; `ddbInspirationPulse` setting toggled |
 
-`Combatant` payload shape: `{ name, hp, maxHp, initiative, active, friendly?, isPlayer?, hidden?, hideHp?, statuses? }`.
+`Combatant` payload shape: `{ name, hp, maxHp, initiative, active, friendly?, isPlayer?, hidden?, hideHp?, statuses?, inspired? }`.
 
 ## Tests covering this
 
@@ -69,3 +77,5 @@
 - Custom condition words beyond Well / Hurt / Bloodied / Down.
 - Per-combatant scale or position on the player tracker; the entire `#initiative-tracker` is scaled as a unit.
 - Persisting manual combatants across plugin reload (manual mode is session-scoped; the persisted state is `combatTrackerScale` only).
+- Surfacing Heroic Inspiration for non-D&D-Beyond sources. The Initiative Tracker plugin and manual mode have no data channel for it; their combatants always render without the `init-inspired` highlight.
+- Spending or toggling Heroic Inspiration from the plugin. The integration is read-only — the DM still toggles it on the D&D Beyond service itself; the plugin reflects the change on the next poll cycle.
