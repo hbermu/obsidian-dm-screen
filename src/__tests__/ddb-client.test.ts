@@ -532,4 +532,81 @@ describe("DdbClient - getCharacter", () => {
     const char = await client.getCharacter(1);
     expect(char.statuses).toEqual(["poisoned"]);
   });
+
+  it("parses data.inspiration === true into inspired: true", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: {
+            name: "Ino",
+            baseHitPoints: 30,
+            stats: [{ id: 3, value: 10 }],
+            bonusStats: [],
+            overrideStats: [],
+            classes: [{ level: 1 }],
+            modifiers: {},
+            inspiration: true,
+          },
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const char = await client.getCharacter(1);
+    expect(char.inspired).toBe(true);
+  });
+
+  it("defaults inspired to false when data.inspiration is absent", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: {
+            name: "NoSpirit",
+            baseHitPoints: 30,
+            stats: [{ id: 3, value: 10 }],
+            bonusStats: [],
+            overrideStats: [],
+            classes: [{ level: 1 }],
+            modifiers: {},
+          },
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const char = await client.getCharacter(1);
+    expect(char.inspired).toBe(false);
+  });
+
+  it("treats data.inspiration === false as inspired: false (not stale true)", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: {
+            name: "Spent",
+            baseHitPoints: 30,
+            stats: [{ id: 3, value: 10 }],
+            bonusStats: [],
+            overrideStats: [],
+            classes: [{ level: 1 }],
+            modifiers: {},
+            inspiration: false,
+          },
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const char = await client.getCharacter(1);
+    expect(char.inspired).toBe(false);
+  });
 });

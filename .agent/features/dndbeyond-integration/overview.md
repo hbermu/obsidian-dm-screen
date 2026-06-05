@@ -16,6 +16,7 @@
 
 - `ddbEnabled` — gates the tab
 - `ddbCobaltSession` — the `CobaltSession` cookie used as auth
+- `ddbInspirationPulse` — animates (or not) the red glow that marks D&D Beyond PCs with Heroic Inspiration; see `../combat-tracker/overview.md`
 - `cacheBaseFolder` — the monster image cache lives at `<cacheBaseFolder>/beyond/`
 - `hydrusCacheTtlDays` — re-used for the monster image cache TTL
 
@@ -27,6 +28,7 @@
    - A password-type input for the `CobaltSession` cookie value (trimmed on save).
    - An `Open D&D Beyond` button that opens the upstream service URL in a browser window (via `window.open`).
    - A Test connection button that calls `client.validateSession()` and shows a Notice with the outcome.
+   - A `Pulse on inspired PC rows` toggle that controls whether the player-screen highlight for Heroic Inspiration animates. When toggled, the plugin calls `broadcastInspirationStyle()` to push the new state to every connected client and `refreshOpenDmPanels()` so the DM-side preview picks up the change too.
 3. The D&D Beyond tab shall expose a Choose Encounter button (its modal carries the search input that filters encounters by case-insensitive substring — see `encounters-and-tracking.md`), a Show PC HP checkbox that toggles `hideHp` on PC entries in the broadcast, and a Show full turn order checkbox (see `../combat-tracker/round-1-reveal.md`).
 4. Detailed sub-functionality is split across:
    - `auth.md` — CobaltSession → Bearer token, refresh, validate

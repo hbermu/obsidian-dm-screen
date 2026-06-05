@@ -51,9 +51,9 @@
 17. The active turn shall be `encounter.turnNum - 1` while `encounter.inProgress` is true, otherwise `-1`.
 18. While `encounter.inProgress === false`, the broadcast shall mark no combatant active.
 19. The reveal rule shall be applied (see `../combat-tracker/round-1-reveal.md`): when `showFullTurnOrder === false`, combatants at index `> currentTurnIdx` shall be marked `hidden`; when `true`, no combatant shall be marked hidden by this rule.
-20. PC entries shall carry `friendly: true`, `isPlayer: true`, `hideHp: !showPcHp`, and `statuses` populated from `DdbCharacterSummary.statuses` (which `DdbClient.getCharacter` parses from `data.conditions[]` via `ddbConditionsToStatuses` in `src/conditions.ts`).
-21. Monster entries shall carry `friendly: false`, `isPlayer: false`, and `statuses` populated from `DnDBeyondPanel.monsterStatuses.get(instanceKey)` — an ephemeral in-memory `Map<string, Set<string>>` keyed by the per-instance `uniqueId` returned by D&D Beyond (falling back to `${monster.id}:${monster.name}` when `uniqueId` is empty, so "Goblin (A)"/"Goblin (B)" duplicates that share a template id don't share statuses). The map is mutated by the DM via the click-to-edit Menu and cleared on `selectEncounter` and `stopTracking`.
-22. DDB `manualEntries` shall carry `friendly: false`, `isPlayer: false`, `statuses: []` — there is no DM-side click affordance for them on the Beyond tab; the DM uses the local manual tracker for free-form combatants instead.
+20. PC entries shall carry `friendly: true`, `isPlayer: true`, `hideHp: !showPcHp`, `statuses` populated from `DdbCharacterSummary.statuses` (which `DdbClient.getCharacter` parses from `data.conditions[]` via `ddbConditionsToStatuses` in `src/conditions.ts`), and `inspired` populated from `DdbCharacterSummary.inspired` (which `DdbClient.getCharacter` parses from the top-level `data.inspiration` boolean on the character sheet, defaulting to `false` when absent).
+21. Monster entries shall carry `friendly: false`, `isPlayer: false`, `inspired: false`, and `statuses` populated from `DnDBeyondPanel.monsterStatuses.get(instanceKey)` — an ephemeral in-memory `Map<string, Set<string>>` keyed by the per-instance `uniqueId` returned by D&D Beyond (falling back to `${monster.id}:${monster.name}` when `uniqueId` is empty, so "Goblin (A)"/"Goblin (B)" duplicates that share a template id don't share statuses). The map is mutated by the DM via the click-to-edit Menu and cleared on `selectEncounter` and `stopTracking`.
+22. DDB `manualEntries` shall carry `friendly: false`, `isPlayer: false`, `statuses: []`, `inspired: false` — there is no DM-side click affordance for them on the Beyond tab; the DM uses the local manual tracker for free-form combatants instead.
 
 ### Toggles
 
@@ -65,7 +65,7 @@
 ### DM-side preview
 
 27. The panel shall render a `dm-ddb-preview` block containing a `Player preview — Round N` header (or `Player preview` when no encounter is selected; `Player preview — Encounter idle` when the encounter is not in progress) and a `<ul class="dm-ddb-preview-list">`.
-28. The preview list shall render every participant returned by `buildParticipants` — including those marked `hidden` — using the same `init-entry` / `init-active` / `init-friendly` / `init-pc-tag` / `init-name` / `init-hp-text` / `init-condition-*` classes the player view uses. Hidden combatants shall additionally carry the `init-hidden` class (dimmed).
+28. The preview list shall render every participant returned by `buildParticipants` — including those marked `hidden` — using the same `init-entry` / `init-active` / `init-friendly` / `init-pc-tag` / `init-name` / `init-hp-text` / `init-condition-*` classes the player view uses. Hidden combatants shall additionally carry the `init-hidden` class (dimmed). Combatants with `inspired === true` shall additionally carry the `init-inspired` class (see `../combat-tracker/overview.md` Heroic Inspiration requirements).
 29. When no encounter is selected, the preview shall display the empty-state text `No encounter selected. Click Choose Encounter to begin.`. When the polled encounter has no combatants, it shall display `Encounter has no combatants.`.
 
 ## Tests covering this

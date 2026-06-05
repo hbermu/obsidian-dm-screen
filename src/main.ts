@@ -183,6 +183,7 @@ export default class DmScreenPlugin extends Plugin {
     };
     this.server.start(this.settings.serverPort);
     this.broadcastWaitingScreen();
+    this.broadcastInspirationStyle();
     const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
     for (const leaf of leaves) {
       const view = leaf.view as DmControlPanel;
@@ -201,6 +202,23 @@ export default class DmScreenPlugin extends Plugin {
         subtitle: this.settings.waitingSubtitle,
       },
     });
+  }
+
+  broadcastInspirationStyle(): void {
+    if (!this.server) return;
+    debug("broadcastInspirationStyle: pulse=", this.settings.ddbInspirationPulse);
+    this.server.broadcast({
+      type: "inspiration-style",
+      payload: { pulse: this.settings.ddbInspirationPulse },
+    });
+  }
+
+  refreshOpenDmPanels(): void {
+    const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
+    for (const leaf of leaves) {
+      const view = leaf.view as DmControlPanel;
+      view.debouncedRender?.();
+    }
   }
 
   private onPlayerClientInfo(_info: { width: number; height: number; devicePixelRatio: number }) {
@@ -298,7 +316,7 @@ export default class DmScreenPlugin extends Plugin {
   sendInitiativeUpdate(combatants: Array<{
     name: string; hp: number; maxHp: number; initiative: number;
     active: boolean; friendly?: boolean; isPlayer?: boolean;
-    hidden?: boolean; statuses?: string[];
+    hidden?: boolean; statuses?: string[]; inspired?: boolean;
   }>, round?: number) {
     if (!this.server) return;
     const visible = combatants.filter(c => !c.hidden);

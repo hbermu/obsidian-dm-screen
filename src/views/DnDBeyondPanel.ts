@@ -18,6 +18,7 @@ type PreviewCombatant = {
   hidden: boolean;
   hideHp: boolean;
   statuses: string[];
+  inspired: boolean;
   // Non-null on DDB monster rows — used by the DM preview to wire a
   // click handler that opens the condition menu. This is the per-instance
   // key (uniqueId from DDB, or `${id}:${name}` when uniqueId is empty),
@@ -261,6 +262,7 @@ export class DnDBeyondPanel {
           hidden,
           hideHp: !this.showPcHp,
           statuses: char?.statuses ?? [],
+          inspired: char?.inspired ?? false,
         });
       } else if (p.kind === "monster") {
         const key = monsterInstanceKey(p);
@@ -276,6 +278,7 @@ export class DnDBeyondPanel {
           hidden,
           hideHp: false,
           statuses: monsterStatuses ? [...monsterStatuses] : [],
+          inspired: false,
           monsterKey: key,
         });
       } else {
@@ -290,6 +293,7 @@ export class DnDBeyondPanel {
           hidden,
           hideHp: false,
           statuses: [],
+          inspired: false,
         });
       }
     }
@@ -310,6 +314,7 @@ export class DnDBeyondPanel {
       hidden: p.hidden,
       hideHp: p.hideHp,
       statuses: p.statuses,
+      inspired: p.inspired,
     }));
     this.plugin.sendInitiativeUpdate(combatants, state.encounter.roundNum);
   }
@@ -512,6 +517,7 @@ function buildPreviewRow(c: PreviewCombatant): HTMLLIElement {
   if (c.active) li.classList.add("init-active");
   if (c.friendly || c.isPlayer) li.classList.add("init-friendly");
   if (c.hidden) li.classList.add("init-hidden");
+  if (c.inspired) li.classList.add("init-inspired");
 
   const nameEl = document.createElement("span");
   nameEl.className = "init-name";

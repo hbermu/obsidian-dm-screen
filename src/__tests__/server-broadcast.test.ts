@@ -74,6 +74,17 @@ describe("PlayerScreenServer.broadcast", () => {
     });
   });
 
+  it("caches inspiration-style so late joiners receive it", () => {
+    server.broadcast({
+      type: "inspiration-style",
+      payload: { pulse: false },
+    });
+
+    const cache = (server as any).lastState as Map<string, string>;
+    expect(cache.has("inspiration-style")).toBe(true);
+    expect(JSON.parse(cache.get("inspiration-style")!).payload).toEqual({ pulse: false });
+  });
+
   it("sends to all connected clients", () => {
     const ws1 = makeWsStub();
     const ws2 = makeWsStub();

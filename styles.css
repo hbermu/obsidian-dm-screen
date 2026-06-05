@@ -1486,6 +1486,34 @@
   opacity: 0.4;
 }
 
+/* Heroic Inspiration mirror on the DM-side preview. Lighter shadow than the
+   player view because the rows are smaller here. The pulse is gated on the
+   `dm-inspired-pulse-on` class applied to `.dm-ddb-panel` by DmControlPanel
+   based on the local `ddbInspirationPulse` setting (no WS — it's local). */
+.dm-ddb-preview .init-entry.init-inspired {
+  box-shadow:
+    inset 0 0 0 1px rgba(232, 70, 60, 0.5),
+    0 0 6px rgba(232, 70, 60, 0.3);
+  border-radius: 4px;
+}
+
+@keyframes dm-inspired-pulse-dm {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(232, 70, 60, 0.35),
+      0 0 4px rgba(232, 70, 60, 0.2);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(232, 70, 60, 0.65),
+      0 0 9px rgba(232, 70, 60, 0.45);
+  }
+}
+
+.dm-ddb-panel.dm-inspired-pulse-on .dm-ddb-preview .init-entry.init-inspired {
+  animation: dm-inspired-pulse-dm 1.5s ease-in-out infinite;
+}
+
 .dm-ddb-preview .init-name {
   flex: 1;
   min-width: 0;

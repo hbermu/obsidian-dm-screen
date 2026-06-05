@@ -37,6 +37,7 @@
 | `combat-scale` | DM → player | `{ scale: number }` (`0.5`–`2.0`) | DM clicks `−` / `1×` / `+` on the tracker scale, or on initial render | yes |
 | `viewport-update` | DM → player | `{ panX: number, panY: number, zoom: number }` | Reserved for player-viewport sync (currently emitted only by `broadcastPlayerViewport`; not bound to a UI control yet) | yes |
 | `waiting-screen` | DM → player | `{ title: string, subtitle: string }` | Server start; `waitingTitle` or `waitingSubtitle` settings change | yes |
+| `inspiration-style` | DM → player | `{ pulse: boolean }` | Server start; `ddbInspirationPulse` setting toggled | yes |
 | `clear` | DM → player | `{}` | DM clicks Clear Player Screen | no (purges cache) |
 | `client-info` | player → DM | `{ width: number, height: number, devicePixelRatio: number }` | Player connects; player window resizes | n/a (received only) |
 

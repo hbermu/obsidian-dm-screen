@@ -85,6 +85,8 @@ describe("DDB → Server → Player round-trip", () => {
         active: false,
         isPlayer: true,
         hidden: false,
+        // Aria carries heroic inspiration; the other PCs do not.
+        inspired: p.name === "Aria the Wizard",
       })),
       ...encounter.monsters.map((m) => ({
         name: m.name,
@@ -94,6 +96,7 @@ describe("DDB → Server → Player round-trip", () => {
         active: false,
         isPlayer: false,
         hidden: false,
+        inspired: false,
       })),
     ];
 
@@ -103,7 +106,7 @@ describe("DDB → Server → Player round-trip", () => {
       ws.once("error", rej);
     });
 
-    const messageReceived = new Promise<{ type: string; payload: { combatants: Array<{ name: string }> ; round: number } }>((res) => {
+    const messageReceived = new Promise<{ type: string; payload: { combatants: Array<{ name: string; inspired?: boolean }> ; round: number } }>((res) => {
       ws.once("message", (data) => res(JSON.parse(String(data))));
     });
 
@@ -120,6 +123,11 @@ describe("DDB → Server → Player round-trip", () => {
     expect(wireNames).toContain("Aria the Wizard");
     expect(wireNames).toContain("Adult Red Dragon");
     expect(msg.payload.round).toBe(1);
+
+    const aria = msg.payload.combatants.find((c) => c.name === "Aria the Wizard");
+    const dragon = msg.payload.combatants.find((c) => c.name === "Adult Red Dragon");
+    expect(aria?.inspired).toBe(true);
+    expect(dragon?.inspired).toBe(false);
 
     ws.close();
     await new Promise((r) => ws.once("close", r));

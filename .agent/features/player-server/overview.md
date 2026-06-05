@@ -17,6 +17,7 @@
 - `lastBroadcastCache` — persisted late-joiner cache restored on plugin load
 - `waitingTitle` — big text rendered on the waiting screen (default `"Player Screen"`)
 - `waitingSubtitle` — smaller text below the title (default `"Waiting for DM to push content..."`)
+- `ddbInspirationPulse` — drives the `inspiration-style` broadcast that toggles the `dm-inspired-pulse` body class on every connected player (default `true`)
 
 ## Requirements
 
@@ -41,6 +42,7 @@
 19. `buildPlayerHtml()` shall inline the current `waitingTitle` and `waitingSubtitle` into the `#waiting-screen` markup, HTML-escaping the values. Empty values shall cause the corresponding `<h1>` or `<p>` to be omitted entirely.
 20. After `startServer()` succeeds, the plugin shall call `broadcastWaitingScreen()` to seed the late-joiner cache with the current waiting-screen text.
 21. When either `waitingTitle` or `waitingSubtitle` changes in settings, the plugin shall broadcast `waiting-screen` immediately so already-connected clients update without a reload.
+22. After `startServer()` succeeds, the plugin shall also call `broadcastInspirationStyle()` to seed the late-joiner cache with the current `ddbInspirationPulse` value (see `../combat-tracker/overview.md` Heroic Inspiration requirements). When `ddbInspirationPulse` changes in settings, the plugin shall broadcast `inspiration-style` immediately so already-connected clients update without a reload.
 
 ## Broadcast / IPC
 

@@ -137,6 +137,9 @@ export class DdbClient {
       : baseHp + bonusHp + this.computeHpBonuses(data);
     const currentHp = Math.max(0, maxHp - removedHp);
 
+    const inspired = (data.inspiration as boolean) ?? false;
+    if (inspired) debug("DDB: getCharacter", characterId, "inspired=true");
+
     return {
       id: characterId,
       name: (data.name as string) ?? "Unknown",
@@ -148,6 +151,7 @@ export class DdbClient {
           ? (data.conditions as Array<{ id: number; level: number | null }>)
           : []
       ),
+      inspired,
     };
   }
 

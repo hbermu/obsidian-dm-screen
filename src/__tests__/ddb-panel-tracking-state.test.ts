@@ -334,6 +334,77 @@ describe("DnDBeyondPanel monsterStatuses", () => {
     expect(sent[0].statuses).toEqual(["charmed", "exhaustion:3", "grappled"]);
   });
 
+  it("propagates PC inspired flag from the character API", () => {
+    const container = document.createElement("div");
+    const plugin = makePlugin();
+    const panel = new DnDBeyondPanel(plugin, container);
+    (panel as any).showFullTurnOrder = true;
+    const state = makeState({
+      roundNum: 1,
+      turnNum: 1,
+      participants: [
+        { name: "Ino", initiative: 22, kind: "player", id: 7 },
+        { name: "Spent", initiative: 12, kind: "player", id: 8 },
+      ],
+    });
+    (state.characters as Map<number, any>).get(7)!.inspired = true;
+    (state.characters as Map<number, any>).get(8)!.inspired = false;
+
+    (panel as any).broadcastToPlayerScreen(state);
+    const sent = plugin.sendInitiativeUpdate.mock.calls[0][0];
+    const ino = sent.find((c: any) => c.name === "Ino");
+    const spent = sent.find((c: any) => c.name === "Spent");
+    expect(ino.inspired).toBe(true);
+    expect(spent.inspired).toBe(false);
+  });
+
+  it("monsters and manualEntries always broadcast inspired: false", () => {
+    const container = document.createElement("div");
+    const plugin = makePlugin();
+    const panel = new DnDBeyondPanel(plugin, container);
+    (panel as any).showFullTurnOrder = true;
+    const state = makeState({
+      roundNum: 1,
+      turnNum: 1,
+      participants: [
+        { name: "Goblin", initiative: 18, kind: "monster" },
+        { name: "Trap", initiative: 5, kind: "monster" },
+      ],
+    });
+
+    (panel as any).broadcastToPlayerScreen(state);
+    const sent = plugin.sendInitiativeUpdate.mock.calls[0][0];
+    for (const c of sent) {
+      expect(c.inspired).toBe(false);
+    }
+  });
+
+  it("clears stale inspired on a true → false poll transition", () => {
+    const container = document.createElement("div");
+    const plugin = makePlugin();
+    const panel = new DnDBeyondPanel(plugin, container);
+    (panel as any).showFullTurnOrder = true;
+    const state1 = makeState({
+      roundNum: 1,
+      turnNum: 1,
+      participants: [{ name: "Morrigan", initiative: 20, kind: "player", id: 7 }],
+    });
+    (state1.characters as Map<number, any>).get(7)!.inspired = true;
+    (panel as any).broadcastToPlayerScreen(state1);
+
+    const state2 = makeState({
+      roundNum: 2,
+      turnNum: 1,
+      participants: [{ name: "Morrigan", initiative: 20, kind: "player", id: 7 }],
+    });
+    (state2.characters as Map<number, any>).get(7)!.inspired = false;
+    (panel as any).broadcastToPlayerScreen(state2);
+
+    const calls = plugin.sendInitiativeUpdate.mock.calls;
+    expect(calls[0][0][0].inspired).toBe(true);
+    expect(calls[1][0][0].inspired).toBe(false);
+  });
+
   it("stopTracking clears monsterStatuses", () => {
     const container = document.createElement("div");
     const panel = new DnDBeyondPanel(makePlugin(), container);

@@ -27,6 +27,7 @@ export interface DmScreenSettings {
   // D&D Beyond integration
   ddbEnabled: boolean;
   ddbCobaltSession: string;
+  ddbInspirationPulse: boolean;
   // Combat tracker
   combatTrackerScale: number;
   // Server limits
@@ -65,6 +66,7 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   hydrusDefaultSearchTags: "",
   ddbEnabled: false,
   ddbCobaltSession: "",
+  ddbInspirationPulse: true,
   combatTrackerScale: 1,
   maxClients: 10,
   waitingTitle: "Player Screen",
@@ -432,6 +434,18 @@ export class DmScreenSettingTab extends PluginSettingTab {
           }
         })
     );
+
+    new Setting(containerEl)
+      .setName("Pulse on inspired PC rows")
+      .setDesc("Animate the red glow around D&D Beyond PCs that have Heroic Inspiration. Turn off for a static glow only.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.ddbInspirationPulse).onChange(async (value) => {
+          this.plugin.settings.ddbInspirationPulse = value;
+          await this.plugin.saveSettings();
+          this.plugin.broadcastInspirationStyle();
+          this.plugin.refreshOpenDmPanels();
+        })
+      );
 
     // ─── Advanced ───
     containerEl.createEl("h3", { text: "Advanced" });

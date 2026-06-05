@@ -15,6 +15,7 @@ interface Combatant {
   hidden?: boolean;
   hideHp?: boolean;
   statuses?: string[];
+  inspired?: boolean;
 }
 
 interface InitiativePayload {
@@ -56,6 +57,7 @@ function buildInitiativeRow(c: Combatant): HTMLLIElement {
   const classes = ["init-entry"];
   if (c.active) classes.push("init-active");
   if (c.friendly || c.isPlayer) classes.push("init-friendly");
+  if (c.inspired) classes.push("init-inspired");
   li.className = classes.join(" ");
 
   const nameSpan = document.createElement("span");
@@ -248,6 +250,9 @@ class PlayerScreen {
       case "waiting-screen":
         this.applyWaitingScreen(msg.payload as { title: string; subtitle: string });
         break;
+      case "inspiration-style":
+        this.applyInspirationStyle(msg.payload as { pulse: boolean });
+        break;
       case "clear":
         this.showWaiting();
         this.clearImageLayers();
@@ -269,6 +274,10 @@ class PlayerScreen {
     const pulseDot = screen.querySelector(".pulse-dot");
     upsertWaitingChild(screen, "h1", payload.title, pulseDot);
     upsertWaitingChild(screen, "p", payload.subtitle, pulseDot);
+  }
+
+  private applyInspirationStyle(payload: { pulse: boolean }) {
+    document.body.classList.toggle("dm-inspired-pulse", !!payload.pulse);
   }
 
   private applyCombatScale(scale: number) {
