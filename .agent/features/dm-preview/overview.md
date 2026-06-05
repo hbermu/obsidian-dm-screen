@@ -4,7 +4,7 @@
 
 ## Source files
 
-- `src/views/DmControlPanel.ts` — `renderPlayerScreenSection` builds the preview area, `setupPreviewPanZoom` binds wheel and middle-click handlers, `resetDmView`, `getEffectiveResolution`, `getPlayerViewport`
+- `src/views/DmControlPanel.ts` — `renderPlayerScreenSection` builds the preview area, `setupPreviewPanZoom` binds middle-click pan handlers (no wheel zoom — see `pan-zoom.md`), `resetDmView`, `getEffectiveResolution`, `getPlayerViewport`
 - `src/player/player.ts` — `updateViewport` consumes `viewport-update` payloads (the player-side analogue to DM pan/zoom; currently used only via the broadcaster, not bound to a DM control)
 
 ## Settings used

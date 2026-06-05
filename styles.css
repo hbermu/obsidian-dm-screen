@@ -4,6 +4,10 @@
 
 .dm-control-panel {
   padding: 12px;
+  /* Drive responsive rules off the panel's own width, not the window's.
+     Side panels in Obsidian can be narrow even when the window is wide. */
+  container-type: inline-size;
+  container-name: dm-panel;
 }
 
 .dm-section {
@@ -749,6 +753,7 @@
 
 .dm-layer-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 6px;
   padding: 4px 8px;
@@ -923,6 +928,7 @@
 
 .dm-preview-view-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 4px 0;
@@ -965,6 +971,16 @@
   height: 100%;
   cursor: crosshair;
   z-index: 10;
+  /* The fog canvas lives inside .dm-layer-rect-frame which is
+     pointer-events: none so layer drag clicks fall through to the
+     rect. The canvas itself MUST opt back in or it never sees the
+     drawing mousedown/mousemove. */
+  pointer-events: auto;
+}
+
+.dm-layer-rect.dm-fog-editing,
+.dm-layer-rect.dm-fog-editing:active {
+  cursor: crosshair;
 }
 
 .dm-layer-rect.dm-fog-editing .dm-layer-rect-frame {
@@ -1325,6 +1341,7 @@
 
 .dm-ddb-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -1340,18 +1357,6 @@
 
 .dm-ddb-choose-btn {
   white-space: nowrap;
-}
-
-.dm-ddb-selected {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85em;
-  color: var(--text-muted);
-}
-
-.dm-ddb-selected-name {
-  flex: 1;
 }
 
 .dm-ddb-encounter-row {
@@ -1483,7 +1488,11 @@
 
 .dm-ddb-preview .init-name {
   flex: 1;
+  min-width: 0;
   color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dm-ddb-preview .init-pc-tag {
@@ -1493,6 +1502,7 @@
   padding: 1px 4px;
   border-radius: 4px;
   margin-left: 6px;
+  flex-shrink: 0;
 }
 
 .dm-ddb-preview .init-hp-text {
@@ -1500,6 +1510,7 @@
   color: var(--text-muted);
   min-width: 50px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .dm-ddb-preview .init-condition {
@@ -1507,6 +1518,7 @@
   font-weight: 600;
   min-width: 60px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .dm-ddb-preview .init-condition-well { color: #4caf50; }
@@ -1526,5 +1538,48 @@
 .dm-combat-name-link:hover {
   text-decoration: underline;
   color: var(--text-accent);
+}
+
+/* ─── Responsive (narrow side panel) ───────────────────────────────
+   When the DM Control Panel is parked on a narrow side dock, rows
+   that normally fit horizontally collapse onto a second line so
+   nothing gets clipped or hidden by overflow.                       */
+
+@container dm-panel (max-width: 380px) {
+  /* Reset View drops below the zoom slider and spans the full width. */
+  .dm-preview-view-controls .dm-layer-btn {
+    flex-basis: 100%;
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Combat tabs stack so the D&D Beyond tab is fully visible. */
+  .dm-combat-tabs {
+    flex-direction: column;
+  }
+  .dm-combat-tabs button {
+    width: 100%;
+  }
+
+  /* Layer row: the 8/10-button right column drops below the
+     mid column (name + slider) instead of being clipped. */
+  .dm-layer-right-col {
+    flex-basis: 100%;
+    margin-top: 4px;
+  }
+  .dm-layer-right-col .dm-layer-controls,
+  .dm-layer-right-col .dm-layer-position-row {
+    justify-content: center;
+  }
+
+  /* DDB tab: Choose Encounter takes its own row, the two toggles
+     share the next row underneath. */
+  .dm-ddb-choose-btn {
+    flex-basis: 100%;
+  }
+  .dm-ddb-hp-toggle,
+  .dm-ddb-reveal-toggle {
+    flex: 1 0 auto;
+  }
 }
 

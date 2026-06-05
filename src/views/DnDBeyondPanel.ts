@@ -138,12 +138,6 @@ export class DnDBeyondPanel {
       attr: { for: "dm-ddb-show-full-turn-order" },
     });
 
-    if (this.selectedEncounterId) {
-      const selectedRow = this.container.createDiv({ cls: "dm-ddb-selected" });
-      const label = this.polledState?.encounter.name ?? "Loading…";
-      selectedRow.createSpan({ cls: "dm-ddb-selected-name", text: `Tracking: ${label}` });
-    }
-
     this.previewEl = this.container.createDiv({ cls: "dm-ddb-preview" });
     this.previewHeaderEl = this.previewEl.createDiv({ cls: "dm-ddb-preview-header" });
     this.previewEl.createEl("ul", { cls: "dm-ddb-preview-list" });

@@ -343,30 +343,11 @@ export class DmControlPanel extends ItemView {
       });
 
       const port = this.plugin.settings.serverPort;
-      const localUrl = `http://localhost:${port}`;
       const lanIp = this.getLanIp();
       const lanUrl = lanIp ? `http://${lanIp}:${port}` : null;
 
-      // Local URL
-      const urlRow = section.createDiv("dm-server-url");
-      const urlLink = urlRow.createEl("a", {
-        text: localUrl,
-        href: localUrl,
-        cls: "dm-server-url-link",
-      });
-      urlLink.setAttr("target", "_blank");
-
-      const copyBtn = urlRow.createEl("button", {
-        text: "Copy",
-        cls: "dm-copy-url-btn",
-      });
-      copyBtn.addEventListener("click", () => {
-        navigator.clipboard.writeText(localUrl);
-        copyBtn.textContent = "Copied!";
-        setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
-      });
-
-      // LAN URL
+      // LAN URL — localhost row removed (it doesn't help any LAN client and
+      // ate vertical space on narrow panels).
       if (lanUrl) {
         const lanRow = section.createDiv("dm-server-url");
         const lanLink = lanRow.createEl("a", {
@@ -1404,11 +1385,26 @@ export class DmControlPanel extends ItemView {
   }
 
   private initInlineFogCanvas(canvas: HTMLCanvasElement, layer: ImageLayer, rect: HTMLElement) {
-    // Size canvas to match the rect's rendered size
+    // Size canvas to match the host element's rendered size. `rect` here is
+    // actually the .dm-layer-rect-frame (renamed `frame` upstream so the fog
+    // overlay aligns with the visible image, not the broadcast wrapper).
     const rectBounds = rect.getBoundingClientRect();
-    if (rectBounds.width < 1 || rectBounds.height < 1) return;
+    if (rectBounds.width < 1 || rectBounds.height < 1) {
+      debugWarn(
+        "initInlineFogCanvas: host element has zero-size bounds",
+        "(width=", rectBounds.width.toFixed(2),
+        "height=", rectBounds.height.toFixed(2),
+        ") — fog canvas init skipped"
+      );
+      return;
+    }
     canvas.width = rectBounds.width;
     canvas.height = rectBounds.height;
+    debug(
+      "initInlineFogCanvas: layer", layer.id,
+      "canvas=", canvas.width.toFixed(0), "x", canvas.height.toFixed(0),
+      "tool=", this.fogTool
+    );
 
     // Draw semi-transparent fog preview
     const fogCanvas = this.getFogCanvas(layer);
@@ -1480,6 +1476,11 @@ export class DmControlPanel extends ItemView {
       const { x, y } = toFogCoord(e);
       startX = x;
       startY = y;
+      debug(
+        "fog: mousedown layer", layer.id,
+        "tool=", this.fogTool,
+        "start=", x.toFixed(0), ",", y.toFixed(0)
+      );
       if (isFreehand()) {
         applyFreehand(x, y);
         refreshOverlay();
@@ -1524,12 +1525,23 @@ export class DmControlPanel extends ItemView {
     const finishDraw = (e: MouseEvent) => {
       if (!drawing) return;
       drawing = false;
+      let endX = startX;
+      let endY = startY;
       if (!isFreehand()) {
         const { x, y } = toFogCoord(e);
+        endX = x;
+        endY = y;
         if (Math.abs(x - startX) > 3 || Math.abs(y - startY) > 3) {
           applyShape(startX, startY, x, y);
         }
       }
+      debug(
+        "fog: mouseup layer", layer.id,
+        "tool=", this.fogTool,
+        "end=", endX.toFixed(0), ",", endY.toFixed(0),
+        "shiftHeld=", e.shiftKey,
+        "type=", e.type
+      );
       this.syncFogToLayer(layer);
 
       // Update fog overlay in preview
@@ -1540,6 +1552,7 @@ export class DmControlPanel extends ItemView {
 
       // Shift held = stay in edit mode, otherwise exit
       if (!e.shiftKey) {
+        debug("fog: exiting edit mode for layer", layer.id);
         this.fogEditLayerId = null;
         this.render();
       } else {
@@ -1562,12 +1575,9 @@ export class DmControlPanel extends ItemView {
     this.panZoomAbort = new AbortController();
     const { signal } = this.panZoomAbort;
 
-    previewArea.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      this.dmZoom = Math.max(0.1, Math.min(10, this.dmZoom + delta));
-      previewInner.style.transform = `translate(${this.dmPanX}%, ${this.dmPanY}%) scale(${this.dmZoom})`;
-    }, { signal });
+    // Wheel-to-zoom is intentionally NOT bound: it would swallow page scroll
+    // whenever the cursor was over the preview. Zoom is driven exclusively
+    // by the `.dm-zoom-slider` + reset button rendered above the preview.
 
     let panning = false;
     let panStartX = 0;
