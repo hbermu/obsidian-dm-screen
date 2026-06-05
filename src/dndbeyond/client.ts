@@ -236,8 +236,9 @@ export class DdbClient {
     if (res.status < 200 || res.status >= 300) {
       this.token = null;
       this.tokenExpiry = 0;
-      debugError("DDB: auth failed with status", res.status);
-      throw new Error(`DDB auth failed (${res.status})`);
+      const detail = res.text?.slice(0, 200).trim() ?? "";
+      debugError("DDB: auth failed with status", res.status, detail);
+      throw new Error(detail ? `DDB auth failed (${res.status}): ${detail}` : `DDB auth failed (${res.status})`);
     }
     const data = res.json as DdbCobaltTokenResponse;
     if (!data.token) throw new Error("DDB auth response missing token");

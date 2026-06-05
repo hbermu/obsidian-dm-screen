@@ -17,7 +17,9 @@ export default class DmScreenPlugin extends Plugin {
   settings: DmScreenSettings = DEFAULT_SETTINGS;
   server: PlayerScreenServer | null = null;
   hydrusCache: HydrusCache | null = null;
+  ddbImageCache: DdbImageCache | null = null;
   private hydrusSweepInterval: number | null = null;
+  private ddbImageSweepInterval: number | null = null;
 
   /** Returns the first DM Control Panel view that is currently open. */
   async findOpenDmControlPanel(): Promise<DmControlPanel | null> {
@@ -104,6 +106,10 @@ export default class DmScreenPlugin extends Plugin {
       window.clearInterval(this.hydrusSweepInterval);
       this.hydrusSweepInterval = null;
     }
+    if (this.ddbImageSweepInterval !== null) {
+      window.clearInterval(this.ddbImageSweepInterval);
+      this.ddbImageSweepInterval = null;
+    }
   }
 
   async loadSettings() {
@@ -144,14 +150,19 @@ export default class DmScreenPlugin extends Plugin {
       }
     }
 
-    const imgCache = new DdbImageCache(
+    this.ddbImageCache = new DdbImageCache(
       `${base}/beyond`,
       this.app.vault.adapter as unknown as VaultAdapterLike,
       this.settings.hydrusCacheTtlDays
     );
-    void imgCache.sweep().then((n) => {
+    void this.ddbImageCache.sweep().then((n) => {
       if (n > 0) debug("DDB image cache sweep removed", n, "stale image(s)");
     }).catch(() => {});
+    if (this.ddbImageSweepInterval === null) {
+      this.ddbImageSweepInterval = window.setInterval(() => {
+        void this.ddbImageCache?.sweep().catch(() => {});
+      }, 24 * 60 * 60 * 1000);
+    }
   }
 
   startServer() {

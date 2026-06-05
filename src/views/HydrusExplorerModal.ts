@@ -384,7 +384,7 @@ export class HydrusExplorerModal extends Modal {
     for (const tile of tiles) {
       const card = this.gridEl.createDiv({ cls: "dm-hydrus-tile" });
       card.dataset.hash = tile.hash;
-      card.title = `${tile.knownTags.slice(0, 8).join(", ") || "(no tags)"}\nclick → background · shift+click → image layer`;
+      card.title = `${tile.knownTags.slice(0, 8).join(", ") || "(no tags)"}\nclick → image layer · shift+click → background`;
 
       const thumb = card.createEl("img", { cls: "dm-hydrus-thumb" });
       thumb.alt = "";

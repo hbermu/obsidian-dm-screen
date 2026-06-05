@@ -122,6 +122,12 @@ export class DmControlPanel extends ItemView {
   async onOpen() {
     debug("DmControlPanel: onOpen");
     document.addEventListener("keydown", this.escHandler);
+    // DM-side viewport is session-scoped: reset to 100% / 0,0 on every open,
+    // even if the same view instance is reopened (see
+    // .agent/features/image-layers/persistence.md → Non-goals).
+    this.dmZoom = 1;
+    this.dmPanX = 0;
+    this.dmPanY = 0;
     this.restoreState();
     this.render();
   }

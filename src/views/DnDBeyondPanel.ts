@@ -2,9 +2,7 @@ import { Menu, Notice } from "obsidian";
 import type DmScreenPlugin from "../main";
 import { DdbClient } from "../dndbeyond/client";
 import { DdbEncounterPoller, type DdbPolledState } from "../dndbeyond/poller";
-import { DdbImageCache } from "../dndbeyond/imageCache";
 import { debug, debugWarn } from "../debug";
-import type { VaultAdapterLike } from "../hydrus/cache";
 import type { DdbEncounter } from "../dndbeyond/types";
 import { DnDBeyondEncounterModal } from "./DnDBeyondEncounterModal";
 import { CONDITIONS, decodeStatus, encodeExhaustion } from "../conditions";
@@ -443,17 +441,17 @@ export class DnDBeyondPanel {
     const uniqueIds = [...new Set(encounter.monsters.map((m) => m.id))];
     if (uniqueIds.length === 0) return;
 
+    const cache = this.plugin.ddbImageCache;
+    if (!cache) {
+      debugWarn("loadMonsterImages: DDB image cache not initialised");
+      return;
+    }
+
     debug("loadMonsterImages: encounter", encounter.name, "uniqueIds", uniqueIds);
 
     try {
       const avatarMap = await this.client.getMonsterImages(uniqueIds);
       debug("loadMonsterImages: avatarMap entries", avatarMap.size, [...avatarMap.entries()]);
-
-      const base =
-        this.plugin.settings.cacheBaseFolder.replace(/^\/+|\/+$/g, "") || ".dm-screen";
-      const adapter = this.plugin.app.vault.adapter as unknown as VaultAdapterLike;
-      const ttlDays = this.plugin.settings.hydrusCacheTtlDays || 30;
-      const cache = new DdbImageCache(`${base}/beyond`, adapter, ttlDays);
 
       const dmPanel = await this.plugin.findOpenDmControlPanel();
       if (!dmPanel) {
