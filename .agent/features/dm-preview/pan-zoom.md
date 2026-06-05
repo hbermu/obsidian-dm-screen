@@ -1,6 +1,6 @@
 # DM Preview Pan & Zoom
 
-> Local-only navigation of the DM preview canvas. Wheel = zoom, middle-click drag = pan, slider and Reset View buttons available below the preview. Not broadcast to players.
+> Local-only navigation of the DM preview canvas. Middle-click drag = pan, slider + Reset View button drive the zoom. Not broadcast to players.
 
 ## Source files
 
@@ -12,7 +12,7 @@
 
 ## Requirements
 
-1. When the user scroll-wheels over the preview area, the panel shall change `dmZoom` by `+0.1` (scrolling up) or `-0.1` (scrolling down), clamped to `[0.1, 10]`, and re-apply the inner transform.
+1. The preview area shall NOT bind the mouse wheel: scrolling over it propagates so the surrounding panel can scroll normally. Zoom is driven exclusively by the zoom slider and the Reset View button.
 2. When the user mousedown-middle-clicks the preview area, the panel shall start a pan: subsequent mousemove events (anywhere on the document) shall update `dmPanX` and `dmPanY` proportionally to the cursor delta over the preview's bounds.
 3. When the middle mouse button is released, the panel shall stop the pan.
 4. The Reset View button shall set `dmZoom = 1`, `dmPanX = 0`, `dmPanY = 0`, and re-render.
@@ -21,7 +21,8 @@
 
 ## Non-goals
 
-- Touch / trackpad pinch zoom (wheel only).
+- Wheel-driven zoom. Removed because it swallowed page scroll whenever the cursor was over the preview.
+- Touch / trackpad pinch zoom.
 - Left-click drag pan (left click is reserved for layer drag).
 - Persisting DM pan/zoom across opens.
 - Animating to the new zoom (snap immediately).
