@@ -27,7 +27,7 @@
    - A password-type input for the `CobaltSession` cookie value (trimmed on save).
    - An `Open D&D Beyond` button that opens the upstream service URL in a browser window (via `window.open`).
    - A Test connection button that calls `client.validateSession()` and shows a Notice with the outcome.
-3. The D&D Beyond tab shall expose a search input filtering the encounter list by name (case-insensitive), and a Show PC HP checkbox that toggles `hideHp` on PC entries in the broadcast.
+3. The D&D Beyond tab shall expose a Choose Encounter button (its modal carries the search input that filters encounters by case-insensitive substring — see `encounters-and-tracking.md`), a Show PC HP checkbox that toggles `hideHp` on PC entries in the broadcast, and a Show full turn order checkbox (see `../combat-tracker/round-1-reveal.md`).
 4. Detailed sub-functionality is split across:
    - `auth.md` — CobaltSession → Bearer token, refresh, validate
    - `poller.md` — long-polling cadence, circuit breaker, min-gap

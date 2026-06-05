@@ -118,11 +118,29 @@ describe("HydrusCache", () => {
     expect(await fresh.get("h1")).toBeUndefined();
   });
 
-  it("sweep ignores entries that were never used", async () => {
+  it("sweep keeps freshly-downloaded entries even if never used", async () => {
     const client = fakeClient();
-    await cache.fetchAndCache(client, fakeFile()); // lastUsedAt = 0 → ignored by sweep
+    await cache.fetchAndCache(client, fakeFile()); // lastUsedAt = 0, downloadedAt = now
     expect(await cache.sweep()).toBe(0);
     expect(adapter.bin.has(".dm-screen/hydrus/h1.png")).toBe(true);
+  });
+
+  it("sweep removes never-used entries once downloadedAt exceeds TTL", async () => {
+    const client = fakeClient();
+    await cache.fetchAndCache(client, fakeFile()); // lastUsedAt = 0
+    // Backdate downloadedAt past the TTL — emulates a cached download that
+    // the DM never pushed and just sat there too long.
+    const path = ".dm-screen/hydrus/index.json";
+    const idx = JSON.parse(adapter.text.get(path)!) as {
+      entries: Record<string, { downloadedAt: number }>;
+    };
+    idx.entries["h1"].downloadedAt = Date.now() - 40 * 24 * 60 * 60 * 1000;
+    adapter.text.set(path, JSON.stringify(idx));
+
+    const fresh = new HydrusCache(null, { folder: ".dm-screen/hydrus", ttlDays: 30, adapter });
+    expect(await fresh.sweep()).toBe(1);
+    expect(adapter.bin.has(".dm-screen/hydrus/h1.png")).toBe(false);
+    expect(await fresh.get("h1")).toBeUndefined();
   });
 
   it("evict removes a single entry from disk and index", async () => {
