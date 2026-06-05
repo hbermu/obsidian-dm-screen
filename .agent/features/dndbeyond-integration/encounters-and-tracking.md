@@ -51,8 +51,9 @@
 17. The active turn shall be `encounter.turnNum - 1` while `encounter.inProgress` is true, otherwise `-1`.
 18. While `encounter.inProgress === false`, the broadcast shall mark no combatant active.
 19. The reveal rule shall be applied (see `../combat-tracker/round-1-reveal.md`): when `showFullTurnOrder === false`, combatants at index `> currentTurnIdx` shall be marked `hidden`; when `true`, no combatant shall be marked hidden by this rule.
-20. PC entries shall carry `friendly: true`, `isPlayer: true`, `statuses: []`, and `hideHp: !showPcHp`.
-21. Monster and manual entries shall carry `friendly: false`, `isPlayer: false`, `statuses: []`.
+20. PC entries shall carry `friendly: true`, `isPlayer: true`, `hideHp: !showPcHp`, and `statuses` populated from `DdbCharacterSummary.statuses` (which `DdbClient.getCharacter` parses from `data.conditions[]` via `ddbConditionsToStatuses` in `src/conditions.ts`).
+21. Monster entries shall carry `friendly: false`, `isPlayer: false`, and `statuses` populated from `DnDBeyondPanel.monsterStatuses.get(monsterId)` — an ephemeral in-memory `Map<number, Set<string>>` mutated by the DM via the click-to-edit Menu, cleared on `selectEncounter` and `stopTracking`.
+22. DDB `manualEntries` shall carry `friendly: false`, `isPlayer: false`, `statuses: []` — there is no DM-side click affordance for them on the Beyond tab; the DM uses the local manual tracker for free-form combatants instead.
 
 ### Toggles
 

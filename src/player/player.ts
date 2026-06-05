@@ -2,6 +2,7 @@
 // This runs in the browser on the player's TV/screen
 
 import { safePlayerUrl } from "./safeUrl";
+import { decodeStatus } from "../conditions";
 
 interface Combatant {
   name: string;
@@ -72,10 +73,29 @@ function buildInitiativeRow(c: Combatant): HTMLLIElement {
     const wrap = document.createElement("div");
     wrap.className = "init-statuses";
     for (const status of c.statuses) {
-      const badge = document.createElement("span");
-      badge.className = "init-status-badge";
-      badge.textContent = status;
-      wrap.appendChild(badge);
+      const d = decodeStatus(status);
+      if (d.kind === "condition") {
+        const icon = document.createElement("span");
+        icon.className = "init-status-icon";
+        icon.title = d.def.name;
+        icon.innerHTML = d.def.iconSvg;
+        wrap.appendChild(icon);
+      } else if (d.kind === "exhaustion") {
+        const icon = document.createElement("span");
+        icon.className = "init-status-icon init-status-exhaustion";
+        icon.title = `Exhaustion (Level ${d.level})`;
+        icon.innerHTML = d.iconSvg;
+        const level = document.createElement("span");
+        level.className = "init-status-level";
+        level.textContent = String(d.level);
+        icon.appendChild(level);
+        wrap.appendChild(icon);
+      } else {
+        const badge = document.createElement("span");
+        badge.className = "init-status-badge";
+        badge.textContent = d.text;
+        wrap.appendChild(badge);
+      }
     }
     li.appendChild(wrap);
   }

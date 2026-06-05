@@ -210,6 +210,38 @@ body {
   white-space: nowrap;
 }
 
+.init-status-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  color: #ffb74d;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.init-status-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.init-status-exhaustion .init-status-level {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  font-size: 0.55rem;
+  font-weight: bold;
+  color: #fff;
+  background: #b71c1c;
+  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
 /* Background media (video or image) */
 #video-background,
 #image-background {

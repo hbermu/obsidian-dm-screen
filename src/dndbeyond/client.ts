@@ -1,5 +1,6 @@
 import { requestUrl } from "obsidian";
 import { debug, debugWarn, debugError } from "../debug";
+import { ddbConditionsToStatuses } from "../conditions";
 import type {
   DdbCobaltTokenResponse,
   DdbEncounterSummary,
@@ -142,6 +143,11 @@ export class DdbClient {
       currentHitPoints: currentHp,
       maxHitPoints: maxHp,
       temporaryHitPoints: tempHp,
+      statuses: ddbConditionsToStatuses(
+        Array.isArray(data.conditions)
+          ? (data.conditions as Array<{ id: number; level: number | null }>)
+          : []
+      ),
     };
   }
 

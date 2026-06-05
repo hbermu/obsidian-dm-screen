@@ -1,4 +1,4 @@
-import { Notice } from "obsidian";
+import { Menu, Notice } from "obsidian";
 import type DmScreenPlugin from "../main";
 import { DdbClient } from "../dndbeyond/client";
 import { DdbEncounterPoller, type DdbPolledState } from "../dndbeyond/poller";
@@ -7,6 +7,7 @@ import { debug, debugWarn } from "../debug";
 import type { VaultAdapterLike } from "../hydrus/cache";
 import type { DdbEncounter } from "../dndbeyond/types";
 import { DnDBeyondEncounterModal } from "./DnDBeyondEncounterModal";
+import { CONDITIONS, decodeStatus, encodeExhaustion } from "../conditions";
 
 type PreviewCombatant = {
   name: string;
@@ -18,6 +19,12 @@ type PreviewCombatant = {
   isPlayer: boolean;
   hidden: boolean;
   hideHp: boolean;
+  statuses: string[];
+  // Non-null on DDB monster rows — used by the DM preview to wire a
+  // click handler that opens the condition menu. This is the per-instance
+  // key (uniqueId from DDB, or `${id}:${name}` when uniqueId is empty),
+  // NOT the template `id` which is shared across A/B/C duplicates.
+  monsterKey?: string;
 };
 
 export class DnDBeyondPanel {
@@ -31,6 +38,13 @@ export class DnDBeyondPanel {
   private container: HTMLElement;
   private previewEl: HTMLElement | null = null;
   private previewHeaderEl: HTMLElement | null = null;
+  // Ephemeral DM-assigned conditions for DDB monsters, keyed by the
+  // per-instance unique id from DDB (or a synthetic id:name fallback when
+  // DDB doesn't return one). DDB shares the template `id` across multiple
+  // instances of the same monster — "Goblin (A)" and "Goblin (B)" have the
+  // same numeric id and would otherwise share statuses. Cleared on encounter
+  // switch and on stopTracking.
+  private monsterStatuses = new Map<string, Set<string>>();
   onTrackingChange: (() => void) | null = null;
 
   constructor(private plugin: DmScreenPlugin, container: HTMLElement) {
@@ -155,6 +169,7 @@ export class DnDBeyondPanel {
     this.polledState = null;
     this.showFullTurnOrderUserSet = false;
     this.showFullTurnOrder = false;
+    this.monsterStatuses.clear();
     this.startTracking(id);
     this.render();
     this.onTrackingChange?.();
@@ -183,6 +198,7 @@ export class DnDBeyondPanel {
     }
     this.selectedEncounterId = null;
     this.polledState = null;
+    this.monsterStatuses.clear();
     this.plugin.sendInitiativeUpdate([], 0);
     this.render();
     this.onTrackingChange?.();
@@ -252,6 +268,23 @@ export class DnDBeyondPanel {
           isPlayer: true,
           hidden,
           hideHp: !this.showPcHp,
+          statuses: char?.statuses ?? [],
+        });
+      } else if (p.kind === "monster") {
+        const key = monsterInstanceKey(p);
+        const monsterStatuses = this.monsterStatuses.get(key);
+        participants.push({
+          name: p.name,
+          hp: (p as { currentHitPoints: number }).currentHitPoints,
+          maxHp: (p as { maximumHitPoints: number }).maximumHitPoints,
+          initiative: p.initiative,
+          active: isActive,
+          friendly: false,
+          isPlayer: false,
+          hidden,
+          hideHp: false,
+          statuses: monsterStatuses ? [...monsterStatuses] : [],
+          monsterKey: key,
         });
       } else {
         participants.push({
@@ -264,6 +297,7 @@ export class DnDBeyondPanel {
           isPlayer: false,
           hidden,
           hideHp: false,
+          statuses: [],
         });
       }
     }
@@ -283,7 +317,7 @@ export class DnDBeyondPanel {
       isPlayer: p.isPlayer,
       hidden: p.hidden,
       hideHp: p.hideHp,
-      statuses: [] as string[],
+      statuses: p.statuses,
     }));
     this.plugin.sendInitiativeUpdate(combatants, state.encounter.roundNum);
   }
@@ -329,8 +363,84 @@ export class DnDBeyondPanel {
     }
 
     for (const p of participants) {
-      list.appendChild(buildPreviewRow(p));
+      const row = buildPreviewRow(p);
+      if (p.monsterKey != null) {
+        const key = p.monsterKey;
+        const monsterName = p.name;
+        row.classList.add("dm-ddb-preview-row-clickable");
+        row.addEventListener("click", (evt) =>
+          this.openMonsterConditionMenu(key, monsterName, evt)
+        );
+      }
+      list.appendChild(row);
     }
+  }
+
+  private openMonsterConditionMenu(monsterKey: string, monsterName: string, evt: MouseEvent): void {
+    if (!this.polledState) return;
+    const current = this.monsterStatuses.get(monsterKey) ?? new Set<string>();
+    debug("DDB Panel: open monster condition menu for", monsterName, "(key", monsterKey, ")");
+
+    const menu = new Menu();
+
+    const hasAny = current.size > 0;
+    menu.addItem((item) => {
+      item.setTitle("Remove all conditions").setDisabled(!hasAny).onClick(() => {
+        if (!hasAny) return;
+        this.monsterStatuses.delete(monsterKey);
+        this.applyMonsterStatusChange();
+      });
+    });
+    menu.addSeparator();
+
+    for (const cond of Object.values(CONDITIONS)) {
+      const active = current.has(cond.id);
+      menu.addItem((item) => {
+        item.setTitle(cond.name).setChecked(active).onClick(() => {
+          const set = new Set(this.monsterStatuses.get(monsterKey) ?? new Set<string>());
+          if (active) set.delete(cond.id);
+          else set.add(cond.id);
+          this.monsterStatuses.set(monsterKey, set);
+          this.applyMonsterStatusChange();
+        });
+      });
+    }
+
+    menu.addSeparator();
+
+    const currentExhaustion = readExhaustionLevel(current);
+    menu.addItem((item) => {
+      item.setTitle(currentExhaustion === 0 ? "Exhaustion — None" : `Exhaustion — Level ${currentExhaustion}`).setDisabled(true);
+    });
+    menu.addItem((item) => {
+      item.setTitle("  Remove exhaustion").setChecked(currentExhaustion === 0).onClick(() => {
+        this.setMonsterExhaustion(monsterKey, 0);
+      });
+    });
+    for (let n = 1; n <= 6; n++) {
+      menu.addItem((item) => {
+        item.setTitle(`  Exhaustion ${n}`).setChecked(currentExhaustion === n).onClick(() => {
+          this.setMonsterExhaustion(monsterKey, n);
+        });
+      });
+    }
+
+    menu.showAtMouseEvent(evt);
+  }
+
+  private setMonsterExhaustion(monsterKey: string, level: number): void {
+    const set = new Set(this.monsterStatuses.get(monsterKey) ?? new Set<string>());
+    for (const s of [...set]) if (s.startsWith("exhaustion:")) set.delete(s);
+    const enc = encodeExhaustion(level);
+    if (enc) set.add(enc);
+    this.monsterStatuses.set(monsterKey, set);
+    this.applyMonsterStatusChange();
+  }
+
+  private applyMonsterStatusChange(): void {
+    if (!this.polledState) return;
+    this.broadcastToPlayerScreen(this.polledState);
+    this.renderPreview();
   }
 
   private async loadMonsterImages(encounter: DdbEncounter): Promise<void> {
@@ -385,6 +495,25 @@ function classifyHp(hp: number, maxHp: number): { cls: string; label: string } {
   return { cls: "init-condition-well", label: "Well" };
 }
 
+function monsterInstanceKey(m: { uniqueId?: string; id: number; name: string }): string {
+  const uid = (m.uniqueId ?? "").trim();
+  if (uid.length > 0) return uid;
+  // Fallback when DDB didn't return uniqueId (e.g. old encounters or tests):
+  // use a composite of template id + display name so A/B/C suffixes still
+  // disambiguate.
+  return `${m.id}:${m.name}`;
+}
+
+function readExhaustionLevel(statuses: Iterable<string>): number {
+  for (const s of statuses) {
+    if (s.startsWith("exhaustion:")) {
+      const n = parseInt(s.slice("exhaustion:".length), 10);
+      if (Number.isFinite(n) && n >= 1 && n <= 6) return n;
+    }
+  }
+  return 0;
+}
+
 function buildPreviewRow(c: PreviewCombatant): HTMLLIElement {
   const li = document.createElement("li");
   li.className = "init-entry";
@@ -402,6 +531,37 @@ function buildPreviewRow(c: PreviewCombatant): HTMLLIElement {
     nameEl.appendChild(tag);
   }
   li.appendChild(nameEl);
+
+  if (c.statuses && c.statuses.length > 0) {
+    const wrap = document.createElement("span");
+    wrap.className = "init-statuses";
+    for (const status of c.statuses) {
+      const d = decodeStatus(status);
+      if (d.kind === "condition") {
+        const icon = document.createElement("span");
+        icon.className = "dm-status-icon";
+        icon.title = d.def.name;
+        icon.innerHTML = d.def.iconSvg;
+        wrap.appendChild(icon);
+      } else if (d.kind === "exhaustion") {
+        const icon = document.createElement("span");
+        icon.className = "dm-status-icon dm-status-exhaustion";
+        icon.title = `Exhaustion (Level ${d.level})`;
+        icon.innerHTML = d.iconSvg;
+        const level = document.createElement("span");
+        level.className = "dm-status-level";
+        level.textContent = String(d.level);
+        icon.appendChild(level);
+        wrap.appendChild(icon);
+      } else {
+        const badge = document.createElement("span");
+        badge.className = "dm-status-badge";
+        badge.textContent = d.text;
+        wrap.appendChild(badge);
+      }
+    }
+    li.appendChild(wrap);
+  }
 
   const showHp = (c.friendly || c.isPlayer) && !c.hideHp;
   if (showHp) {

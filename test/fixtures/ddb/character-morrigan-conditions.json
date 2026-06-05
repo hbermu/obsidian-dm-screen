@@ -1,0 +1,21 @@
+{
+  "_comment": "Minimal sanitised subset of the GET /character/v5/character response body for a PC with active conditions (Charmed + Exhaustion 3 + Grappled). Used by ddb-client.test.ts to lock in the parser contract. Generated from a real encounter capture — all identifying numbers / stat blocks stripped.",
+  "data": {
+    "name": "Morrigan",
+    "baseHitPoints": 90,
+    "bonusHitPoints": null,
+    "removedHitPoints": 20,
+    "temporaryHitPoints": 0,
+    "overrideHitPoints": null,
+    "stats": [{ "id": 3, "value": 14 }],
+    "bonusStats": [],
+    "overrideStats": [],
+    "classes": [{ "level": 10 }],
+    "modifiers": {},
+    "conditions": [
+      { "id": 2, "level": null },
+      { "id": 4, "level": 3 },
+      { "id": 6, "level": null }
+    ]
+  }
+}

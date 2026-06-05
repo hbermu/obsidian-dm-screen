@@ -92,6 +92,7 @@ src/
   settings.ts            # Settings interface, defaults, settings UI
   types.ts               # Shared types (TrackerCombatant, ImageLayer, etc.)
   debug.ts               # Debug-mode logger
+  conditions.ts          # D&D 5e condition catalogue (icons, DDB id mapping, status encode/decode)
   global.d.ts            # Window augmentations (InitiativeTracker, FantasyStatblocks)
   player/
     player.ts            # Player-side WebSocket client and rendering

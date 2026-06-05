@@ -50,4 +50,8 @@ export interface DdbCharacterSummary {
   currentHitPoints: number;
   maxHitPoints: number;
   temporaryHitPoints: number;
+  // Encoded D&D 5e conditions sourced from the character sheet
+  // (`data.conditions[]`). Format defined in `src/conditions.ts`:
+  // condition ids (e.g. "charmed") plus "exhaustion:1".."exhaustion:6".
+  statuses: string[];
 }

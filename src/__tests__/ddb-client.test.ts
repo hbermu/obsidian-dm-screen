@@ -435,4 +435,101 @@ describe("DdbClient - getCharacter", () => {
     const client = new DdbClient("session");
     await expect(client.getCharacter(1)).rejects.toThrow("DDB session expired");
   });
+
+  it("parses data.conditions into encoded statuses sorted by DDB id (Morrigan fixture)", async () => {
+    const fixture = await import("../../test/fixtures/ddb/character-morrigan-conditions.json");
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return { json: fixture.default };
+    });
+
+    const client = new DdbClient("session");
+    const char = await client.getCharacter(1);
+
+    // Charmed (id 2) + Exhaustion (id 4, level 3) + Grappled (id 6).
+    expect(char.statuses).toEqual(["charmed", "exhaustion:3", "grappled"]);
+    expect(char.name).toBe("Morrigan");
+  });
+
+  it("returns empty statuses when conditions is absent", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: {
+            name: "NoConditions",
+            baseHitPoints: 20,
+            stats: [{ id: 3, value: 10 }],
+            bonusStats: [],
+            overrideStats: [],
+            classes: [{ level: 1 }],
+            modifiers: {},
+          },
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const char = await client.getCharacter(1);
+    expect(char.statuses).toEqual([]);
+  });
+
+  it("returns empty statuses when conditions is an empty array", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: {
+            name: "Clean",
+            baseHitPoints: 20,
+            stats: [{ id: 3, value: 10 }],
+            bonusStats: [],
+            overrideStats: [],
+            classes: [{ level: 1 }],
+            modifiers: {},
+            conditions: [],
+          },
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const char = await client.getCharacter(1);
+    expect(char.statuses).toEqual([]);
+  });
+
+  it("ignores unknown DDB condition ids", async () => {
+    mockRequestUrl((call) => {
+      if (call.url.includes("cobalt-token")) {
+        return { json: { token: "jwt", ttl: 3600 } };
+      }
+      return {
+        json: {
+          data: {
+            name: "Weird",
+            baseHitPoints: 20,
+            stats: [{ id: 3, value: 10 }],
+            bonusStats: [],
+            overrideStats: [],
+            classes: [{ level: 1 }],
+            modifiers: {},
+            conditions: [
+              { id: 99, level: null },
+              { id: 11, level: null },
+            ],
+          },
+        },
+      };
+    });
+
+    const client = new DdbClient("session");
+    const char = await client.getCharacter(1);
+    expect(char.statuses).toEqual(["poisoned"]);
+  });
 });
