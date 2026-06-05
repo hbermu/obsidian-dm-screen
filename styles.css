@@ -1359,18 +1359,6 @@
   white-space: nowrap;
 }
 
-.dm-ddb-selected {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85em;
-  color: var(--text-muted);
-}
-
-.dm-ddb-selected-name {
-  flex: 1;
-}
-
 .dm-ddb-encounter-row {
   display: flex;
   align-items: center;
@@ -1500,7 +1488,11 @@
 
 .dm-ddb-preview .init-name {
   flex: 1;
+  min-width: 0;
   color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dm-ddb-preview .init-pc-tag {
@@ -1510,6 +1502,7 @@
   padding: 1px 4px;
   border-radius: 4px;
   margin-left: 6px;
+  flex-shrink: 0;
 }
 
 .dm-ddb-preview .init-hp-text {
@@ -1517,6 +1510,7 @@
   color: var(--text-muted);
   min-width: 50px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .dm-ddb-preview .init-condition {
@@ -1524,6 +1518,7 @@
   font-weight: 600;
   min-width: 60px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .dm-ddb-preview .init-condition-well { color: #4caf50; }
