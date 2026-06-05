@@ -17,7 +17,7 @@
 
 1. When the user enables fog for a layer that has no `fogDataUrl`, the DM panel shall create an offscreen canvas of width `1024` and height `1024 × (image.naturalHeight / image.naturalWidth)`, fill it black, and store it in `fogCanvases` keyed by `layer.id`. The data URL of that canvas shall become `layer.fogDataUrl`.
 2. When the user enables fog for a layer that already has a `fogDataUrl` from persistence, the DM panel shall recreate the offscreen canvas from that data URL when first edited.
-3. While `layer.fogEnabled` is true, the player shall render an `<img>` with `src = layer.fogDataUrl` as the second child of the layer wrapper, positioned `absolute` and sized 100%/100% so it covers the image.
+3. While `layer.fogEnabled` is true, the player shall render an `<img>` with `src = layer.fogDataUrl` inside the layer's `.image-layer-frame` element (the same parent that holds the layer image), positioned `absolute` and sized 100%/100% so it covers the image. (The wrapper chain on the player is `wrapper > .image-layer-frame > [layerImg, fogImg]` — fog is a sibling of the layer image, not of the frame.)
 4. When the user toggles fog OFF, the DM panel shall reset `layer.fogDataUrl` to the empty string and exit fog-edit mode for that layer if it was active.
 5. While a layer is in fog-edit mode, the DM panel shall add the `dm-fog-editing` class to the preview rectangle and overlay an inline canvas the same size for drawing.
 6. The Escape key shall exit fog-edit mode globally (`fogEditLayerId = null`) and re-render.
