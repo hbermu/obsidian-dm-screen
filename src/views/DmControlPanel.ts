@@ -1594,12 +1594,9 @@ export class DmControlPanel extends ItemView {
     this.panZoomAbort = new AbortController();
     const { signal } = this.panZoomAbort;
 
-    previewArea.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      this.dmZoom = Math.max(0.1, Math.min(10, this.dmZoom + delta));
-      previewInner.style.transform = `translate(${this.dmPanX}%, ${this.dmPanY}%) scale(${this.dmZoom})`;
-    }, { signal });
+    // Wheel-to-zoom is intentionally NOT bound: it would swallow page scroll
+    // whenever the cursor was over the preview. Zoom is driven exclusively
+    // by the `.dm-zoom-slider` + reset button rendered above the preview.
 
     let panning = false;
     let panStartX = 0;
