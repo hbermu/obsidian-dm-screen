@@ -192,21 +192,49 @@ jobs:
         if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true'
         id: tag_check
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+          # actions/checkout@v4 does not fetch tags by default, so checking
+          # `git rev-parse "v$VERSION"` against the workflow's local repo
+          # always misses on a fresh checkout. Check the remote tag list and
+          # the GitHub releases API instead — either signal means we already
+          # published this prerelease and the push is a re-run.
+          if gh release view "v$VERSION" >/dev/null 2>&1 \
+             || git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Tag v$VERSION already exists; nothing to do."
+            echo "::notice::Tag v$VERSION already exists on remote; nothing to publish."
           else
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build prerelease artefacts
+      - name: Bail if stable of this line was already published
         if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true' && steps.tag_check.outputs.exists == 'false'
+        id: stable_check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          # Strip the -beta.N suffix to get the corresponding stable version.
+          # If a stable release for that line already exists, the prerelease
+          # is orphan-by-construction: it would either re-create a release
+          # that the previous stable's cleanup deleted (the exact bug this
+          # guard catches) or sit alongside a shipped stable, which makes
+          # no sense for BRAT subscribers.
+          BASE="${VERSION%-beta.*}"
+          if gh release view "v$BASE" >/dev/null 2>&1; then
+            echo "stable_exists=true" >> $GITHUB_OUTPUT
+            echo "::notice::Stable release v$BASE already exists; refusing to publish v$VERSION. Bump manifest.json on main to the next planned dev version (or to the latest stable) to re-arm beta publishing."
+          else
+            echo "stable_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build prerelease artefacts
+        if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true' && steps.tag_check.outputs.exists == 'false' && steps.stable_check.outputs.stable_exists == 'false'
         run: make build
 
       - name: Create prerelease tag
-        if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true' && steps.tag_check.outputs.exists == 'false'
+        if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true' && steps.tag_check.outputs.exists == 'false' && steps.stable_check.outputs.stable_exists == 'false'
         env:
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
@@ -216,7 +244,7 @@ jobs:
           git push origin "v$VERSION"
 
       - name: Publish prerelease
-        if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true' && steps.tag_check.outputs.exists == 'false'
+        if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true' && steps.tag_check.outputs.exists == 'false' && steps.stable_check.outputs.stable_exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.ver.outputs.version }}
