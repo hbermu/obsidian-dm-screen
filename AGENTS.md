@@ -165,6 +165,31 @@ The AI proposes the label when opening the PR via `gh pr create --label`. The us
 
 To replace a beta or stable, bump to the next version. Never force-move a tag. Old betas are cleaned up automatically when the stable for the same `vX.Y.Z` ships; do not delete them by hand mid-flow.
 
+## Spec verification protocol
+
+The `spec-update-check` CI gate catches PRs that touch `src/` without touching `.agent/features/`, but it cannot detect spec sentences that quietly stopped being true. To prevent that drift, every code-touching change must run through this protocol — not just the obvious "edit the matching spec" rule.
+
+### Before editing
+
+1. **Identify every affected spec.** A single `src/` change frequently touches multiple specs (an image-layer drag handler is described in both `image-layers/layer-controls.md` and `dm-preview/overview.md`; a status icon renderer is in `combat-tracker/overview.md` AND every initiative source spec). Grep `.agent/features/` for the file path, the symbol names you're about to touch, and the user-visible behaviour. Read the `overview.md` of every feature dir that matches, plus every sub-spec file in those dirs.
+2. **Walk the EARS list, not the prose.** The "Source files" block at the top of a spec is informational; the canonical contract is the numbered `Requirements` list. For each requirement that touches the file you're about to edit, ask: "would my planned change still satisfy this exact sentence?".
+
+### While editing
+
+3. **Update the spec in the same commit.** If observable behaviour changes, modify the matching EARS requirement so the new sentence matches the new code. Add new requirements for new sub-behaviour. Remove requirements (and any code, tests, and helpers exclusively serving them) for removed behaviour. Do not rely on "I'll catch it in the next PR".
+4. **Update test names too.** Test descriptions are part of the behaviour contract — if a test was named `"sweep ignores entries that were never used"` and you flipped the rule, rename the test (and its assertions) in the same diff.
+
+### After editing
+
+5. **Re-read each modified spec end-to-end against the diff.** If any requirement no longer matches the code, fix one or the other in the same commit. Cross-check identifiers (constant names, class field names, Map key types, MIME/extension lists, CSS class names) — these are the most common drift sources.
+6. **Verify referenced helpers and constants exist.** If a spec sentence names `MIN_REQUEST_GAP_MS`, search the codebase. If it doesn't exist, fix the spec (or restore the constant). Aspirational sentences left over from earlier designs are spec drift even when the file appears recent.
+
+### When you spot pre-existing drift
+
+7. **Fix it in the same commit.** If you discover a spec sentence that doesn't match current code, even if it's unrelated to your change, correct it — commit type `chore(<scope>): align spec with implementation`. Don't carry known drift forward; an audit later is far more expensive than the inline fix.
+
+Spec drift is treated as a bug. A PR that ships code matching the spec is preferred over a PR that ships code that contradicts the spec — but a PR that updates both in lockstep is preferred over either.
+
 ## Known pitfalls
 
 - **`↺` rotate-icon characters in `DmControlPanel.ts`**: the Edit tool sometimes cannot match the literal UTF-8 character before substitution. Use `sed` via Bash or the `↺` escape.

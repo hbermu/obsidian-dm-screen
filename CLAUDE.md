@@ -2,5 +2,10 @@
 
 Claude-specific notes:
 - The `obsidian-dm-screen` skill (loaded from the user's `.claude/commands/`) covers Docker plumbing and the release workflow; `.agent/features/` is canonical for feature behaviour.
-- Before editing files in any subsystem, read the matching `.agent/features/<feature>/overview.md` and any sub-spec files relevant to your change. Update them in the same commit.
+- Before editing files in any subsystem, follow the verification protocol in `AGENTS.md → Spec verification protocol`. Short version:
+  1. **Before**: identify EVERY affected spec (not just the obvious one — grep `.agent/features/` for the file path, the symbols, and the user-visible behaviour). Read `overview.md` AND every sub-spec in each affected dir. Walk the EARS requirement list.
+  2. **During**: update the spec in the same commit. Modify the EARS sentence to match the new behaviour, add requirements for new sub-behaviour, remove requirements for removed behaviour. Renumber downstream entries when you insert. Update test descriptions when behaviour flips.
+  3. **After**: re-read each modified spec end-to-end against the diff. Cross-check named identifiers (constants, class fields, Map key types, CSS classes) exist in code.
+  4. **Pre-existing drift**: if you spot a spec sentence that doesn't match current code (even unrelated to your change), fix it in the same commit. Don't carry known drift forward.
+- The `spec-update-check` CI gate catches missing spec changes but **not** spec sentences that silently became false. The protocol above is the only defence against that.
 - Treat this file as additive only: if guidance conflicts with `AGENTS.md` or `.agent/features/**`, follow those sources and update this file in the same PR to remove drift.
