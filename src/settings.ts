@@ -437,7 +437,7 @@ export class DmScreenSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Pulse on inspired PC rows")
-      .setDesc("Animate the red glow around D&D Beyond PCs that have Heroic Inspiration. Turn off for a static glow only.")
+      .setDesc("Animate the gold glow around D&D Beyond PCs that have Heroic Inspiration. Turn off for a static glow only.")
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.ddbInspirationPulse).onChange(async (value) => {
           this.plugin.settings.ddbInspirationPulse = value;
