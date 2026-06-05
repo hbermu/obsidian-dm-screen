@@ -1404,11 +1404,26 @@ export class DmControlPanel extends ItemView {
   }
 
   private initInlineFogCanvas(canvas: HTMLCanvasElement, layer: ImageLayer, rect: HTMLElement) {
-    // Size canvas to match the rect's rendered size
+    // Size canvas to match the host element's rendered size. `rect` here is
+    // actually the .dm-layer-rect-frame (renamed `frame` upstream so the fog
+    // overlay aligns with the visible image, not the broadcast wrapper).
     const rectBounds = rect.getBoundingClientRect();
-    if (rectBounds.width < 1 || rectBounds.height < 1) return;
+    if (rectBounds.width < 1 || rectBounds.height < 1) {
+      debugWarn(
+        "initInlineFogCanvas: host element has zero-size bounds",
+        "(width=", rectBounds.width.toFixed(2),
+        "height=", rectBounds.height.toFixed(2),
+        ") — fog canvas init skipped"
+      );
+      return;
+    }
     canvas.width = rectBounds.width;
     canvas.height = rectBounds.height;
+    debug(
+      "initInlineFogCanvas: layer", layer.id,
+      "canvas=", canvas.width.toFixed(0), "x", canvas.height.toFixed(0),
+      "tool=", this.fogTool
+    );
 
     // Draw semi-transparent fog preview
     const fogCanvas = this.getFogCanvas(layer);
@@ -1480,6 +1495,11 @@ export class DmControlPanel extends ItemView {
       const { x, y } = toFogCoord(e);
       startX = x;
       startY = y;
+      debug(
+        "fog: mousedown layer", layer.id,
+        "tool=", this.fogTool,
+        "start=", x.toFixed(0), ",", y.toFixed(0)
+      );
       if (isFreehand()) {
         applyFreehand(x, y);
         refreshOverlay();
@@ -1524,12 +1544,23 @@ export class DmControlPanel extends ItemView {
     const finishDraw = (e: MouseEvent) => {
       if (!drawing) return;
       drawing = false;
+      let endX = startX;
+      let endY = startY;
       if (!isFreehand()) {
         const { x, y } = toFogCoord(e);
+        endX = x;
+        endY = y;
         if (Math.abs(x - startX) > 3 || Math.abs(y - startY) > 3) {
           applyShape(startX, startY, x, y);
         }
       }
+      debug(
+        "fog: mouseup layer", layer.id,
+        "tool=", this.fogTool,
+        "end=", endX.toFixed(0), ",", endY.toFixed(0),
+        "shiftHeld=", e.shiftKey,
+        "type=", e.type
+      );
       this.syncFogToLayer(layer);
 
       // Update fog overlay in preview
@@ -1540,6 +1571,7 @@ export class DmControlPanel extends ItemView {
 
       // Shift held = stay in edit mode, otherwise exit
       if (!e.shiftKey) {
+        debug("fog: exiting edit mode for layer", layer.id);
         this.fogEditLayerId = null;
         this.render();
       } else {
