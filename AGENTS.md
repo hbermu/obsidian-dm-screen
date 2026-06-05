@@ -153,6 +153,29 @@ When the feature branch eventually squash-merges to `main` as `vX.Y.Z` stable, t
 
 If you push without bumping `manifest.json` to a `-beta.N` value (e.g. you forgot, or the branch carries the last stable version), the workflow logs a notice and publishes nothing. CI (`typecheck`, `test`, `build`) still runs on every push.
 
+### Pre-push manifest check (mandatory before the first `git push -u`)
+
+Because the release workflow never pushes to `main`, after a stable release lands on `main` the three version files (`manifest.json`, `package.json`, `package-lock.json` top-level `version`) stay at the development value they had when the stable was cut — usually `X.Y.Z-beta.N`. Any feature branch created from that state inherits the beta version, and pushing it would publish a prerelease against a line that may already be shipped (orphan-by-construction).
+
+**Before the first `git push -u origin <new-branch>` on any branch**, the AI MUST run:
+
+```bash
+grep '"version"' manifest.json
+```
+
+If the value contains `-beta.N` and you are **not** intentionally cutting a beta, bump all three version files to the latest stable tag's value (or the next planned dev version) before the push:
+
+```bash
+# Latest stable tag, for reference:
+git ls-remote --tags origin 'v[0-9]*' | grep -v -- '-beta' | sort -V | tail -1
+```
+
+Edit `manifest.json`, `package.json`, `package-lock.json` (top-level `version` field — and the nested `packages[""].version`), commit as `chore(repo): bump version files to X.Y.Z` with `release:skip`, then push. The first push of every new branch should be from a manifest that matches "the version we'd ship if this branch were stable today" — never from a stale `-beta.N`.
+
+The release workflow has a guard (`Bail if stable of this line was already published`) that refuses to publish `vX.Y.Z-beta.N` when `vX.Y.Z` stable already exists, but the guard is a safety net. The pre-push check is the AI's responsibility because the guard can only run *after* the push happens — it spares the orphan publication but not the wasted CI run, and it cannot protect against a stable-line beta that hasn't shipped yet (no stable to compare against).
+
+When intentionally cutting a beta of an unshipped line, the flow is unchanged: bump to `X.Y.Z-beta.N`, commit, push. Both checks recognise the intent and let the publish proceed.
+
 ### Version judgement
 
 SemVer applies. Decide bump from the cumulative diff since the last stable tag:
