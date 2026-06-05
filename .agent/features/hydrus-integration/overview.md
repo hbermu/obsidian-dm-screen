@@ -32,8 +32,8 @@
 
 1. The DM Control Panel shall expose an Image from Hydrus button if and only if `hydrusEnabled` is true and `hydrusApiUrl` is non-empty.
 2. When the button is clicked, the panel shall open `HydrusExplorerModal`.
-3. The plugin shall instantiate `HydrusCache` on load and on every settings save (so cache options reflect the latest settings).
-4. While `hydrusEnabled` is true, the plugin shall sweep the cache once on load and then every 24 hours.
+3. The plugin shall instantiate `HydrusCache` (and `DdbImageCache`) on load and whenever a cache-related setting changes (`hydrusEnabled`, `cacheBaseFolder`, `hydrusCacheTtlDays`). It shall NOT re-instantiate on every unrelated settings save — bulk paths like `DmControlPanel.saveState` fire on every layer broadcast and rebuilding caches there would be wasteful.
+4. While `hydrusEnabled` is true, the plugin shall sweep the Hydrus cache once on load and then every 24 hours. The `DdbImageCache` sweep schedule is independent of `hydrusEnabled` — it always sweeps on load and on a 24-hour interval while the plugin is loaded.
 5. The plugin shall expose `buildHydrusClient()` returning a configured `HydrusClient` or `null` if any of `hydrusEnabled` / `hydrusApiUrl` / `hydrusApiKey` is missing or empty.
 6. Sub-functionality requirements are split across:
    - `connection-and-services.md` — connectivity test, service discovery, multi-service selection

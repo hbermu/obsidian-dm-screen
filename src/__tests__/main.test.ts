@@ -62,7 +62,9 @@ function makePlugin(settingsOverrides: Record<string, unknown> = {}): DmScreenPl
   plugin.settings = { ...DEFAULT_SETTINGS, ...settingsOverrides } as any;
   plugin.server = null;
   plugin.hydrusCache = null;
+  plugin.ddbImageCache = null;
   (plugin as any).hydrusSweepInterval = null;
+  (plugin as any).ddbImageSweepInterval = null;
   (plugin as any).statblockCache = new Map();
 
   // Mock Obsidian Plugin API
@@ -644,11 +646,12 @@ describe("DmScreenPlugin", () => {
   // ─── onunload ────────────────────────────────────────────────
 
   describe("onunload", () => {
-    it("stops server and clears sweep interval", async () => {
+    it("stops server and clears both sweep intervals", async () => {
       const plugin = makePlugin();
       const fakeServer = makeFakeServer();
       plugin.server = fakeServer as any;
       (plugin as any).hydrusSweepInterval = 12345;
+      (plugin as any).ddbImageSweepInterval = 67890;
       const clearIntervalSpy = vi.spyOn(window, "clearInterval");
 
       await plugin.onunload();
@@ -656,7 +659,9 @@ describe("DmScreenPlugin", () => {
       expect(plugin.server).toBeNull();
       expect(fakeServer.stop).toHaveBeenCalled();
       expect(clearIntervalSpy).toHaveBeenCalledWith(12345);
+      expect(clearIntervalSpy).toHaveBeenCalledWith(67890);
       expect((plugin as any).hydrusSweepInterval).toBeNull();
+      expect((plugin as any).ddbImageSweepInterval).toBeNull();
     });
 
     it("handles case when no server and no interval", async () => {
@@ -695,12 +700,30 @@ describe("DmScreenPlugin", () => {
       expect(plugin.hydrusCache!.sweep).toHaveBeenCalled();
     });
 
-    it("sets sweep interval only once", () => {
+    it("sets each sweep interval only once across multiple inits", () => {
       const plugin = makePlugin({ hydrusEnabled: true });
       const setIntervalSpy = vi.spyOn(window, "setInterval").mockReturnValue(999 as any);
       (plugin as any).initHydrusCache();
       (plugin as any).initHydrusCache();
-      expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+      // Two intervals total: Hydrus + DDB image cache. Both must be set
+      // exactly once even when initHydrusCache is called multiple times.
+      expect(setIntervalSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("creates and sweeps DdbImageCache regardless of hydrusEnabled", () => {
+      const plugin = makePlugin({
+        cacheBaseFolder: ".custom/cache",
+        hydrusCacheTtlDays: 14,
+        hydrusEnabled: false,
+      });
+      (plugin as any).initHydrusCache();
+      expect(DdbImageCache).toHaveBeenCalledWith(
+        ".custom/cache/beyond",
+        (plugin as any).app.vault.adapter,
+        14
+      );
+      expect(plugin.ddbImageCache).not.toBeNull();
+      expect(plugin.ddbImageCache!.sweep).toHaveBeenCalled();
     });
   });
 

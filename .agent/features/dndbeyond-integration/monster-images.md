@@ -7,7 +7,7 @@
 - `src/dndbeyond/client.ts` — `getMonsterImages(ids)` — issues individual GETs to the monster service and returns a `Map<id, avatarUrl>`
 - `src/dndbeyond/imageCache.ts` — `DdbImageCache`, `getOrDownload(monsterId, imageUrl, name)`, `sweep`
 - `src/views/DnDBeyondPanel.ts` — `loadMonsterImages(encounter)` orchestrates dedupe → fetch → cache → layer add
-- `src/main.ts` — schedules a daily sweep alongside the Hydrus cache sweep
+- `src/main.ts` — owns the shared `ddbImageCache` instance (constructed in `initHydrusCache`, cleared on `onunload`), and schedules its 24-hour sweep alongside the Hydrus cache sweep
 
 ## Settings used
 
@@ -18,7 +18,7 @@
 
 1. `loadMonsterImages(encounter)` shall dedupe the encounter's monster IDs via `Set`.
 2. The panel shall call `client.getMonsterImages(uniqueIds)` once per encounter selection.
-3. `client.getMonsterImages` shall issue one GET per id (rate-limit pacing is handled by the poller's `MIN_REQUEST_GAP_MS` when called inside a poll cycle; here it issues all calls back-to-back).
+3. `client.getMonsterImages` shall issue one GET per id in parallel via `Promise.allSettled`, with no inter-request pacing. A failed individual request is logged and skipped; the rest of the map still returns.
 4. For each `(monsterId, imageUrl)` pair, the panel shall:
    - Look up the monster's name from `encounter.monsters` (fallback `Monster <id>`).
    - Call `cache.getOrDownload(monsterId, imageUrl, name)` to obtain a vault path.

@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
 import type { HydrusClient, HydrusFile } from "./client";
-import { debug } from "../debug";
+import { debug, debugWarn } from "../debug";
 
 export interface CachedEntry {
   hash: string;
@@ -143,13 +143,20 @@ export class HydrusCache {
   async sweep(): Promise<number> {
     const index = await this.loadIndex();
     const cutoff = Date.now() - this.ttlMs;
-    const stale = Object.values(index.entries).filter(
-      (entry) => entry.lastUsedAt > 0 && entry.lastUsedAt < cutoff
-    );
+    const stale = Object.values(index.entries).filter((entry) => {
+      // Never-used entries (lastUsedAt === 0) age from downloadedAt so cached
+      // downloads the DM never pushed eventually leave the cache too.
+      const effective = entry.lastUsedAt > 0 ? entry.lastUsedAt : entry.downloadedAt;
+      return effective > 0 && effective < cutoff;
+    });
     debug("HydrusCache: sweep — total entries:", Object.keys(index.entries).length, "stale:", stale.length);
     for (const entry of stale) {
-      await this.removeIfPresent(entry.vaultPath);
-      if (entry.thumbVaultPath) await this.removeIfPresent(entry.thumbVaultPath);
+      try {
+        await this.removeIfPresent(entry.vaultPath);
+        if (entry.thumbVaultPath) await this.removeIfPresent(entry.thumbVaultPath);
+      } catch (e) {
+        debugWarn("HydrusCache: sweep failed to remove", entry.hash, (e as Error).message);
+      }
     }
     if (stale.length === 0) return 0;
     await this.mutateIndex((idx) => {
