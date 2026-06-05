@@ -377,6 +377,16 @@ export class DnDBeyondPanel {
 
     const menu = new Menu();
 
+    const hasAny = current.size > 0;
+    menu.addItem((item) => {
+      item.setTitle("Remove all conditions").setDisabled(!hasAny).onClick(() => {
+        if (!hasAny) return;
+        this.monsterStatuses.delete(monsterId);
+        this.applyMonsterStatusChange();
+      });
+    });
+    menu.addSeparator();
+
     for (const cond of Object.values(CONDITIONS)) {
       const active = current.has(cond.id);
       menu.addItem((item) => {
