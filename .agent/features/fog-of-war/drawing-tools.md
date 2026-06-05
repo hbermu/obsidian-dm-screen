@@ -19,9 +19,9 @@
 5. The freehand tools (`reveal-eraser`, `fog-pen`) shall apply a filled circle of radius `fogCanvas.width * 0.05` at every mousemove while the mouse button is held.
 6. The shape tools (`*-circle`, `*-rect`) shall draw a preview outline on the inline canvas while the mouse drags, and commit the filled shape to the offscreen fog canvas on mouseup.
 7. The circle tools shall commit an ellipse defined by the bounding rectangle of (mousedown, mouseup). The rectangle tools shall commit the bounding rectangle directly.
-8. If the bounding rectangle's width or height is less than 3 fog-canvas pixels, the shape tool shall not commit anything on mouseup.
+8. If the bounding rectangle's width AND height are both 3 fog-canvas pixels or less, the shape tool shall not commit anything on mouseup. (A drag where either dimension exceeds 3 px still commits — that lets the DM draw thin rectangles deliberately.)
 9. When a draw completes (mouseup, or mouseleave for freehand), the DM panel shall encode the offscreen fog canvas back to a data URL via `syncFogToLayer`, store it in `layer.fogDataUrl`, broadcast `image-layers-sync`, and update the preview fog overlay.
-10. If the Shift key is held on mouseup of a shape tool, the panel shall stay in fog-edit mode; otherwise it shall exit fog-edit mode and re-render.
+10. If the Shift key is held on the mouseup that finishes a stroke (any tool — shape or freehand, including the `mouseleave` path that closes a freehand stroke that exits the canvas), the panel shall stay in fog-edit mode; otherwise it shall exit fog-edit mode and re-render.
 
 ## Tests covering this
 

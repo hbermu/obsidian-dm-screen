@@ -52,21 +52,21 @@
 18. While `encounter.inProgress === false`, the broadcast shall mark no combatant active.
 19. The reveal rule shall be applied (see `../combat-tracker/round-1-reveal.md`): when `showFullTurnOrder === false`, combatants at index `> currentTurnIdx` shall be marked `hidden`; when `true`, no combatant shall be marked hidden by this rule.
 20. PC entries shall carry `friendly: true`, `isPlayer: true`, `hideHp: !showPcHp`, and `statuses` populated from `DdbCharacterSummary.statuses` (which `DdbClient.getCharacter` parses from `data.conditions[]` via `ddbConditionsToStatuses` in `src/conditions.ts`).
-21. Monster entries shall carry `friendly: false`, `isPlayer: false`, and `statuses` populated from `DnDBeyondPanel.monsterStatuses.get(monsterId)` — an ephemeral in-memory `Map<number, Set<string>>` mutated by the DM via the click-to-edit Menu, cleared on `selectEncounter` and `stopTracking`.
+21. Monster entries shall carry `friendly: false`, `isPlayer: false`, and `statuses` populated from `DnDBeyondPanel.monsterStatuses.get(instanceKey)` — an ephemeral in-memory `Map<string, Set<string>>` keyed by the per-instance `uniqueId` returned by D&D Beyond (falling back to `${monster.id}:${monster.name}` when `uniqueId` is empty, so "Goblin (A)"/"Goblin (B)" duplicates that share a template id don't share statuses). The map is mutated by the DM via the click-to-edit Menu and cleared on `selectEncounter` and `stopTracking`.
 22. DDB `manualEntries` shall carry `friendly: false`, `isPlayer: false`, `statuses: []` — there is no DM-side click affordance for them on the Beyond tab; the DM uses the local manual tracker for free-form combatants instead.
 
 ### Toggles
 
-22. The Show PC HP checkbox shall toggle `showPcHp`; when toggled while a `polledState` is in memory, the panel shall re-broadcast immediately and re-render the preview.
-23. The Show full turn order checkbox shall toggle `showFullTurnOrder`; the first toggle by the DM shall set `showFullTurnOrderUserSet = true`. When toggled while a `polledState` is in memory, the panel shall re-broadcast immediately and re-render the preview.
-24. When `selectEncounter` is called, both `showFullTurnOrder` and `showFullTurnOrderUserSet` shall be reset to `false`.
-25. On the first `onPollUpdate` after a new selection (i.e. previous `polledState` was null), when `showFullTurnOrderUserSet === false` and `state.encounter.roundNum >= 2`, the panel shall auto-set `showFullTurnOrder = true` and sync the checkbox.
+23. The Show PC HP checkbox shall toggle `showPcHp`; when toggled while a `polledState` is in memory, the panel shall re-broadcast immediately and re-render the preview.
+24. The Show full turn order checkbox shall toggle `showFullTurnOrder`; the first toggle by the DM shall set `showFullTurnOrderUserSet = true`. When toggled while a `polledState` is in memory, the panel shall re-broadcast immediately and re-render the preview.
+25. When `selectEncounter` is called, both `showFullTurnOrder` and `showFullTurnOrderUserSet` shall be reset to `false`.
+26. On the first `onPollUpdate` after a new selection (i.e. previous `polledState` was null), when `showFullTurnOrderUserSet === false` and `state.encounter.roundNum >= 2`, the panel shall auto-set `showFullTurnOrder = true` and sync the checkbox.
 
 ### DM-side preview
 
-26. The panel shall render a `dm-ddb-preview` block containing a `Player preview — Round N` header (or `Player preview` when no encounter is selected; `Player preview — Encounter idle` when the encounter is not in progress) and a `<ul class="dm-ddb-preview-list">`.
-27. The preview list shall render every participant returned by `buildParticipants` — including those marked `hidden` — using the same `init-entry` / `init-active` / `init-friendly` / `init-pc-tag` / `init-name` / `init-hp-text` / `init-condition-*` classes the player view uses. Hidden combatants shall additionally carry the `init-hidden` class (dimmed).
-28. When no encounter is selected, the preview shall display the empty-state text `No encounter selected. Click Choose Encounter to begin.`. When the polled encounter has no combatants, it shall display `Encounter has no combatants.`.
+27. The panel shall render a `dm-ddb-preview` block containing a `Player preview — Round N` header (or `Player preview` when no encounter is selected; `Player preview — Encounter idle` when the encounter is not in progress) and a `<ul class="dm-ddb-preview-list">`.
+28. The preview list shall render every participant returned by `buildParticipants` — including those marked `hidden` — using the same `init-entry` / `init-active` / `init-friendly` / `init-pc-tag` / `init-name` / `init-hp-text` / `init-condition-*` classes the player view uses. Hidden combatants shall additionally carry the `init-hidden` class (dimmed).
+29. When no encounter is selected, the preview shall display the empty-state text `No encounter selected. Click Choose Encounter to begin.`. When the polled encounter has no combatants, it shall display `Encounter has no combatants.`.
 
 ## Tests covering this
 

@@ -13,7 +13,7 @@
 ## Requirements
 
 1. The manual tracker shall render an Add row with three inputs (name, initiative, HP) and a `+` button.
-2. When the `+` button is clicked with a non-empty name, the panel shall push a new combatant `{ name, initiative, hp: input, maxHp: input, active: false }`, re-sort by initiative DESC, broadcast, and re-render.
+2. When the `+` button is clicked with a non-empty name, the panel shall push a new combatant `{ name, initiative, hp: input, maxHp: input, active: false, statuses: [] }`, re-sort by initiative DESC, broadcast, and re-render.
 3. Each combatant row shall expose: the initiative number, the name, an editable HP input, the maxHP read-only `/ <max>`, and a remove button.
 4. When the HP input changes, the panel shall update `combatant.hp` and broadcast.
 5. The Next Turn button shall: clear `active` on all combatants; advance `currentTurn` by 1, wrapping to 0 and incrementing `manualRound` on wrap; set the new current combatant `active = true`; broadcast.
