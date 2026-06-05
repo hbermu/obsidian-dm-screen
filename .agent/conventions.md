@@ -55,6 +55,24 @@ If a code change merely refactors without altering observable behaviour, no spec
 
 When a feature is removed, delete its spec directory in the same commit. Never leave tombstone files, `(removed)` markers, or commented-out spec sections. The history of the repo is the history of the spec; old commits document old behaviour.
 
+## Audit and verification
+
+The `spec-update-check` CI gate catches PRs that change `src/` without changing `.agent/features/`. It does NOT catch:
+
+- Spec sentences that became false because of a refactor that updated the spec in one direction but missed the cross-reference in another file (e.g. renamed a Map's key type in code, updated one spec, forgot the second).
+- Identifiers (constant names, class fields, Map shapes, MIME/extension lists, CSS class names) renamed in code without ripple-updating the spec text.
+- Requirements written aspirationally that the implementation never satisfied (e.g. a `MIN_REQUEST_GAP_MS` that was planned but never landed).
+- Duplicate numbering inside a `Requirements` list when a new item was inserted without renumbering downstream entries.
+
+When editing source, follow the full verification protocol in `AGENTS.md → Spec verification protocol`. The short version:
+
+1. **Before**: identify every affected spec file, read the EARS list (not just the prose).
+2. **During**: update specs in the same commit; renumber when inserting; update test descriptions when behaviour flips.
+3. **After**: re-read each modified spec end-to-end against the diff; cross-check named identifiers exist in code.
+4. **Found drift unrelated to your change**: fix it in the same commit, don't carry it forward.
+
+When asked to audit a feature, walk every EARS requirement in `overview.md` and every sub-spec, locate the source files referenced (and any not referenced that the feature actually depends on), and produce a per-requirement met / not-met list with `file:line` evidence. A periodic full audit is the only safety net against silent drift.
+
 ## No-external-references rule
 
 Specs reference only:
