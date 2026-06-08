@@ -154,18 +154,17 @@ jobs:
               --notes-file notes.md \
               main.js manifest.json styles.css
 
-      - name: Clean up beta releases and tags for this version
+      - name: Clean up all beta releases and tags
         if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.next.outputs.version }}
         run: |
-          prefix="v${VERSION}-beta."
           gh release list --limit 200 --json tagName --jq '.[] | .tagName' \
             | while read -r tag; do
                 case "$tag" in
-                  "$prefix"*) echo "Deleting prerelease $tag (superseded by v$VERSION)"
-                              gh release delete "$tag" --yes --cleanup-tag ;;
+                  *-beta.*) echo "Deleting prerelease $tag (stable v$VERSION published)"
+                            gh release delete "$tag" --yes --cleanup-tag ;;
                 esac
               done
 

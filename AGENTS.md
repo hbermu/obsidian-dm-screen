@@ -149,7 +149,7 @@ Prereleases are cut from the working branch — no dedicated `release/v…` bran
 
 Multiple betas on the same branch: bump to `beta.2`, push; the workflow tags `vX.Y.Z-beta.2`. The previous `vX.Y.Z-beta.1` release is left in place (it remains a valid intermediate proof point). Re-pushing the same beta version is a no-op (the workflow bails when the tag already exists).
 
-When the feature branch eventually squash-merges to `main` as `vX.Y.Z` stable, the release workflow publishes the stable release **and then deletes every `vX.Y.Z-beta.*` GitHub release and its underlying tag**. The Releases page only retains stable releases and the currently-in-flight betas of unrelated lines. BRAT users who were pinned to a beta of the line just released should switch to the stable.
+When **any** PR squash-merges to `main` and produces a stable release, the release workflow publishes the stable release **and then deletes every `*-beta.*` GitHub release and its underlying tag** — not only the betas of the line just shipped, but every prerelease in the repo. Rationale: the Releases page is canonical for "what's shipped", and betas of an abandoned line (e.g. cut as `v0.16.2-beta.N` but the eventual stable lands as `v0.17.0` because the bump label changed) would otherwise become orphans that never get cleaned up. BRAT users pinned to any beta should switch to the latest stable.
 
 If you push without bumping `manifest.json` to a `-beta.N` value (e.g. you forgot, or the branch carries the last stable version), the workflow logs a notice and publishes nothing. CI (`typecheck`, `test`, `build`) still runs on every push.
 
@@ -186,7 +186,7 @@ SemVer applies. Decide bump from the cumulative diff since the last stable tag:
 
 The AI proposes the label when opening the PR via `gh pr create --label`. The user can change the label up to the moment of merge.
 
-To replace a beta or stable, bump to the next version. Never force-move a tag. Old betas are cleaned up automatically when the stable for the same `vX.Y.Z` ships; do not delete them by hand mid-flow.
+To replace a beta or stable, bump to the next version. Never force-move a tag. Every beta in the repo is cleaned up automatically the next time a stable release ships (regardless of which line that stable belongs to); do not delete betas by hand mid-flow.
 
 ## Spec verification protocol
 
