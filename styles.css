@@ -1432,6 +1432,7 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
   background: var(--background-secondary);
+  overflow: hidden;
 }
 
 .dm-ddb-preview-header {
@@ -1609,6 +1610,18 @@
   .dm-ddb-hp-toggle,
   .dm-ddb-reveal-toggle {
     flex: 1 0 auto;
+  }
+
+  /* DM preview rows: tighter footprint so HP + condition still fit
+     when a row also carries a status icon (e.g. exhaustion on a PC). */
+  .dm-ddb-preview .init-entry {
+    gap: 4px;
+  }
+  .dm-ddb-preview .init-hp-text {
+    min-width: 36px;
+  }
+  .dm-ddb-preview .init-condition {
+    min-width: 50px;
   }
 }
 
