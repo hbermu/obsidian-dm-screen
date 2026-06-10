@@ -51,6 +51,10 @@
 20. The `Clear All Layers` button shall reset `imageLayers` to empty, reset `nextZIndex` to 1, broadcast `image-layers-sync` with an empty array, and re-render.
 21. The `Clear Player Screen` button shall additionally broadcast `clear`, set `activeBackgroundUrl` and `activeVideoPath` to null, and show a `Player screen cleared` Notice.
 
+### Right-click context menu
+
+22. When the user right-clicks a `.dm-layer-row`, the DM panel shall prevent the default browser context menu and open an Obsidian `Menu` whose contents are built by `buildLayerContextMenu` from `src/views/layerContextMenu.ts`. The send-to behaviour is specified in `../webhook-send/overview.md`.
+
 ## Tests covering this
 
 - `src/__tests__/dm-control-combat.test.ts` — visibility / z-order / remove flows
