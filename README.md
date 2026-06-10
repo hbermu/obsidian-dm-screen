@@ -18,6 +18,7 @@ Built for in-person 5e games where the DM wants a clean visual layer for the pla
 - **Initiative tracker** — manual, synced from the Initiative Tracker plugin, or live from a D&D Beyond encounter.
 - **Statblock display** — inline 5e statblocks via Fantasy Statblocks.
 - **Multi-screen aware** — multiple connected players with per-client resolution detection.
+- **Send layer to webhook** — right-click an image layer to POST it to Telegram, Discord, or any `multipart/form-data` endpoint with an editable caption.
 
 ![Fog of war on the DM preview](docs/screenshots/fog-of-war.png)
 
@@ -71,9 +72,26 @@ To set it up:
 3. Paste it into the settings field and click **Test connection**.
 4. In the DM Control Panel's COMBAT section, switch to the **D&D Beyond** tab and pick an encounter. Initiative, HP, and monster avatars start streaming to the player screen automatically.
 
+### Webhook share (Telegram, Discord, …)
+
+Right-click any image layer in the DM Control Panel → **Send to image webhook…** → pick a target, edit the caption (defaults to the layer's label), hit Send. Anything that accepts a `multipart/form-data` upload works:
+
+- **[Telegram](https://core.telegram.org/bots/api#sendphoto) bot** — `sendPhoto` against a chat your bot is in, with the caption riding along.
+- **[Discord](https://discord.com/developers/docs/resources/webhook#execute-webhook) webhook** — drops the image into a channel; the caption becomes the message body.
+- **Generic** — anything else; you spell out the image field name, caption field name, and any extra static form fields (tokens, IDs, etc.).
+
+To set it up:
+
+1. Open **Settings → DM Screen → Webhooks**.
+2. Click **Load template ▾** and pick **Telegram bot**, **Discord webhook**, or **Generic multipart** to drop in starter values.
+3. Replace the placeholders in the URL (`<TOKEN>`, `<CHAT_ID>`, `<ID>`) with the real credentials from your bot or channel. URL fields render in plain text so you can copy them out to an external editor when fiddling with long bot URLs.
+4. Right-click an image layer → **Send to image webhook…**, confirm, send.
+
+Fog of war is never composited onto the outbound image — what the layer originally is, is what gets sent.
+
 ## Configuration
 
-Open **Settings → DM Screen**. The tab is split into four sections — Server, Hydrus Library, D&D Beyond, and Advanced — each with inline descriptions for every option. Most defaults are fine for a first run; you only need to revisit settings when you plug in Hydrus or D&D Beyond.
+Open **Settings → DM Screen**. The tab is split into five sections — Server, Hydrus Library, D&D Beyond, Webhooks, and Advanced — each with inline descriptions for every option. Most defaults are fine for a first run; you only need to revisit settings when you plug in Hydrus, D&D Beyond, or a webhook target.
 
 ## Compatible plugins
 
