@@ -1,5 +1,47 @@
-import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import { App, Menu, Notice, PluginSettingTab, Setting } from "obsidian";
 import type DmScreenPlugin from "./main";
+import type { WebhookConfig } from "./webhooks/types";
+
+export type { WebhookConfig } from "./webhooks/types";
+
+function newWebhookId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  return `wh-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+const WEBHOOK_TEMPLATES: { label: string; build: () => Omit<WebhookConfig, "id"> }[] = [
+  {
+    label: "Telegram bot",
+    build: () => ({
+      name: "Telegram bot",
+      url: "https://api.telegram.org/bot<TOKEN>/sendPhoto",
+      imageField: "photo",
+      captionField: "caption",
+      extraFields: [{ key: "chat_id", value: "<CHAT_ID>" }],
+    }),
+  },
+  {
+    label: "Discord webhook",
+    build: () => ({
+      name: "Discord webhook",
+      url: "https://discord.com/api/webhooks/<ID>/<TOKEN>",
+      imageField: "files[0]",
+      captionField: "content",
+      extraFields: [],
+    }),
+  },
+  {
+    label: "Generic multipart",
+    build: () => ({
+      name: "Generic multipart",
+      url: "",
+      imageField: "file",
+      captionField: "caption",
+      extraFields: [],
+    }),
+  },
+];
 
 export interface DmScreenSettings {
   serverPort: number;
@@ -30,6 +72,8 @@ export interface DmScreenSettings {
   ddbInspirationPulse: boolean;
   // Combat tracker
   combatTrackerScale: number;
+  // Webhooks (generic image-share targets: Telegram bot, Discord webhook, …)
+  webhooks: WebhookConfig[];
   // Server limits
   maxClients: number;
   // Waiting screen (player-side)
@@ -68,6 +112,7 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   ddbCobaltSession: "",
   ddbInspirationPulse: true,
   combatTrackerScale: 1,
+  webhooks: [],
   maxClients: 10,
   waitingTitle: "Player Screen",
   waitingSubtitle: "Waiting for DM to push content...",
@@ -447,6 +492,10 @@ export class DmScreenSettingTab extends PluginSettingTab {
         })
       );
 
+    // ─── Webhooks ───
+    containerEl.createEl("h3", { text: "Webhooks" });
+    this.renderWebhooksSection(containerEl);
+
     // ─── Advanced ───
     containerEl.createEl("h3", { text: "Advanced" });
 
@@ -459,5 +508,156 @@ export class DmScreenSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+  }
+
+  private renderWebhooksSection(containerEl: HTMLElement): void {
+    const intro = containerEl.createEl("p", { cls: "setting-item-description" });
+    intro.setText(
+      "Outbound multipart/form-data targets reachable via right-click on an image layer. " +
+        "Use a preset below as a starting point and replace placeholders with real values.",
+    );
+
+    for (const wh of this.plugin.settings.webhooks) {
+      this.renderWebhookBlock(containerEl, wh);
+    }
+
+    new Setting(containerEl)
+      .addButton((btn) =>
+        btn.setButtonText("+ Add webhook").onClick(async () => {
+          this.plugin.settings.webhooks.push({
+            id: newWebhookId(),
+            name: "New webhook",
+            url: "",
+            imageField: "file",
+            captionField: "caption",
+            extraFields: [],
+          });
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+      )
+      .addButton((btn) =>
+        btn.setButtonText("Load template ▾").onClick((evt) => {
+          const menu = new Menu();
+          for (const tmpl of WEBHOOK_TEMPLATES) {
+            menu.addItem((item) =>
+              item.setTitle(tmpl.label).onClick(async () => {
+                this.plugin.settings.webhooks.push({
+                  id: newWebhookId(),
+                  ...tmpl.build(),
+                });
+                await this.plugin.saveSettings();
+                this.display();
+              }),
+            );
+          }
+          menu.showAtMouseEvent(evt as MouseEvent);
+        }),
+      );
+  }
+
+  private renderWebhookBlock(parent: HTMLElement, wh: WebhookConfig): void {
+    const block = parent.createDiv({ cls: "dm-webhook-block" });
+    block.createEl("h4", { text: wh.name || "Unnamed webhook" });
+
+    new Setting(block).setName("Name").addText((t) =>
+      t.setValue(wh.name).onChange(async (v) => {
+        wh.name = v;
+        await this.plugin.saveSettings();
+      }),
+    );
+
+    new Setting(block)
+      .setName("URL")
+      .setDesc("Full endpoint URL. Treated as a secret (tokens may be embedded).")
+      .addText((t) => {
+        t.inputEl.type = "password";
+        t.inputEl.style.width = "100%";
+        t.setValue(wh.url).onChange(async (v) => {
+          wh.url = v.trim();
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(block)
+      .setName("Image field name")
+      .setDesc('Form field for the binary image. Telegram=photo, Discord=files[0].')
+      .addText((t) =>
+        t.setValue(wh.imageField).onChange(async (v) => {
+          wh.imageField = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(block)
+      .setName("Caption field name")
+      .setDesc("Empty to omit the caption. Telegram=caption, Discord=content.")
+      .addText((t) =>
+        t.setValue(wh.captionField).onChange(async (v) => {
+          wh.captionField = v;
+          await this.plugin.saveSettings();
+        }),
+      );
+
+    const extras = block.createDiv({ cls: "dm-webhook-extras" });
+    extras.createEl("div", {
+      cls: "setting-item-name",
+      text: "Extra form fields",
+    });
+    extras.createEl("div", {
+      cls: "setting-item-description",
+      text: "Static key/value pairs added to every request (e.g. Telegram chat_id).",
+    });
+
+    for (let i = 0; i < wh.extraFields.length; i++) {
+      const f = wh.extraFields[i];
+      const idx = i;
+      const row = extras.createDiv({ cls: "dm-webhook-extra-field" });
+      const kInput = row.createEl("input", {
+        type: "text",
+        attr: { placeholder: "field name" },
+      }) as HTMLInputElement;
+      kInput.value = f.key;
+      kInput.addEventListener("change", async () => {
+        f.key = kInput.value;
+        await this.plugin.saveSettings();
+      });
+      const vInput = row.createEl("input", {
+        type: "text",
+        attr: { placeholder: "value" },
+      }) as HTMLInputElement;
+      vInput.value = f.value;
+      vInput.addEventListener("change", async () => {
+        f.value = vInput.value;
+        await this.plugin.saveSettings();
+      });
+      const del = row.createEl("button", { text: "✕" });
+      del.addEventListener("click", async () => {
+        wh.extraFields.splice(idx, 1);
+        await this.plugin.saveSettings();
+        this.display();
+      });
+    }
+
+    new Setting(extras).addButton((b) =>
+      b.setButtonText("+ Add field").onClick(async () => {
+        wh.extraFields.push({ key: "", value: "" });
+        await this.plugin.saveSettings();
+        this.display();
+      }),
+    );
+
+    new Setting(block).addButton((b) =>
+      b
+        .setWarning()
+        .setButtonText("Delete webhook")
+        .onClick(async () => {
+          this.plugin.settings.webhooks = this.plugin.settings.webhooks.filter(
+            (w) => w.id !== wh.id,
+          );
+          await this.plugin.saveSettings();
+          this.display();
+        }),
+    );
   }
 }

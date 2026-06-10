@@ -1625,3 +1625,77 @@
   }
 }
 
+/* ──────────── Webhook settings & Send-to modal ──────────── */
+
+.dm-webhook-block {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--background-secondary);
+}
+.dm-webhook-block h4 {
+  margin: 0 0 8px;
+}
+.dm-webhook-extras {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.dm-webhook-extra-field {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 4px 0;
+}
+.dm-webhook-extra-field input[type="text"] {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.dm-webhook-extra-field button {
+  flex: 0 0 auto;
+}
+
+.dm-send-modal .modal-content,
+.dm-send-modal {
+  min-width: 360px;
+}
+.dm-send-modal-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+.dm-send-modal-row label {
+  font-weight: 600;
+  font-size: 0.85em;
+}
+.dm-send-modal-row select,
+.dm-send-modal-row textarea {
+  width: 100%;
+}
+.dm-send-modal-preview {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+  background: var(--background-primary-alt);
+  border-radius: 4px;
+  padding: 8px;
+}
+.dm-send-modal-preview img {
+  max-width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+}
+.dm-send-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.dm-send-modal-empty {
+  font-style: italic;
+  color: var(--text-muted);
+  margin: 8px 0;
+}
+

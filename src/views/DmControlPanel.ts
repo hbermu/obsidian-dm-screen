@@ -3,6 +3,8 @@ import type DmScreenPlugin from "../main";
 import type { TrackerCombatant, ImageLayer } from "../types";
 import { renderStatblock } from "./StatblockPanel";
 import { DnDBeyondPanel } from "./DnDBeyondPanel";
+import { SendToWebhookModal } from "./SendToWebhookModal";
+import { buildLayerContextMenu } from "./layerContextMenu";
 import { debug, debugWarn, debugError } from "../debug";
 import { CONDITIONS, decodeStatus, encodeExhaustion } from "../conditions";
 
@@ -651,6 +653,11 @@ export class DmControlPanel extends ItemView {
         const color = DmControlPanel.LAYER_COLORS[colorIdx];
         const row = list.createDiv("dm-layer-row");
         if (!layer.visible) row.addClass("dm-layer-hidden");
+
+        row.addEventListener("contextmenu", (evt: MouseEvent) => {
+          evt.preventDefault();
+          this.openLayerContextMenu(evt, layer);
+        });
 
         // Left column: eye on top (full width), fog + border side-by-side below
         const leftCol = row.createDiv("dm-layer-left-col");
@@ -2187,6 +2194,30 @@ export class DmControlPanel extends ItemView {
       hidden: isRoundOne && activeIdx >= 0 && i > activeIdx,
     }));
     this.plugin.sendInitiativeUpdate(out, this.manualRound);
+  }
+
+  private openLayerContextMenu(evt: MouseEvent, layer: ImageLayer): void {
+    const menu = new Menu();
+    buildLayerContextMenu(menu, layer, this.plugin.settings.webhooks, {
+      openSendModal: (l) =>
+        new SendToWebhookModal(this.app, this.plugin, l).open(),
+      openWebhookSettings: () => this.openPluginSettings(),
+    });
+    menu.showAtMouseEvent(evt);
+  }
+
+  private openPluginSettings(): void {
+    const setting = (
+      this.app as {
+        setting?: { open: () => void; openTabById: (id: string) => void };
+      }
+    ).setting;
+    if (!setting) {
+      new Notice("Open Obsidian Settings → DM Screen → Webhooks", 5000);
+      return;
+    }
+    setting.open();
+    setting.openTabById("dm-screen");
   }
 }
 
