@@ -15,8 +15,8 @@
 
 1. The settings tab shall render a "Webhooks" section as an `<h3>` between the "D&D Beyond" and "Advanced" sections.
 2. The section shall begin with a one-paragraph description explaining the section's purpose and a pointer to right-click on a layer.
-3. For each record in `settings.webhooks`, the section shall render a `.dm-webhook-block` card with the record's name as `<h4>` and the following Setting rows: Name (text), URL (text with `inputEl.type = "password"`), Image field name (text), Caption field name (text), an Extra form fields editor, and a "Delete webhook" warning button.
-4. The URL input shall display masked characters but retain the exact value (including any embedded token).
+3. For each record in `settings.webhooks`, the section shall render a `.dm-webhook-block` card with the record's name as `<h4>` and the following Setting rows: Name (text), URL (plain text, full-width), Image field name (text), Caption field name (text), an Extra form fields editor, and a "Delete webhook" warning button.
+4. The URL input shall render in plain text (not masked) so the value can be visually inspected, copied, and pasted into an external editor.
 5. The Extra form fields editor shall render one `.dm-webhook-extra-field` row per entry containing a key text input, a value text input, and a `✕` delete button.
 6. When the user changes a key or value input and the input fires `change`, the settings tab shall write back to the entry and persist via `saveSettings()` without re-rendering the section.
 7. When the user clicks the `✕` button on an extra field, the settings tab shall remove the entry at that index, persist, and re-render the section.

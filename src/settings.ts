@@ -569,9 +569,10 @@ export class DmScreenSettingTab extends PluginSettingTab {
 
     new Setting(block)
       .setName("URL")
-      .setDesc("Full endpoint URL. Treated as a secret (tokens may be embedded).")
+      .setDesc(
+        "Full endpoint URL. Shown in plain text so it can be copied or pasted into an external editor for tweaking.",
+      )
       .addText((t) => {
-        t.inputEl.type = "password";
         t.inputEl.style.width = "100%";
         t.setValue(wh.url).onChange(async (v) => {
           wh.url = v.trim();
