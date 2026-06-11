@@ -49,6 +49,7 @@
 - `src/__tests__/server-broadcast.test.ts` — `show-background-media` is cached and replayed
 - `src/__tests__/server-bootstrap.integration.test.ts` — wires the DM → player flow
 - `src/__tests__/dm-preview-bg.test.ts` — `resolveBackgroundPreviewUrl` and `isVideoBackgroundUrl` helpers used by the DM-side preview overlay
+- `test/visual/background.spec.ts` — Playwright visual regression: deterministic grid PNG broadcast via `show-background-media` is rendered by the real player bundle on `#image-background`.
 
 ## Non-goals
 

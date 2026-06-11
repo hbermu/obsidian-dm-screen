@@ -44,6 +44,7 @@ The cache rule for `image-layers-sync` is the standard one in `../player-server/
 - `src/__tests__/dm-control-combat.test.ts` — layer addition does not duplicate by label, `addImageLayer` flow
 - `src/__tests__/server-broadcast.test.ts` — `image-layers-sync` is cached and replayed to late joiners
 - `src/__tests__/ddb-to-player.integration.test.ts` — DDB monster-image layers reach the player
+- `test/visual/layers-fog.spec.ts` — Playwright visual regression: two stacked image layers rendered on the real player bundle, with and without fog overlays. Asserts wrapper geometry, frame sizing (aspect-preserving), and z-order. See `../player-server/overview.md`.
 
 ## Non-goals
 

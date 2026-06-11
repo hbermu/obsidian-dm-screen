@@ -19,6 +19,13 @@ coverage/
 .vitest-cache/
 
 # ===========================
+# Playwright (visual regression — baselines under test/visual/__snapshots__/ ARE committed)
+# ===========================
+playwright-report/
+test-results/
+test/visual/.harness/
+
+# ===========================
 # Dev vault runtime state
 # (the .dev/vault skeleton itself IS committed; only generated files inside it are ignored)
 # ===========================

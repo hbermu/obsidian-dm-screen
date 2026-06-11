@@ -70,5 +70,25 @@ services:
         npx vitest run
       "
 
+  # Keep image tag in sync with @playwright/test in package.json.
+  # Uses its own node_modules volume — alpine vs jammy musl/glibc binaries (esbuild,
+  # playwright browsers) are not interchangeable with the other services'.
+  visual:
+    image: mcr.microsoft.com/playwright:v1.50.0-jammy
+    profiles: ["tools"]
+    working_dir: /app
+    environment:
+      TZ: Europe/Madrid
+      CI: "1"
+    volumes:
+      - .:/app
+      - playwright_modules:/app/node_modules
+    command: >
+      sh -c "
+        npm install --no-audit --no-fund &&
+        npx playwright test
+      "
+
 volumes:
   node_modules: {}
+  playwright_modules: {}
