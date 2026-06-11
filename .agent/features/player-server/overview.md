@@ -43,6 +43,7 @@
 20. After `startServer()` succeeds, the plugin shall call `broadcastWaitingScreen()` to seed the late-joiner cache with the current waiting-screen text.
 21. When either `waitingTitle` or `waitingSubtitle` changes in settings, the plugin shall broadcast `waiting-screen` immediately so already-connected clients update without a reload.
 22. After `startServer()` succeeds, the plugin shall also call `broadcastInspirationStyle()` to seed the late-joiner cache with the current `ddbInspirationPulse` value (see `../combat-tracker/overview.md` Heroic Inspiration requirements). When `ddbInspirationPulse` changes in settings, the plugin shall broadcast `inspiration-style` immediately so already-connected clients update without a reload.
+23. When the player-side WebSocket transitions to OPEN, the player shall set `window.__wsConnected` to `true`; when it transitions to CLOSE, the player shall set `window.__wsConnected` to `false`. (Drives the connection-ready gate used by the visual test harness so screenshots never fire before the first broadcast can arrive.)
 
 ## Broadcast / IPC
 
@@ -58,6 +59,7 @@ The server is the transport for every DM → player and player → DM message. T
 - `src/__tests__/server-combat-scale.test.ts` — `combat-scale` broadcast end-to-end
 - `src/__tests__/smoke.test.ts` — module loads, exports present
 - `src/__tests__/bundle-smoke.integration.test.ts` — production `main.js` builds and contains the server class
+- `test/visual/*.spec.ts` — Playwright visual regression suite. Boots a real `PlayerScreenServer` against the production player bundle (via `scripts/build-player.mjs` + a CJS-bundled `server-entry.ts` built in `test/visual/harness/build-host.mjs`) and asserts pixel-stable screenshots of waiting screen, background image, image-layers-sync, fog overlays (full / circle / rect / freehand), and the initiative tracker. Baselines must be generated inside the official Microsoft Playwright container so local and CI render identically.
 
 ## Non-goals
 

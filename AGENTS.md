@@ -68,6 +68,8 @@ All targets run inside Docker; the container manages `node_modules`.
 | `make typecheck` | `tsc --noEmit` |
 | `make test` | `vitest run` (all unit + integration tests) |
 | `make test-watch` | `vitest` in watch mode (interactive) |
+| `make test-visual` | Playwright visual regression suite (inside the official `mcr.microsoft.com/playwright` image) |
+| `make test-visual-update` | Refresh committed visual baselines (inside container — host-generated PNGs WILL diff) |
 | `make build` | production esbuild bundle → `main.js` |
 | `make dev` | esbuild watcher only, no Obsidian GUI |
 | `make up` | Obsidian GUI at `https://localhost:3001` + esbuild watcher |
@@ -75,6 +77,10 @@ All targets run inside Docker; the container manages `node_modules`.
 | `make clean` | remove build artefacts |
 
 Run `make typecheck && make test` before every commit. CI runs the same targets plus `make build`; all three must pass on every PR. The bundle smoke test (`bundle-smoke.integration.test.ts`) re-builds `main.js` inside the test run, so changes that break the production build also fail tests.
+
+### Visual tests
+
+Visual regressions run via Playwright against the real production player bundle. Baselines live under `test/visual/__snapshots__/`. **Always update baselines inside the container** with `make test-visual-update` — host-generated PNGs render differently from the pinned Playwright image and will diff in CI. The `mcr.microsoft.com/playwright:vX.Y.Z-jammy` image tag in `docker-compose.yml` is kept in sync with the `@playwright/test` version pinned in `package.json`; bump them together. The `visual` CI job is informational only (not in required checks) until the suite has soaked.
 
 ## Where to find what
 

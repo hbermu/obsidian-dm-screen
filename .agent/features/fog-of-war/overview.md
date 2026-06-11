@@ -30,6 +30,7 @@ Fog updates ride on `image-layers-sync` (specified in `../image-layers/overview.
 ## Tests covering this
 
 - `src/__tests__/dm-control-combat.test.ts` — fog enable/disable flows touching state, no canvas in the test environment
+- `test/visual/layers-fog.spec.ts` — Playwright visual regression covering the player-side rendering of full fog, circle reveal, rect reveal, and freehand reveal masks. The mask PNGs are generated deterministically in the harness; this suite does not exercise DM-side drawing.
 
 ## Non-goals
 

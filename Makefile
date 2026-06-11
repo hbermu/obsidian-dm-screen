@@ -1,4 +1,4 @@
-.PHONY: help up down build dev typecheck test test-watch logs ps clean
+.PHONY: help up down build dev typecheck test test-watch test-visual test-visual-update logs ps clean
 
 help:                ## list available targets
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -27,6 +27,12 @@ test:                ## vitest run
 
 test-watch:          ## vitest in watch mode (interactive)
 	docker compose --profile tools run --rm -e CI=0 test sh -c "npm install --no-audit --no-fund && npx vitest"
+
+test-visual:         ## playwright visual regression (inside the official playwright image)
+	docker compose --profile tools run --rm visual
+
+test-visual-update:  ## refresh visual baselines (inside container — host PNGs WILL diff)
+	docker compose --profile tools run --rm visual sh -c "npm install --no-audit --no-fund && npx playwright test --update-snapshots"
 
 logs:                ## tail combined logs
 	docker compose logs -f --tail=50

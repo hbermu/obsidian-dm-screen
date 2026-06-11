@@ -69,6 +69,7 @@
 - `src/__tests__/main.test.ts` — Initiative Tracker plugin event mapping into `TrackerCombatant[]`, `sendInitiativeUpdate` filters hidden
 - `src/__tests__/server-combat-scale.test.ts` — `combat-scale` end-to-end
 - `src/__tests__/ddb-to-player.integration.test.ts` — D&D Beyond → player `initiative-update`
+- `test/visual/initiative.spec.ts` — Playwright visual regression of the player-side initiative tracker: condition icons, hidden HP for hostiles, hidden combatant filtering, inspiration glow + pulse, active-turn marker, round-counter heading.
 
 ## Non-goals
 

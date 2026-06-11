@@ -36,6 +36,7 @@
 ## Tests covering this
 
 - `src/__tests__/effective-resolution.test.ts` — the selection / fallback chain in `getEffectiveResolution`
+- `test/visual/tablet.spec.ts` — Playwright visual regression at a 1280×800 tablet viewport (separate Playwright project), exercising the `client-info` round-trip and verifying that layer geometry renders correctly at a non-desktop resolution.
 
 ## Non-goals
 

@@ -171,6 +171,7 @@ class PlayerScreen {
 
     this.ws.addEventListener("open", () => {
       console.log("[Player Screen] Connected to DM");
+      (window as unknown as { __wsConnected: boolean }).__wsConnected = true;
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
@@ -195,6 +196,7 @@ class PlayerScreen {
 
     this.ws.addEventListener("close", () => {
       console.log("[Player Screen] Disconnected, reconnecting in 3s...");
+      (window as unknown as { __wsConnected: boolean }).__wsConnected = false;
       if (this.hasConnectedOnce) this.showDisconnectedOverlay();
       this.reconnectTimer = setTimeout(() => this.connect(), 3000);
     });

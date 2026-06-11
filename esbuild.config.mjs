@@ -2,6 +2,7 @@ import esbuild from "esbuild";
 import process from "process";
 import fs from "fs";
 import path from "path";
+import { buildPlayerBundle } from "./scripts/build-player.mjs";
 
 const prod = process.argv[2] === "production";
 const outDir = process.env.BUILD_OUT;
@@ -14,26 +15,7 @@ if (outDir) {
   }
 }
 
-// Build the player screen separately (bundled as a string to serve via HTTP)
-const playerScreenBuild = async () => {
-  const result = await esbuild.build({
-    entryPoints: ["src/player/player.ts"],
-    bundle: true,
-    write: false,
-    format: "iife",
-    target: "es2020",
-    minify: prod,
-  });
-  return result.outputFiles[0].text;
-};
-
-const playerCss = fs.existsSync("src/player/player.css")
-  ? fs.readFileSync("src/player/player.css", "utf-8")
-  : "";
-
-const playerHtml = fs.existsSync("src/player/index.html")
-  ? fs.readFileSync("src/player/index.html", "utf-8")
-  : "";
+const { css: playerCss, html: playerHtml } = await buildPlayerBundle({ minify: prod });
 
 const context = await esbuild.context({
   entryPoints: ["src/main.ts"],
@@ -62,7 +44,7 @@ const context = await esbuild.context({
         build.onLoad(
           { filter: /.*/, namespace: "player-inline" },
           async () => {
-            const js = await playerScreenBuild();
+            const { js } = await buildPlayerBundle({ minify: prod });
             return {
               contents: `export default ${JSON.stringify(js)};`,
               loader: "js",
