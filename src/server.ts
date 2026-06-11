@@ -26,6 +26,58 @@ export interface ClientInfo {
   devicePixelRatio: number;
 }
 
+export function vaultPathFromUrl(url: unknown): string | null {
+  if (typeof url !== "string" || !url.startsWith("/vault/")) return null;
+  try {
+    return decodeURIComponent(url.slice(7));
+  } catch {
+    return null;
+  }
+}
+
+export class VaultServeAllowlist {
+  private background: string | null = null;
+  private layers: Set<string> = new Set();
+
+  observe(message: PlayerMessage): void {
+    switch (message.type) {
+      case "show-background-media":
+        this.background = vaultPathFromUrl((message.payload as { url?: unknown }).url);
+        return;
+      case "hide-background-media":
+        this.background = null;
+        return;
+      case "image-layers-sync": {
+        const raw = (message.payload as { layers?: unknown }).layers;
+        const next = new Set<string>();
+        if (Array.isArray(raw)) {
+          for (const layer of raw) {
+            const l = layer as { dataUrl?: unknown; fogDataUrl?: unknown };
+            const data = vaultPathFromUrl(l.dataUrl);
+            if (data !== null) next.add(data);
+            const fog = vaultPathFromUrl(l.fogDataUrl);
+            if (fog !== null) next.add(fog);
+          }
+        }
+        this.layers = next;
+        return;
+      }
+      case "clear":
+        this.background = null;
+        this.layers.clear();
+        return;
+    }
+  }
+
+  isAllowed(decodedPath: string): boolean {
+    return decodedPath === this.background || this.layers.has(decodedPath);
+  }
+
+  snapshot(): { background: string | null; layers: string[] } {
+    return { background: this.background, layers: [...this.layers] };
+  }
+}
+
 export class PlayerScreenServer {
   private plugin: DmScreenPlugin;
   private httpServer: Server | null = null;
@@ -36,6 +88,7 @@ export class PlayerScreenServer {
   onClientCountChanged: (() => void) | null = null;
   // Cache last broadcast per message type for late-joining clients
   private lastState = new Map<string, string>();
+  private allowlist = new VaultServeAllowlist();
 
   constructor(plugin: DmScreenPlugin) {
     this.plugin = plugin;
@@ -119,6 +172,7 @@ export class PlayerScreenServer {
   }
 
   broadcast(message: PlayerMessage) {
+    this.allowlist.observe(message);
     const data = JSON.stringify(message);
     debug("broadcast:", message.type, "→", this.clients.size, "client(s)", `(${data.length} bytes)`);
 
@@ -168,6 +222,13 @@ export class PlayerScreenServer {
         debugWarn("serveVaultFile: rejected path traversal attempt:", decodedPath);
         res.writeHead(400);
         res.end("Bad path");
+        return;
+      }
+
+      if (!this.allowlist.isAllowed(decodedPath)) {
+        debug("serveVaultFile: not on display allowlist:", decodedPath);
+        res.writeHead(404);
+        res.end("Not found");
         return;
       }
 
