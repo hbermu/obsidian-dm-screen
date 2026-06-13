@@ -205,9 +205,16 @@ jobs:
           # Commit the bump on a detached head so we can tag a commit that
           # contains the new version files. The branch is never pushed; only
           # the tag is, so main stays untouched and protection is respected.
+          # When the merged PR already bumped manifest.json to the target
+          # version (per the pre-push manifest check rule in AGENTS.md), the
+          # version-files step is a no-op and `git add` stages nothing; in
+          # that case we tag the merge commit directly without an extra
+          # release commit.
           git checkout --detach
           git add package.json package-lock.json manifest.json
-          git commit -m "release: v$VERSION"
+          if ! git diff --cached --quiet; then
+            git commit -m "release: v$VERSION"
+          fi
           git tag -a "v$VERSION" -m "v$VERSION"
           git push origin "v$VERSION"
 
