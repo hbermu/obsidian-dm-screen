@@ -2,6 +2,20 @@
 
 Automatically maintained by `.github/workflows/release.yml` after every stable release. Do not edit by hand — changes are overwritten on the next publish.
 
+## v0.19.0 — minor — 2026-06-13
+
+### Features
+- feat(release): tiered release notes + CHANGELOG.md (#47)
+
+### Fixes
+- fix(release): tolerate no-op version bump in tag commit (#48)
+- fix(player-server): restrict /vault/ to currently-displayed files (#42)
+
+### Other
+- test(player-server): add Playwright visual regression suite (#43)
+
+**Full Changelog**: https://github.com/hbermu/obsidian-dm-screen/compare/v0.18.0...v0.19.0
+
 ## v0.18.1 — patch — 2026-06-11
 
 ### Features
