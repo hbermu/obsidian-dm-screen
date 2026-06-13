@@ -87,45 +87,113 @@ jobs:
         if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
         run: make build
 
-      - name: Build categorized release notes
+      - name: Build tiered release notes
         if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
         id: notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.next.outputs.version }}
+          BUMP: ${{ steps.pr_bump.outputs.type }}
+          PR_NUM: ${{ github.event.pull_request.number }}
         run: |
-          prev_tag=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "")
-          if [ -n "$prev_tag" ]; then
-            since=$(git log -1 --format=%cI "$prev_tag")
-          else
-            since="1970-01-01T00:00:00Z"
-          fi
-          prs=$(gh pr list --state merged --base main \
-              --search "merged:>$since" \
-              --json number,title --limit 200)
+          # Previous stable tag (any tier), used as the compare-link footer
+          # baseline for patch releases.
+          prev_tag=$(git tag --list 'v*' --sort=-version:refname \
+              | grep -vE -- '-beta\.[0-9]+$' | head -1)
+
+          # Tier-specific previous tag, used as the aggregation window for
+          # minor (prev v*.*.0) and major (prev v*.0.0) releases.
+          case "$BUMP" in
+            major)
+              prev_window=$(git tag --list 'v*.0.0' --sort=-version:refname \
+                  | grep -vE -- '-beta\.[0-9]+$' | head -1)
+              ;;
+            minor)
+              prev_window=$(git tag --list 'v*.*.0' --sort=-version:refname \
+                  | grep -vE -- '-beta\.[0-9]+$' | head -1)
+              ;;
+            *)
+              prev_window="$prev_tag"
+              ;;
+          esac
 
           cat_match() {
-            echo "$prs" | jq -r --arg re "$1" \
+            echo "$1" | jq -r --arg re "$2" \
               '.[] | select(.title | test($re; "i")) | "- \(.title) (#\(.number))"'
           }
-          features=$(cat_match '^(feat|feature)(\(|:)')
-          fixes=$(cat_match '^(fix|hotfix)(\(|:)')
-          docs=$(cat_match '^docs(\(|:)')
-          ci=$(cat_match '^(ci|chore|build)(\(|:)')
-          other=$(cat_match '^(refactor|test|perf|style|revert|release)(\(|:)')
 
-          {
-            [ -n "$features" ] && printf "### Features\n%s\n\n" "$features"
-            [ -n "$fixes" ]    && printf "### Fixes\n%s\n\n" "$fixes"
-            [ -n "$docs" ]     && printf "### Documentation\n%s\n\n" "$docs"
-            [ -n "$ci" ]       && printf "### Build & CI\n%s\n\n" "$ci"
-            [ -n "$other" ]    && printf "### Other\n%s\n\n" "$other"
-            if [ -n "$prev_tag" ]; then
-              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...v${VERSION}"
-            fi
-          } > notes.md
-          echo "Generated notes:"
+          case "$BUMP" in
+            patch)
+              # Single-PR patch: just this PR's title, no headings.
+              PR_TITLE=$(gh pr view "$PR_NUM" --json title --jq .title)
+              {
+                echo "- ${PR_TITLE} (#${PR_NUM})"
+                if [ -n "$prev_tag" ]; then
+                  echo ""
+                  echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...v${VERSION}"
+                fi
+              } > notes.md
+              ;;
+            minor)
+              # Aggregate every PR merged since the previous minor (v*.*.0),
+              # categorized by conventional-commit type.
+              if [ -n "$prev_window" ]; then
+                since=$(git log -1 --format=%cI "$prev_window")
+              else
+                since="1970-01-01T00:00:00Z"
+              fi
+              prs=$(gh pr list --state merged --base main \
+                  --search "merged:>$since" \
+                  --json number,title --limit 200)
+              features=$(cat_match "$prs" '^(feat|feature)(\(|:)')
+              fixes=$(cat_match "$prs" '^(fix|hotfix)(\(|:)')
+              docs=$(cat_match "$prs" '^docs(\(|:)')
+              ci=$(cat_match "$prs" '^(ci|chore|build)(\(|:)')
+              other=$(cat_match "$prs" '^(refactor|test|perf|style|revert|release)(\(|:)')
+              {
+                [ -n "$features" ] && printf "### Features\n%s\n\n" "$features"
+                [ -n "$fixes" ]    && printf "### Fixes\n%s\n\n" "$fixes"
+                [ -n "$docs" ]     && printf "### Documentation\n%s\n\n" "$docs"
+                [ -n "$ci" ]       && printf "### Build & CI\n%s\n\n" "$ci"
+                [ -n "$other" ]    && printf "### Other\n%s\n\n" "$other"
+                if [ -n "$prev_window" ]; then
+                  echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_window}...v${VERSION}"
+                fi
+              } > notes.md
+              ;;
+            major)
+              # Summary from the PR body (strip the boilerplate '## Test plan'
+              # tail that Claude-generated PRs append) + bullet list of every
+              # minor (v*.*.0) shipped since the previous major + a pointer to
+              # CHANGELOG.md for the full detail.
+              PR_BODY=$(gh pr view "$PR_NUM" --json body --jq .body)
+              SUMMARY=$(printf '%s\n' "$PR_BODY" | awk '/^## Test plan/{exit} {print}')
+              minors=$(git tag --list 'v*.*.0' --sort=-version:refname \
+                  | grep -vE -- '-beta\.[0-9]+$' \
+                  | awk -v lo="$prev_window" -v hi="v${VERSION}" '$0!=hi && (lo=="" || $0>lo)')
+              {
+                if [ -n "$SUMMARY" ]; then
+                  printf '%s\n\n' "$SUMMARY"
+                fi
+                if [ -n "$minors" ]; then
+                  echo "## Releases included"
+                  echo ""
+                  for tag in $minors; do
+                    echo "- [${tag}](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag})"
+                  done
+                  echo ""
+                fi
+                echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) for the full detail of every change since ${prev_window:-the start of the project}."
+                echo ""
+                if [ -n "$prev_window" ]; then
+                  echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_window}...v${VERSION}"
+                fi
+              } > notes.md
+              ;;
+          esac
+          echo "::group::Generated notes"
           cat notes.md
+          echo "::endgroup::"
 
       - name: Tag the bumped commit (without touching main)
         if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
@@ -167,6 +235,59 @@ jobs:
                             gh release delete "$tag" --yes --cleanup-tag ;;
                 esac
               done
+
+      - name: Update CHANGELOG.md on main
+        if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.next.outputs.version }}
+          BUMP: ${{ steps.pr_bump.outputs.type }}
+        run: |
+          # Switch back to main from the detached tag commit. The working
+          # tree carries leftover bumped version files and a fresh main.js
+          # build artefact; --force discards them (we only want CHANGELOG.md
+          # touched on main).
+          git checkout --force main
+          git pull --ff-only origin main
+
+          DATE=$(date -u +%Y-%m-%d)
+          HEADING="## v${VERSION} — ${BUMP} — ${DATE}"
+
+          {
+            echo "$HEADING"
+            echo ""
+            cat notes.md
+            echo ""
+          } > new-section.md
+
+          if [ -f CHANGELOG.md ]; then
+            awk -v ns_file=new-section.md '
+              BEGIN { while ((getline line < ns_file) > 0) ns = ns line "\n" }
+              /^# Changelog/ && !done { print; print ""; printf "%s", ns; done=1; next }
+              { print }
+            ' CHANGELOG.md > CHANGELOG.md.new
+            mv CHANGELOG.md.new CHANGELOG.md
+          else
+            {
+              echo "# Changelog"
+              echo ""
+              echo "Automatically maintained by \`.github/workflows/release.yml\` after every stable release. Do not edit by hand — changes are overwritten on the next publish."
+              echo ""
+              cat new-section.md
+            } > CHANGELOG.md
+          fi
+          rm -f new-section.md
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "chore(changelog): update for v${VERSION}"
+          # Direct push to main; allowed because the workflow trigger
+          # is `pull_request: closed` and `push: branches-ignore: [main]`,
+          # so this push does NOT re-fire the workflow. Requires repo
+          # branch-protection rules to allow github-actions[bot] to bypass
+          # required reviews / status checks for pushes to main.
+          git push origin main
 
       # ────────────── Push-to-any-non-main-branch path: beta only ──────────────
 
