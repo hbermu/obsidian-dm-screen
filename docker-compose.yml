@@ -74,7 +74,7 @@ services:
   # Uses its own node_modules volume — alpine vs jammy musl/glibc binaries (esbuild,
   # playwright browsers) are not interchangeable with the other services'.
   visual:
-    image: mcr.microsoft.com/playwright:v1.50.0-jammy
+    image: mcr.microsoft.com/playwright:v1.60.0-jammy
     profiles: ["tools"]
     working_dir: /app
     environment:
