@@ -143,7 +143,7 @@ describe("HydrusClient.getFileMetadata - tag extraction", () => {
     expect(files[0].knownTags).toEqual(["tag1"]);
   });
 
-  it("handles multiple tag buckets (storage_tags has multiple keys)", async () => {
+  it("returns only the active tag bucket (status 0), ignoring tombstones and pending", async () => {
     mockRequestUrl(() => ({
       json: {
         metadata: [{
@@ -166,7 +166,7 @@ describe("HydrusClient.getFileMetadata - tag extraction", () => {
     }));
     const client = new HydrusClient(baseOpts);
     const files = await client.getFileMetadata(["h1"], "Target");
-    expect(files[0].knownTags.sort()).toEqual(["current-tag", "deleted-tag", "pending-tag"]);
+    expect(files[0].knownTags).toEqual(["current-tag"]);
   });
 
   it("returns empty array when called with empty hashes", async () => {
