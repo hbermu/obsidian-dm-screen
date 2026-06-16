@@ -1264,12 +1264,29 @@
 }
 
 .dm-hydrus-tile-menu {
-  max-width: 350px;
+  max-width: 360px;
 }
 
 .dm-hydrus-tile-menu .menu-item-title {
   white-space: normal;
-  word-wrap: break-word;
+}
+
+.dm-hydrus-tile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.dm-hydrus-tile-tag {
+  display: inline-block;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: 0.85em;
+  line-height: 1.4;
 }
 
 .dm-hydrus-empty {
