@@ -517,15 +517,29 @@ export class HydrusExplorerModal extends Modal {
     const menu = new Menu();
     (menu as any).dom?.classList.add("dm-hydrus-tile-menu");
     const filtered = filterTags(tile.knownTags, this.plugin.settings.hydrusIgnoredTagPatterns);
-    const tags = filtered.join(", ");
-    menu.addItem((item: any) => item.setTitle(`Tags: ${tags || "(no tags)"}`).setDisabled(true));
-    if (tags) {
+    const sorted = [...filtered].sort((a, b) => a.localeCompare(b));
+    const tagsString = sorted.join(", ");
+    menu.addItem((item: any) => {
+      item.setDisabled(true);
+      const titleEl = item.titleEl as HTMLElement | undefined;
+      if (!titleEl) return;
+      titleEl.empty();
+      if (sorted.length === 0) {
+        titleEl.setText("(no tags)");
+        return;
+      }
+      const wrap = titleEl.createDiv({ cls: "dm-hydrus-tile-tags" });
+      for (const t of sorted) {
+        wrap.createSpan({ cls: "dm-hydrus-tile-tag", text: t });
+      }
+    });
+    if (sorted.length > 0) {
       menu.addItem((item: any) =>
         item
           .setTitle("Copy tags")
           .setIcon("tag")
           .onClick(() => {
-            void navigator.clipboard.writeText(tags);
+            void navigator.clipboard.writeText(tagsString);
             new Notice("Tags copied.");
           })
       );
