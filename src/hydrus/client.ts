@@ -192,22 +192,22 @@ interface HydrusMetadataRow {
   }>;
 }
 
+// Why: Hydrus storage_tags is keyed by status — "0" active, "1" pending, "2" deleted
+// tombstone, "3" petitioned. Tombstones are retained server-side to block re-import
+// from "parse tags from filename" rules; surfacing them here would leak deleted tags
+// into the explorer tile menu, tooltip, layer label, Copy tags, and the local filter.
 function extractKnownTags(row: HydrusMetadataRow, tagService?: string): string[] {
   if (!row.tags) return [];
   if (tagService) {
     for (const svc of Object.values(row.tags)) {
       if (svc?.name === tagService) {
-        const buckets = Object.values(svc.storage_tags ?? {});
-        return buckets.flat();
+        return [...(svc.storage_tags?.["0"] ?? [])];
       }
     }
   }
-  // Fallback: union of storage tags across all services
-  const all = new Set<string>();
+  const active = new Set<string>();
   for (const svc of Object.values(row.tags)) {
-    for (const bucket of Object.values(svc?.storage_tags ?? {})) {
-      for (const tag of bucket) all.add(tag);
-    }
+    for (const tag of svc?.storage_tags?.["0"] ?? []) active.add(tag);
   }
-  return [...all];
+  return [...active];
 }

@@ -35,7 +35,8 @@
 3. The plugin shall instantiate `HydrusCache` (and `DdbImageCache`) on load and whenever a cache-related setting changes (`hydrusEnabled`, `cacheBaseFolder`, `hydrusCacheTtlDays`). It shall NOT re-instantiate on every unrelated settings save — bulk paths like `DmControlPanel.saveState` fire on every layer broadcast and rebuilding caches there would be wasteful.
 4. While `hydrusEnabled` is true, the plugin shall sweep the Hydrus cache once on load and then every 24 hours. The `DdbImageCache` sweep schedule is independent of `hydrusEnabled` — it always sweeps on load and on a 24-hour interval while the plugin is loaded.
 5. The plugin shall expose `buildHydrusClient()` returning a configured `HydrusClient` or `null` if any of `hydrusEnabled` / `hydrusApiUrl` / `hydrusApiKey` is missing or empty.
-6. Sub-functionality requirements are split across:
+6. `HydrusClient.getFileMetadata` shall populate `HydrusFile.knownTags` from the Hydrus `storage_tags` bucket `"0"` (currently-active tags) only. Tombstones (`"2"`), pending (`"1"`), and petitioned (`"3"`) buckets shall be excluded so tag cleanups performed in Hydrus are reflected in the explorer (tile tooltip, tile menu, layer-label derivation, Copy tags, local search-box filter) without surfacing deleted tags.
+7. Sub-functionality requirements are split across:
    - `connection-and-services.md` — connectivity test, service discovery, multi-service selection
    - `explorer.md` — modal layout, source modes, filetype filters, pagination
    - `search.md` — tag query parsing, search execution, default tags
