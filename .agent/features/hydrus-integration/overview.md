@@ -9,6 +9,7 @@
 - `src/hydrus/pagination.ts` — `paginate(items, pageIndex, pageSize)` for client-side paging
 - `src/hydrus/tagFilter.ts` — regex-anchored `filterTags` used by the explorer tile menu
 - `src/hydrus/tagInput.ts` — comma-delimited query parser
+- `src/hydrus/noteRefs.ts` — parse/resolve/download `hydrus://` references embedded in notes
 - `src/views/HydrusExplorerModal.ts` — the modal UI
 - `src/views/HydrusTagSuggester.ts` — autocomplete component bound to the search input
 - `src/main.ts` — `buildHydrusClient`, `initHydrusCache`, daily `sweep` interval
@@ -42,6 +43,7 @@
    - `search.md` — tag query parsing, search execution, default tags
    - `tag-suggester.md` — autocomplete behaviour
    - `cache.md` — on-disk layout, index, TTL, mark-used, clear
+   - `note-references.md` — `[label](hydrus://hash)` references pasted into notes, resolved and pulled in via Add Image / Add BG
 
 ## Broadcast / IPC
 
