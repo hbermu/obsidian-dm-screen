@@ -544,6 +544,16 @@ export class HydrusExplorerModal extends Modal {
           })
       );
     }
+    menu.addItem((item: any) =>
+      item
+        .setTitle(mediaTypeOf(tile.mime) === "video" ? "Copy video reference" : "Copy image reference")
+        .setIcon("link")
+        .onClick(() => {
+          const label = layerLabelFromTags(tile.knownTags, tile.hash);
+          void navigator.clipboard.writeText(`[${label}](hydrus://${tile.hash})`);
+          new Notice("Reference copied.");
+        })
+    );
     menu.addSeparator();
 
     menu.addItem((item: any) =>
