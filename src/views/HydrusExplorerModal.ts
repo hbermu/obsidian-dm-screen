@@ -1,6 +1,6 @@
 import { App, Menu, Modal, Notice } from "obsidian";
 import type DmScreenPlugin from "../main";
-import { HydrusClient, type HydrusFile, extFromMime } from "../hydrus/client";
+import { HydrusClient, type HydrusFile, extFromMime, mediaTypeOf } from "../hydrus/client";
 import type { CachedEntry, HydrusCache } from "../hydrus/cache";
 import { paginate } from "../hydrus/pagination";
 import { filterTags } from "../hydrus/tagFilter";
@@ -612,10 +612,6 @@ export class HydrusExplorerModal extends Modal {
   }
 }
 
-function mediaTypeOf(mime: string): "image" | "video" {
-  return mime.toLowerCase().startsWith("video/") ? "video" : "image";
-}
-
 function entryMatchesTag(entry: CachedEntry, needle: string): boolean {
   const n = needle.toLowerCase();
   return entry.knownTags.some((tag) => tag.toLowerCase().includes(n));
@@ -628,7 +624,7 @@ function arrayBufferToDataUrl(buf: ArrayBuffer, mime: string): string {
   return `data:${mime};base64,${btoa(binary)}`;
 }
 
-function encodeForVaultUrl(vaultPath: string): string {
+export function encodeForVaultUrl(vaultPath: string): string {
   return vaultPath
     .split("/")
     .map((segment) => encodeURIComponent(segment))
