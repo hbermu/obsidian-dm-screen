@@ -2,6 +2,53 @@
 
 Automatically maintained by `.github/workflows/release.yml` after every stable release. Do not edit by hand — changes are overwritten on the next publish.
 
+## v0.22.0 — minor — 2026-06-26
+
+### Features
+- feat(dndbeyond): ephemeral monster rename + conditions modal (#55)
+
+**Full Changelog**: https://github.com/hbermu/obsidian-dm-screen/compare/v0.21.0...v0.22.0
+
+## v0.21.0 — minor — 2026-06-22
+
+### Features
+- feat(hydrus): add note references for layers and backgrounds (#54)
+
+**Full Changelog**: https://github.com/hbermu/obsidian-dm-screen/compare/v0.20.0...v0.21.0
+
+## v0.20.0 — minor — 2026-06-16
+
+### Features
+- feat(hydrus): wrap and sort tags in tile context menu (#53)
+
+### Fixes
+- fix(hydrus): exclude tombstone tag buckets from knownTags (#52)
+
+### Build & CI
+- chore(deps): bump @playwright/test to 1.60.0 (#51)
+- chore(repo): backfill CHANGELOG.md with v0.19.0 entry (#49)
+- chore(deps): bump esbuild (#45)
+
+**Full Changelog**: https://github.com/hbermu/obsidian-dm-screen/compare/v0.19.0...v0.20.0
+
+## v0.19.3 — patch — 2026-06-16
+
+- fix(hydrus): exclude tombstone tag buckets from knownTags (#52)
+
+**Full Changelog**: https://github.com/hbermu/obsidian-dm-screen/compare/v0.19.2...v0.19.3
+
+## v0.19.2 — patch — 2026-06-14
+
+- chore(deps): bump @playwright/test to 1.60.0 (#51)
+
+**Full Changelog**: https://github.com/hbermu/obsidian-dm-screen/compare/v0.19.1...v0.19.2
+
+## v0.19.1 — patch — 2026-06-14
+
+- chore(deps): bump esbuild (#45)
+
+**Full Changelog**: https://github.com/hbermu/obsidian-dm-screen/compare/v0.19.0...v0.19.1
+
 ## v0.19.0 — minor — 2026-06-13
 
 ### Features
