@@ -36,10 +36,10 @@
     {
       "id": 6,
       "subject": "Task 6: Cut the beta and verify with the user",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [5],
       "description": "**Goal:** Open the PR, cut a -beta.N prerelease for BRAT, get user confirmation it works in their vault.\n\n**Files:**\n- Modify: manifest.json, package.json, package-lock.json (bump to 0.20.0-beta.1)\n\n**User Verification Required:** call AskUserQuestion (Funciona / Hay un problema). If problem: NOT complete — rework, re-cut beta, re-verify.\n\n```json:metadata\n{\"files\": [\"manifest.json\", \"package.json\", \"package-lock.json\"], \"verifyCommand\": \"git ls-remote --tags origin 'v0.20.0-beta*'\", \"acceptanceCriteria\": [\"version files bumped to 0.20.0-beta.1\", \"prerelease published\", \"PR open with release:minor\", \"user confirms\"], \"requiresUserVerification\": true, \"userVerificationPrompt\": \"La beta está publicada. ¿Funciona el rename y el modal de condiciones en tu vault?\"}\n```"
     }
   ],
-  "lastUpdated": "2026-06-26"
+  "lastUpdated": "2026-06-26T15:45:00Z"
 }
