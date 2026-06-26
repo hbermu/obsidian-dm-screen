@@ -89,10 +89,10 @@ name with no marker. The `Combatant` broadcast type is unchanged.
 
 ### DM preview — the `*` marker
 
-`buildPreviewRow` appends `" *"` to the `.init-name` text (after the PC tag
-logic, which never applies to monsters) when `c.renamed === true`. The marker
-lives only in the DM preview DOM. Add `title`/tooltip showing the original name
-is a nice-to-have, out of scope for the beta.
+`buildPreviewRow` prepends `"* "` to the `.init-name` text (the marker goes
+**before** the name, e.g. `* Goblin (A)`) when `c.renamed === true`. The marker
+lives only in the DM preview DOM. A `title`/tooltip showing the original name is
+a nice-to-have, out of scope for the beta.
 
 ### Right-click handler
 
