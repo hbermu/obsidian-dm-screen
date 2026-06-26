@@ -1,11 +1,12 @@
 # Background Media
 
-> Full-screen image or looping video rendered behind the image layers on the player screen. Sourced from the active note's frontmatter or note body (images only) via the DM panel's Add BG button, or from the Hydrus library (image or video) via the BG from Hydrus modal.
+> Full-screen image or looping video rendered behind the image layers on the player screen. Sourced from the active note's frontmatter or note body (images only) and its `hydrus://` references (image or video) via the DM panel's Add BG button, or from the Hydrus library (image or video) via the BG from Hydrus modal.
 
 ## Source files
 
-- `src/views/DmControlPanel.ts` — Add BG / Stop BG button, `showBackgroundPicker`, `setImageAsBackground`, `getImagesFromNote`, `activeBackgroundUrl`, `activeVideoPath`, DM-side preview overlay rendered in `renderPlayerScreenSection`, `resolveBackgroundPreviewUrl`, `isVideoBackgroundUrl`
+- `src/views/DmControlPanel.ts` — Add BG / Stop BG button, `showBackgroundPicker`, `setImageAsBackground`, `getImagesFromNote`, `collectHydrusRefEntries`, `applyHydrusRef`, `activeBackgroundUrl`, `activeVideoPath`, DM-side preview overlay rendered in `renderPlayerScreenSection`, `resolveBackgroundPreviewUrl`, `isVideoBackgroundUrl`
 - `src/views/HydrusExplorerModal.ts` — `handleSetBackground` broadcasts the Hydrus-cached file as the background; loop and mute come from settings
+- `src/hydrus/noteRefs.ts` — resolves and downloads the active note's `hydrus://` references for the Add BG picker (see `../hydrus-integration/note-references.md`)
 - `src/player/player.ts` — `showBackgroundMedia` and `hideBackgroundMedia` handle the `<video>` and `<img>` elements
 - `src/player/player.css` — `#video-background`, `#image-background` styling
 - `src/server.ts` — `buildPlayerHtml` includes `<video id="video-background">` and `<img id="image-background">`
@@ -19,13 +20,14 @@
 
 ## Requirements
 
-1. The DM panel shall expose an Add BG button that opens the background picker, sourcing images from the active note.
-2. When the active note has no image in its frontmatter or body, the Add BG button shall show a `No images found in note` Notice and do nothing.
-3. When the active note has a single image, the Add BG button shall set that image as the background directly.
-4. When the active note has multiple images, the Add BG button shall open a context menu listing them and apply the selected one.
+1. The DM panel shall expose an Add BG button that opens the background picker, sourcing images from the active note and image/video `hydrus://` references in the active note.
+2. When the active note has no image in its frontmatter or body and no Hydrus references, the Add BG button shall show a `No images found in note` Notice and do nothing.
+3. When there is exactly one actionable source (one local image, or one available Hydrus reference) and no disabled references, the Add BG button shall apply it directly.
+4. When there is more than one actionable source, or any unavailable (offline, uncached) Hydrus reference, the Add BG button shall open a context menu listing them all and apply the selected one.
 5. The image picker shall recognise the `image` and `portrait` frontmatter keys (resolved as wikilinks) and `![[...]]` embedded images of types png, jpg, jpeg, webp, gif.
 6. When an image is selected as background, the DM panel shall set `activeBackgroundUrl` to `/vault/<encoded-path>`, clear `activeVideoPath`, and broadcast `show-background-media` with `mediaType: "image"`.
 7. When the Hydrus modal pushes a file as background, it shall set `activeBackgroundUrl` on the open DM panel and broadcast `show-background-media` with `mediaType` derived from MIME (`video/*` → `"video"`, otherwise `"image"`) and `loop` / `muted` from settings.
+7b. When a Hydrus reference is selected as background from the Add BG picker, the DM panel shall download it to the cache if needed, set `activeBackgroundUrl` to `/vault/<encoded vaultPath>`, set `activeVideoPath` to the vault path for videos (else clear it), and broadcast `show-background-media` with the reference's media type and `loop` / `muted` from settings. The reference resolution and download are specified in `../hydrus-integration/note-references.md`.
 8. While `activeBackgroundUrl` is non-null, the Add BG button shall render as Stop BG.
 9. When the Stop BG button is clicked, the DM panel shall clear `activeBackgroundUrl` and `activeVideoPath`, broadcast `hide-background-media`, and re-render.
 9b. When `republishToServer()` is called (on server start) and `activeBackgroundUrl` is non-null, the DM panel shall re-broadcast `show-background-media` so clients connecting after server start receive the current background without the DM re-selecting it.

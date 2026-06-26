@@ -5,6 +5,8 @@ import { renderStatblock } from "./StatblockPanel";
 import { DnDBeyondPanel } from "./DnDBeyondPanel";
 import { SendToWebhookModal } from "./SendToWebhookModal";
 import { buildLayerContextMenu } from "./layerContextMenu";
+import { parseHydrusRefs, resolveHydrusRefs, ensureLocalCopy, type ResolvedHydrusRef } from "../hydrus/noteRefs";
+import { encodeForVaultUrl, uniqueLayerLabel } from "./HydrusExplorerModal";
 import { debug, debugWarn, debugError } from "../debug";
 import { CONDITIONS, decodeStatus, encodeExhaustion } from "../conditions";
 
@@ -444,7 +446,7 @@ export class DmControlPanel extends ItemView {
       text: "Add Image",
       cls: "mod-cta",
     });
-    addLayerBtn.addEventListener("click", (evt: MouseEvent) => this.showImagePicker(evt));
+    addLayerBtn.addEventListener("click", (evt: MouseEvent) => void this.showImagePicker(evt));
 
     const addBgBtnLabel = this.activeBackgroundUrl ? "Stop BG" : "Add BG";
     const addBgBtn = btnRow.createEl("button", {
@@ -460,7 +462,7 @@ export class DmControlPanel extends ItemView {
         }
         this.render();
       } else {
-        this.showBackgroundPicker(evt);
+        void this.showBackgroundPicker(evt);
       }
     });
 
@@ -1816,7 +1818,46 @@ export class DmControlPanel extends ItemView {
     });
   }
 
-  private showImagePicker(evt: MouseEvent) {
+  private async collectHydrusRefEntries(file: TFile): Promise<ResolvedHydrusRef[]> {
+    if (!this.plugin.hydrusCache) return [];
+    const body = await this.plugin.app.vault.cachedRead(file);
+    const refs = parseHydrusRefs(body);
+    if (refs.length === 0) return [];
+    const client = this.plugin.buildHydrusClient();
+    return resolveHydrusRefs(refs, this.plugin.hydrusCache, client);
+  }
+
+  private async applyHydrusRef(ref: ResolvedHydrusRef, asBackground: boolean): Promise<void> {
+    try {
+      const entry = await ensureLocalCopy(ref, this.plugin.hydrusCache!, this.plugin.buildHydrusClient());
+      if (asBackground) {
+        const url = `/vault/${encodeForVaultUrl(entry.vaultPath)}`;
+        debug("DmControlPanel: applyHydrusRef background", ref.hash.slice(0, 12), ref.mediaType);
+        this.activeBackgroundUrl = url;
+        this.activeVideoPath = ref.mediaType === "video" ? entry.vaultPath : null;
+        this.plugin.server?.broadcast({
+          type: "show-background-media",
+          payload: {
+            url,
+            mediaType: ref.mediaType ?? "image",
+            loop: this.plugin.settings.hydrusDefaultLoop,
+            muted: this.plugin.settings.hydrusDefaultMuted,
+          },
+        });
+        this.render();
+      } else {
+        const dataUrl = await this.plugin.imageToDataUrl(entry.vaultPath);
+        if (dataUrl) {
+          this.addImageLayer(uniqueLayerLabel(this.imageLayers, ref.label), dataUrl, "hydrus", false);
+        }
+      }
+      await this.plugin.hydrusCache!.markUsed(ref.hash);
+    } catch (err) {
+      new Notice(`Hydrus: ${(err as Error).message}`, 6000);
+    }
+  }
+
+  private async showImagePicker(evt: MouseEvent) {
     const activeFile = this.plugin.app.workspace.getActiveFile();
     if (!activeFile) {
       new Notice("No active file");
@@ -1857,26 +1898,34 @@ export class DmControlPanel extends ItemView {
       }
     }
 
-    if (images.length === 0) {
+    const noteType = fm?.["type"] as string | undefined;
+
+    const refs = await this.collectHydrusRefEntries(activeFile);
+    const hydrus = refs.filter((r) => !r.available || r.mediaType === "image");
+
+    const hydrusActionable = hydrus.filter((r) => r.available);
+    const disabled = hydrus.filter((r) => !r.available);
+
+    if (images.length === 0 && hydrusActionable.length === 0 && disabled.length === 0) {
       new Notice("No images found in this note");
       return;
     }
 
-    const noteType = fm?.["type"] as string | undefined;
-
-    // If only one image, add it directly without showing the menu
-    if (images.length === 1) {
-      const img = images[0];
-      this.plugin.imageToDataUrl(img.path).then(dataUrl => {
+    // Apply directly only when there is exactly one actionable entry and nothing disabled.
+    if (images.length + hydrusActionable.length === 1 && disabled.length === 0) {
+      if (images.length === 1) {
+        const img = images[0];
+        const dataUrl = await this.plugin.imageToDataUrl(img.path);
         if (dataUrl) {
           this.addImageLayer(`${activeFile.basename} (${img.source})`, dataUrl, noteType, false);
           new Notice(`Added: ${img.label} (hidden)`);
         }
-      });
+      } else {
+        void this.applyHydrusRef(hydrusActionable[0], false);
+      }
       return;
     }
 
-    const { Menu } = require("obsidian");
     const menu = new Menu();
 
     for (const img of images) {
@@ -1889,6 +1938,17 @@ export class DmControlPanel extends ItemView {
             new Notice(`Added: ${img.label} (hidden)`);
           }
         });
+      });
+    }
+
+    for (const ref of hydrus) {
+      menu.addItem((item: any) => {
+        item.setTitle(`Hydrus: ${ref.label}${ref.available ? "" : " (offline, not cached)"}`).setIcon("link");
+        if (!ref.available) {
+          item.setDisabled(true);
+          return;
+        }
+        item.onClick(() => void this.applyHydrusRef(ref, false));
       });
     }
 
@@ -1917,7 +1977,7 @@ export class DmControlPanel extends ItemView {
     menu.showAtMouseEvent(evt);
   }
 
-  private showBackgroundPicker(evt: MouseEvent): void {
+  private async showBackgroundPicker(evt: MouseEvent): Promise<void> {
     const activeFile = this.plugin.app.workspace.getActiveFile();
     if (!activeFile) {
       new Notice("No active note");
@@ -1925,22 +1985,41 @@ export class DmControlPanel extends ItemView {
     }
 
     const images = this.getImagesFromNote(activeFile);
-    if (images.length === 0) {
+    const refs = await this.collectHydrusRefEntries(activeFile);
+    const hydrus = refs.filter((r) => !r.available || r.mediaType === "image" || r.mediaType === "video");
+
+    const hydrusActionable = hydrus.filter((r) => r.available);
+    const disabled = hydrus.filter((r) => !r.available);
+
+    if (images.length === 0 && hydrusActionable.length === 0 && disabled.length === 0) {
       new Notice("No images found in note");
       return;
     }
 
-    if (images.length === 1) {
-      this.setImageAsBackground(images[0]);
+    if (images.length + hydrusActionable.length === 1 && disabled.length === 0) {
+      if (images.length === 1) {
+        this.setImageAsBackground(images[0]);
+      } else {
+        void this.applyHydrusRef(hydrusActionable[0], true);
+      }
       return;
     }
 
-    const { Menu } = require("obsidian");
     const menu = new Menu();
     for (const img of images) {
       menu.addItem((item: any) => {
         item.setTitle(img.label);
         item.onClick(() => this.setImageAsBackground(img));
+      });
+    }
+    for (const ref of hydrus) {
+      menu.addItem((item: any) => {
+        item.setTitle(`Hydrus: ${ref.label}${ref.available ? "" : " (offline, not cached)"}`).setIcon("link");
+        if (!ref.available) {
+          item.setDisabled(true);
+          return;
+        }
+        item.onClick(() => void this.applyHydrusRef(ref, true));
       });
     }
     menu.showAtMouseEvent(evt);

@@ -57,6 +57,10 @@ export function extFromMime(mime: string): string {
   return MIME_TO_EXT[mime.toLowerCase()] ?? "bin";
 }
 
+export function mediaTypeOf(mime: string): "image" | "video" {
+  return mime.toLowerCase().startsWith("video/") ? "video" : "image";
+}
+
 export class HydrusClient {
   constructor(private opts: HydrusClientOptions) {
     if (!opts.baseUrl) throw new Error("hydrus baseUrl is required");

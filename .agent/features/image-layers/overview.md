@@ -1,11 +1,12 @@
 # Image Layers
 
-> A stack of independently positioned, scaled, and rotated images composited on top of the background media on the player screen. Layers are added from the active note (via Add Image), from the Hydrus library (as cached images), or from the D&D Beyond monster avatar fetcher. The DM manipulates them in the preview area; every change is broadcast in full.
+> A stack of independently positioned, scaled, and rotated images composited on top of the background media on the player screen. Layers are added from the active note (via Add Image — both its local images and its `hydrus://` references), from the Hydrus library (as cached images), or from the D&D Beyond monster avatar fetcher. The DM manipulates them in the preview area; every change is broadcast in full.
 
 ## Source files
 
 - `src/types.ts` — `ImageLayer` interface
-- `src/views/DmControlPanel.ts` — preview rendering (drag), layer list rendering (controls), `addImageLayer`, `broadcastImageLayers`, `broadcastAndRender`, `makeDraggable`, `moveLayerUp` / `moveLayerDown`, `showImagePicker`, image-source frontmatter discovery
+- `src/views/DmControlPanel.ts` — preview rendering (drag), layer list rendering (controls), `addImageLayer`, `broadcastImageLayers`, `broadcastAndRender`, `makeDraggable`, `moveLayerUp` / `moveLayerDown`, `showImagePicker`, `collectHydrusRefEntries`, `applyHydrusRef`, image-source frontmatter discovery
+- `src/hydrus/noteRefs.ts` — resolves and downloads the active note's `hydrus://` image references for the Add Image picker (see `../hydrus-integration/note-references.md`)
 - `src/player/player.ts` — `syncImageLayers` renders the layer stack on the player; viewport pan/zoom of the layer container is applied via `updateViewport`
 - `src/player/player.css` — `.no-border` class, gold border on `.image-layer-frame`
 
@@ -27,9 +28,10 @@
 10. If `layer.bordered === false`, the `.image-layer-frame` shall carry the `.no-border` class.
 11. The player shall apply `transform: rotate(<rotation>deg)` to the wrapper when `rotation` is non-zero.
 12. While `layer.visible` is false, the player shall not render that layer (filter applied in `syncImageLayers`).
-13. Detailed per-layer DM controls are specified in `layer-controls.md`.
-14. State persistence and restore behaviour are specified in `persistence.md`.
-15. Fog of war on a per-layer basis is specified in `../fog-of-war/overview.md`.
+13. When the Add Image picker is invoked, it shall also list the active note's `hydrus://` image references and add the selected one as a cached image layer; the reference parsing, resolution, and download are specified in `../hydrus-integration/note-references.md`.
+14. Detailed per-layer DM controls are specified in `layer-controls.md`.
+15. State persistence and restore behaviour are specified in `persistence.md`.
+16. Fog of war on a per-layer basis is specified in `../fog-of-war/overview.md`.
 
 ## Broadcast / IPC
 
