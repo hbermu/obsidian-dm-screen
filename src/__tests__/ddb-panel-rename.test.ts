@@ -138,3 +138,28 @@ describe("DnDBeyondPanel monsterNames", () => {
     expect((panel as any).monsterNames.size).toBe(0);
   });
 });
+
+describe("DM preview rename marker", () => {
+  function renderRow(panel: any, key: string, name: string, renamed: boolean): HTMLElement {
+    panel.previewEl = document.createElement("div");
+    panel.previewEl.createEl("ul", { cls: "dm-ddb-preview-list" });
+    panel.polledState = makeState([{ name, initiative: 12 }]);
+    if (renamed) panel.monsterNames.set(key, name);
+    panel.showFullTurnOrder = true;
+    panel.renderPreview();
+    return panel.previewEl.querySelector(".init-name") as HTMLElement;
+  }
+
+  it("prefixes a renamed monster with '* '", () => {
+    const panel = new DnDBeyondPanel(makePlugin(), document.createElement("div")) as any;
+    const nameEl = renderRow(panel, "monster-uid-0", "Sneaky Pete", true);
+    expect(nameEl.textContent?.startsWith("* ")).toBe(true);
+    expect(nameEl.textContent).toContain("Sneaky Pete");
+  });
+
+  it("does not prefix a non-renamed monster", () => {
+    const panel = new DnDBeyondPanel(makePlugin(), document.createElement("div")) as any;
+    const nameEl = renderRow(panel, "monster-uid-0", "Goblin", false);
+    expect(nameEl.textContent?.startsWith("*")).toBe(false);
+  });
+});

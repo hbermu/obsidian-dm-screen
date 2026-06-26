@@ -566,7 +566,7 @@ function buildPreviewRow(c: PreviewCombatant): HTMLLIElement {
 
   const nameEl = document.createElement("span");
   nameEl.className = "init-name";
-  nameEl.textContent = c.name;
+  nameEl.textContent = c.renamed ? `* ${c.name}` : c.name;
   if (c.isPlayer) {
     const tag = document.createElement("span");
     tag.className = "init-pc-tag";
