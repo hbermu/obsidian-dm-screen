@@ -22,9 +22,10 @@ type PreviewCombatant = {
   statuses: string[];
   inspired: boolean;
   // Non-null on DDB monster rows — used by the DM preview to wire a
-  // click handler that opens the condition menu. This is the per-instance
-  // key (uniqueId from DDB, or `${id}:${name}` when uniqueId is empty),
-  // NOT the template `id` which is shared across A/B/C duplicates.
+  // contextmenu handler that opens the monster menu (rename + conditions).
+  // This is the per-instance key (uniqueId from DDB, or `${id}:${name}` when
+  // uniqueId is empty), NOT the template `id` which is shared across A/B/C
+  // duplicates.
   monsterKey?: string;
   // DM-side only: the unmodified DDB name and whether an override is active.
   // Never forwarded to the player payload.
