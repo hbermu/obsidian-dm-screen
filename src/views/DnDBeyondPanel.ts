@@ -5,7 +5,9 @@ import { DdbEncounterPoller, type DdbPolledState } from "../dndbeyond/poller";
 import { debug, debugWarn } from "../debug";
 import type { DdbEncounter } from "../dndbeyond/types";
 import { DnDBeyondEncounterModal } from "./DnDBeyondEncounterModal";
-import { CONDITIONS, decodeStatus, encodeExhaustion } from "../conditions";
+import { RenameMonsterModal } from "./RenameMonsterModal";
+import { MonsterConditionsModal } from "./MonsterConditionsModal";
+import { decodeStatus } from "../conditions";
 
 type PreviewCombatant = {
   name: string;
@@ -381,74 +383,53 @@ export class DnDBeyondPanel {
       const row = buildPreviewRow(p);
       if (p.monsterKey != null) {
         const key = p.monsterKey;
-        const monsterName = p.name;
         row.classList.add("dm-ddb-preview-row-clickable");
-        row.addEventListener("click", (evt) =>
-          this.openMonsterConditionMenu(key, monsterName, evt)
-        );
+        row.addEventListener("contextmenu", (evt) => {
+          evt.preventDefault();
+          this.openMonsterMenu(key, evt);
+        });
       }
       list.appendChild(row);
     }
   }
 
-  private openMonsterConditionMenu(monsterKey: string, monsterName: string, evt: MouseEvent): void {
-    if (!this.polledState) return;
-    const current = this.monsterStatuses.get(monsterKey) ?? new Set<string>();
-    debug("DDB Panel: open monster condition menu for", monsterName, "(key", monsterKey, ")");
+  private openMonsterMenu(monsterKey: string, evt: MouseEvent): void {
+    const hasOverride = this.monsterNames.has(monsterKey);
+    debug("DDB Panel: open monster menu for key", monsterKey, "override?", hasOverride);
 
     const menu = new Menu();
-
-    const hasAny = current.size > 0;
     menu.addItem((item) => {
-      item.setTitle("Remove all conditions").setDisabled(!hasAny).onClick(() => {
-        if (!hasAny) return;
-        this.monsterStatuses.delete(monsterKey);
-        this.applyMonsterStatusChange();
+      item.setTitle("Rename…").onClick(() => this.openRenameModal(monsterKey));
+    });
+    menu.addItem((item) => {
+      item.setTitle("Reset name").setDisabled(!hasOverride).onClick(() => {
+        if (hasOverride) this.resetMonsterName(monsterKey);
       });
     });
     menu.addSeparator();
-
-    for (const cond of Object.values(CONDITIONS)) {
-      const active = current.has(cond.id);
-      menu.addItem((item) => {
-        item.setTitle(cond.name).setChecked(active).onClick(() => {
-          const set = new Set(this.monsterStatuses.get(monsterKey) ?? new Set<string>());
-          if (active) set.delete(cond.id);
-          else set.add(cond.id);
-          this.monsterStatuses.set(monsterKey, set);
-          this.applyMonsterStatusChange();
-        });
-      });
-    }
-
-    menu.addSeparator();
-
-    const currentExhaustion = readExhaustionLevel(current);
     menu.addItem((item) => {
-      item.setTitle(currentExhaustion === 0 ? "Exhaustion — None" : `Exhaustion — Level ${currentExhaustion}`).setDisabled(true);
+      item.setTitle("Conditions…").onClick(() => this.openConditionsModal(monsterKey));
     });
-    menu.addItem((item) => {
-      item.setTitle("  Remove exhaustion").setChecked(currentExhaustion === 0).onClick(() => {
-        this.setMonsterExhaustion(monsterKey, 0);
-      });
-    });
-    for (let n = 1; n <= 6; n++) {
-      menu.addItem((item) => {
-        item.setTitle(`  Exhaustion ${n}`).setChecked(currentExhaustion === n).onClick(() => {
-          this.setMonsterExhaustion(monsterKey, n);
-        });
-      });
-    }
-
     menu.showAtMouseEvent(evt);
   }
 
-  private setMonsterExhaustion(monsterKey: string, level: number): void {
-    const set = new Set(this.monsterStatuses.get(monsterKey) ?? new Set<string>());
-    for (const s of [...set]) if (s.startsWith("exhaustion:")) set.delete(s);
-    const enc = encodeExhaustion(level);
-    if (enc) set.add(enc);
-    this.monsterStatuses.set(monsterKey, set);
+  private openRenameModal(monsterKey: string): void {
+    const current = this.monsterNames.get(monsterKey) ?? this.originalNameFor(monsterKey) ?? "";
+    new RenameMonsterModal(this.plugin.app, current, (name) =>
+      this.applyMonsterName(monsterKey, name)
+    ).open();
+  }
+
+  private openConditionsModal(monsterKey: string): void {
+    const current = this.monsterStatuses.get(monsterKey) ?? new Set<string>();
+    new MonsterConditionsModal(this.plugin.app, current, (statuses) =>
+      this.applyMonsterStatuses(monsterKey, statuses)
+    ).open();
+  }
+
+  private applyMonsterStatuses(monsterKey: string, statuses: Set<string>): void {
+    if (statuses.size === 0) this.monsterStatuses.delete(monsterKey);
+    else this.monsterStatuses.set(monsterKey, statuses);
     this.applyMonsterStatusChange();
   }
 
@@ -544,16 +525,6 @@ function monsterInstanceKey(m: { uniqueId?: string; id: number; name: string }):
   // use a composite of template id + display name so A/B/C suffixes still
   // disambiguate.
   return `${m.id}:${m.name}`;
-}
-
-function readExhaustionLevel(statuses: Iterable<string>): number {
-  for (const s of statuses) {
-    if (s.startsWith("exhaustion:")) {
-      const n = parseInt(s.slice("exhaustion:".length), 10);
-      if (Number.isFinite(n) && n >= 1 && n <= 6) return n;
-    }
-  }
-  return 0;
 }
 
 function buildPreviewRow(c: PreviewCombatant): HTMLLIElement {
