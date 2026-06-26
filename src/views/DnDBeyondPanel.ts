@@ -24,6 +24,10 @@ type PreviewCombatant = {
   // key (uniqueId from DDB, or `${id}:${name}` when uniqueId is empty),
   // NOT the template `id` which is shared across A/B/C duplicates.
   monsterKey?: string;
+  // DM-side only: the unmodified DDB name and whether an override is active.
+  // Never forwarded to the player payload.
+  originalName: string;
+  renamed: boolean;
 };
 
 export class DnDBeyondPanel {
@@ -44,6 +48,11 @@ export class DnDBeyondPanel {
   // same numeric id and would otherwise share statuses. Cleared on encounter
   // switch and on stopTracking.
   private monsterStatuses = new Map<string, Set<string>>();
+  // Ephemeral DM-assigned display name overrides for DDB monsters, keyed by the
+  // same per-instance key as monsterStatuses. The override is broadcast to the
+  // player screen as the monster's name; the DM preview marks it with a "*".
+  // Cleared on encounter switch and on stopTracking. Never persisted.
+  private monsterNames = new Map<string, string>();
   onTrackingChange: (() => void) | null = null;
 
   constructor(private plugin: DmScreenPlugin, container: HTMLElement) {
@@ -163,6 +172,7 @@ export class DnDBeyondPanel {
     this.showFullTurnOrderUserSet = false;
     this.showFullTurnOrder = false;
     this.monsterStatuses.clear();
+    this.monsterNames.clear();
     this.startTracking(id);
     this.render();
     this.onTrackingChange?.();
@@ -192,6 +202,7 @@ export class DnDBeyondPanel {
     this.selectedEncounterId = null;
     this.polledState = null;
     this.monsterStatuses.clear();
+    this.monsterNames.clear();
     this.plugin.sendInitiativeUpdate([], 0);
     this.render();
     this.onTrackingChange?.();
@@ -263,12 +274,17 @@ export class DnDBeyondPanel {
           hideHp: !this.showPcHp,
           statuses: char?.statuses ?? [],
           inspired: char?.inspired ?? false,
+          originalName: char?.name ?? p.name,
+          renamed: false,
         });
       } else if (p.kind === "monster") {
         const key = monsterInstanceKey(p);
         const monsterStatuses = this.monsterStatuses.get(key);
+        const override = this.monsterNames.get(key);
         participants.push({
-          name: p.name,
+          name: override ?? p.name,
+          originalName: p.name,
+          renamed: override != null,
           hp: (p as { currentHitPoints: number }).currentHitPoints,
           maxHp: (p as { maximumHitPoints: number }).maximumHitPoints,
           initiative: p.initiative,
@@ -294,6 +310,8 @@ export class DnDBeyondPanel {
           hideHp: false,
           statuses: [],
           inspired: false,
+          originalName: p.name,
+          renamed: false,
         });
       }
     }
@@ -438,6 +456,33 @@ export class DnDBeyondPanel {
     if (!this.polledState) return;
     this.broadcastToPlayerScreen(this.polledState);
     this.renderPreview();
+  }
+
+  applyMonsterName(monsterKey: string, rawName: string): void {
+    const name = rawName.trim();
+    if (name.length === 0) {
+      return;
+    }
+    const original = this.originalNameFor(monsterKey);
+    if (original != null && name === original) {
+      this.monsterNames.delete(monsterKey);
+    } else {
+      this.monsterNames.set(monsterKey, name);
+    }
+    this.applyMonsterStatusChange();
+  }
+
+  resetMonsterName(monsterKey: string): void {
+    this.monsterNames.delete(monsterKey);
+    this.applyMonsterStatusChange();
+  }
+
+  private originalNameFor(monsterKey: string): string | null {
+    if (!this.polledState) return null;
+    for (const m of this.polledState.encounter.monsters ?? []) {
+      if (monsterInstanceKey(m) === monsterKey) return m.name;
+    }
+    return null;
   }
 
   private async loadMonsterImages(encounter: DdbEncounter): Promise<void> {
