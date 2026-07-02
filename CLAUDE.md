@@ -1,7 +1,7 @@
 @AGENTS.md
 
 Claude-specific notes:
-- The `obsidian-dm-screen` skill (loaded from the user's `.claude/commands/`) covers Docker plumbing and the release workflow; `.agent/features/` is canonical for feature behaviour.
+- The `obsidian-dm-screen` skill (loaded from the user's environment) covers Docker plumbing and the release workflow; `.agent/features/` is canonical for feature behaviour.
 - Before editing files in any subsystem, follow the verification protocol in `AGENTS.md → Spec verification protocol`. Short version:
   1. **Before**: identify EVERY affected spec (not just the obvious one — grep `.agent/features/` for the file path, the symbols, and the user-visible behaviour). Read `overview.md` AND every sub-spec in each affected dir. Walk the EARS requirement list.
   2. **During**: update the spec in the same commit. Modify the EARS sentence to match the new behaviour, add requirements for new sub-behaviour, remove requirements for removed behaviour. Renumber downstream entries when you insert. Update test descriptions when behaviour flips.
