@@ -3,6 +3,7 @@
 
 import { safePlayerUrl } from "./safeUrl";
 import { decodeStatus } from "../conditions";
+import { LayerRenderer, type RendererGeometry, type RendererLayer } from "./layerRenderer";
 
 interface Combatant {
   name: string;
@@ -21,22 +22,6 @@ interface Combatant {
 interface InitiativePayload {
   combatants: Combatant[];
   round?: number;
-}
-
-interface ImageLayer {
-  id: string;
-  label: string;
-  dataUrl: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  zIndex: number;
-  rotation: number;
-  visible: boolean;
-  fogEnabled: boolean;
-  fogDataUrl: string;
-  bordered?: boolean;
 }
 
 interface PlayerMessage {
@@ -121,15 +106,15 @@ function buildInitiativeRow(c: Combatant): HTMLLIElement {
 class PlayerScreen {
   private ws: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private lastImageLayers: ImageLayer[] = [];
+  private layers = new LayerRenderer(document.getElementById("image-layers-container")!);
   private hasConnectedOnce = false;
 
   constructor() {
     this.connect();
     window.addEventListener("resize", () => {
       this.sendClientInfo();
-      if (this.lastImageLayers.length > 0) {
-        this.syncImageLayers(this.lastImageLayers);
+      if (this.layers.hasLayers()) {
+        this.layers.resync();
       }
     });
     this.initFullscreenButton();
@@ -236,7 +221,10 @@ class PlayerScreen {
         this.applyCombatScale((msg.payload as { scale: number }).scale);
         break;
       case "image-layers-sync":
-        this.syncImageLayers((msg.payload as { layers: ImageLayer[] }).layers);
+        this.layers.sync((msg.payload as { layers: RendererLayer[] }).layers);
+        break;
+      case "image-layers-geometry":
+        this.layers.applyGeometry((msg.payload as { layers: RendererGeometry[] }).layers);
         break;
       case "show-background-media":
         this.showBackgroundMedia(
@@ -257,7 +245,7 @@ class PlayerScreen {
         break;
       case "clear":
         this.showWaiting();
-        this.clearImageLayers();
+        this.layers.clear();
         this.hideBackgroundMedia();
         break;
       default:
@@ -316,109 +304,6 @@ class PlayerScreen {
     }
   }
 
-  private syncImageLayers(layers: ImageLayer[]) {
-    this.lastImageLayers = layers;
-    const container = document.getElementById("image-layers-container")!;
-
-    // Create or reuse inner div for pan/zoom
-    let inner = document.getElementById("image-layers-inner");
-    if (!inner) {
-      inner = document.createElement("div");
-      inner.id = "image-layers-inner";
-      container.appendChild(inner);
-    }
-    inner.innerHTML = "";
-
-    // Size inner to viewport, maintaining a reference frame where 100% = viewport
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    inner.style.width = `${vw}px`;
-    inner.style.height = `${vh}px`;
-    inner.style.left = "0";
-    inner.style.top = "0";
-
-    const sorted = [...layers].filter(l => l.visible !== false).sort((a, b) => a.zIndex - b.zIndex);
-    for (const layer of sorted) {
-      const safeLayerSrc = safePlayerUrl(layer.dataUrl, "image");
-      if (!safeLayerSrc) {
-        console.warn("[Player Screen] Rejected layer dataUrl, skipping layer");
-        continue;
-      }
-      const wrapper = document.createElement("div");
-      wrapper.style.position = "absolute";
-      wrapper.style.left = `${layer.x}%`;
-      wrapper.style.top = `${layer.y}%`;
-      wrapper.style.width = `${layer.width}%`;
-      wrapper.style.height = `${layer.height}%`;
-      wrapper.style.zIndex = String(layer.zIndex);
-      wrapper.style.display = "flex";
-      wrapper.style.alignItems = "center";
-      wrapper.style.justifyContent = "center";
-      if (layer.rotation) {
-        wrapper.style.transform = `rotate(${layer.rotation}deg)`;
-      }
-
-      // Frame: holds the gold border and aligns img + fog. Sized at load time
-      // to the image's actual rendered rect (preserving its natural aspect
-      // ratio inside the wrapper) so the border hugs the visible content and
-      // the fog overlay aligns with the image.
-      const frame = document.createElement("div");
-      frame.className = "image-layer-frame";
-      frame.style.position = "relative";
-      frame.style.width = "100%";
-      frame.style.height = "100%";
-      frame.style.flexShrink = "0";
-      if (layer.bordered === false) {
-        frame.classList.add("no-border");
-      }
-
-      const img = document.createElement("img");
-      img.style.display = "block";
-      img.style.width = "100%";
-      img.style.height = "100%";
-
-      const sizeFrame = () => {
-        const ww = wrapper.clientWidth;
-        const wh = wrapper.clientHeight;
-        if (!ww || !wh || !img.naturalWidth || !img.naturalHeight) return;
-        const imgAspect = img.naturalWidth / img.naturalHeight;
-        const wrapperAspect = ww / wh;
-        if (imgAspect >= wrapperAspect) {
-          frame.style.width = "100%";
-          frame.style.height = `${(wrapperAspect / imgAspect) * 100}%`;
-        } else {
-          frame.style.height = "100%";
-          frame.style.width = `${(imgAspect / wrapperAspect) * 100}%`;
-        }
-      };
-
-      img.onload = () => requestAnimationFrame(sizeFrame);
-      img.src = safeLayerSrc;
-      frame.appendChild(img);
-
-      if (layer.fogEnabled && layer.fogDataUrl) {
-        const safeFogSrc = safePlayerUrl(layer.fogDataUrl, "image");
-        if (safeFogSrc) {
-          const fogImg = document.createElement("img");
-          fogImg.src = safeFogSrc;
-          fogImg.style.position = "absolute";
-          fogImg.style.top = "0";
-          fogImg.style.left = "0";
-          fogImg.style.width = "100%";
-          fogImg.style.height = "100%";
-          fogImg.style.pointerEvents = "none";
-          frame.appendChild(fogImg);
-        } else {
-          console.warn("[Player Screen] Rejected fog dataUrl, skipping fog overlay");
-        }
-      }
-
-      wrapper.appendChild(frame);
-      inner.appendChild(wrapper);
-      requestAnimationFrame(sizeFrame);
-    }
-  }
-
   private updateViewport(payload: { panX: number; panY: number; zoom: number }) {
     const inner = document.getElementById("image-layers-inner");
     if (inner) {
@@ -469,12 +354,6 @@ class PlayerScreen {
     video.style.display = "none";
     image.src = "";
     image.style.display = "none";
-  }
-
-  private clearImageLayers() {
-    this.lastImageLayers = [];
-    const container = document.getElementById("image-layers-container");
-    if (container) container.innerHTML = "";
   }
 
 }

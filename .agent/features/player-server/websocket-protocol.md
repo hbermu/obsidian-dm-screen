@@ -22,6 +22,7 @@
 3. When a client connects, the server shall replay every cached message of the client's channel in insertion order before any new broadcast can be sent to that client.
 4. When a `clear` broadcast is sent, the server shall purge only the `player`-channel entries from the late-joiner cache before transmitting `clear` to player clients; `map-*` entries survive. Symmetrically, `map-clear` shall purge only the `map-*` entries and transmit to map clients only.
 5. When any broadcast other than `clear`/`map-clear` is sent, the server shall overwrite the cache entry for `message.type` with the new serialised payload (one entry per type at most).
+5b. Every `image-layers-sync` broadcast shall be followed immediately by an `image-layers-geometry` broadcast derived from the same state, so the cached geometry entry is never staler than the cached sync (cache replay preserves first-insertion order: sync before geometry).
 6. When the player side receives a message whose `type` is not in its known set, it shall log `[Player Screen] Unknown message type:` and ignore the payload (no throw, no disconnect).
 7. When the player side fails to parse a message as JSON, it shall log the failure and ignore the message.
 8. When the WebSocket closes on the player side after the player has connected at least once, the player shall display a full-screen `Disconnected` overlay and attempt to reconnect after 3 seconds. On a successful reconnect that follows a previous disconnect, the player shall reload the page so the server's late-joiner cache replay reconstructs the screen from scratch. On the very first successful connect (no prior disconnect), the player shall hide the overlay if present and send `client-info`.
@@ -33,7 +34,8 @@
 |--------------|-----------|---------|-----------|--------------------|
 | `show-background-media` | DM → player | `{ url: string, mediaType: "image" \| "video", loop?: boolean, muted?: boolean }` | DM picks an image/video via Add BG or BG from Hydrus | yes |
 | `hide-background-media` | DM → player | `{}` | DM clicks Stop BG | yes |
-| `image-layers-sync` | DM → player | `{ layers: ImageLayer[] }` (see `image-layers/overview.md`) | Any change to layer position, scale, rotation, visibility, border, fog, or set | yes |
+| `image-layers-sync` | DM → player | `{ layers: ImageLayer[] }` (see `image-layers/overview.md`) | Any structural change to the layer set (add, remove, fog change, toggle) and the end of every continuous gesture | yes |
+| `image-layers-geometry` | DM → player | `{ layers: LayerGeometry[] }` — `{ id, x, y, width, height, zIndex, rotation, visible, bordered }`, no data URLs | Continuous gestures (layer drag, scale slider), trailing-throttled at 50 ms; also immediately after every `image-layers-sync` | yes |
 | `initiative-update` | DM → player | `{ combatants: Combatant[], round: number }` (see `combat-tracker/overview.md`) | Manual turn advance, Initiative Tracker plugin save-state, or D&D Beyond poll cycle | yes |
 | `combat-scale` | DM → player | `{ scale: number }` (`0.5`–`2.0`) | DM clicks `−` / `1×` / `+` on the tracker scale, or on initial render | yes |
 | `viewport-update` | DM → player | `{ panX: number, panY: number, zoom: number }` | Reserved for player-viewport sync (currently emitted only by `broadcastPlayerViewport`; not bound to a UI control yet) | yes |

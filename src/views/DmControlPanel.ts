@@ -102,6 +102,7 @@ export class DmControlPanel extends ItemView {
   expandedCreature: string | null = null;
   private renderDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private saveStateTimer: ReturnType<typeof setTimeout> | null = null;
+  private layerGeometryTimer: ReturnType<typeof setTimeout> | null = null;
   private panZoomAbort: AbortController | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: DmScreenPlugin) {
@@ -147,6 +148,10 @@ export class DmControlPanel extends ItemView {
     document.removeEventListener("keydown", this.escHandler);
     this.panZoomAbort?.abort();
     this.panZoomAbort = null;
+    if (this.layerGeometryTimer) {
+      clearTimeout(this.layerGeometryTimer);
+      this.layerGeometryTimer = null;
+    }
     if (this.ddbPanel) {
       this.ddbPanel.destroy();
       this.ddbPanel = null;
@@ -760,7 +765,7 @@ export class DmControlPanel extends ItemView {
           layer.x = centerX - layer.width / 2;
           layer.y = centerY - layer.height / 2;
           scaleLabel.textContent = `${scale}%`;
-          this.broadcastImageLayers();
+          this.broadcastLayerGeometry();
           const previewRect = this.contentEl.querySelector(`.dm-layer-rect[data-id="${layer.id}"]`) as HTMLElement;
           if (previewRect) {
             previewRect.style.left = `${layer.x}%`;
@@ -769,6 +774,7 @@ export class DmControlPanel extends ItemView {
             previewRect.style.height = `${layer.height}%`;
           }
         });
+        scaleSlider.addEventListener("change", () => this.broadcastImageLayers());
 
         // Right column: two button rows
         const rightCol = row.createDiv("dm-layer-right-col");
@@ -2131,6 +2137,7 @@ export class DmControlPanel extends ItemView {
       layer.y = startTop + dy;
       rect.style.left = `${layer.x}%`;
       rect.style.top = `${layer.y}%`;
+      this.broadcastLayerGeometry();
     };
 
     const onMouseUp = () => {
@@ -2180,7 +2187,49 @@ export class DmControlPanel extends ItemView {
       type: "image-layers-sync",
       payload: { layers: this.imageLayers },
     });
+    // A fresh geometry snapshot always follows the full sync so the cached
+    // image-layers-geometry can never be staler than the cached sync —
+    // late-joiner replay applies them in that order.
+    this.broadcastLayerGeometry(true);
     this.scheduleSaveState();
+  }
+
+  // Continuous gestures (drag, scale slider) broadcast this instead of the
+  // full sync: geometry only, no base64 payloads, trailing-throttled. The
+  // gesture's end still emits the full broadcastImageLayers().
+  broadcastLayerGeometry(immediate = false) {
+    if (!this.plugin.server) return;
+    const send = () => {
+      this.plugin.server?.broadcast({
+        type: "image-layers-geometry",
+        payload: {
+          layers: this.imageLayers.map((l) => ({
+            id: l.id,
+            x: l.x,
+            y: l.y,
+            width: l.width,
+            height: l.height,
+            zIndex: l.zIndex,
+            rotation: l.rotation,
+            visible: l.visible,
+            bordered: l.bordered !== false,
+          })),
+        },
+      });
+    };
+    if (immediate) {
+      if (this.layerGeometryTimer) {
+        clearTimeout(this.layerGeometryTimer);
+        this.layerGeometryTimer = null;
+      }
+      send();
+      return;
+    }
+    if (this.layerGeometryTimer) return;
+    this.layerGeometryTimer = setTimeout(() => {
+      this.layerGeometryTimer = null;
+      send();
+    }, 50);
   }
 
   private broadcastAndRender() {
