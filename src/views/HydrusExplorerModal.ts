@@ -468,6 +468,27 @@ export class HydrusExplorerModal extends Modal {
     }
   }
 
+  private async handleSetMap(tile: Tile) {
+    if (!this.plugin.server) {
+      new Notice("Player Screen server is not running. Start it first.");
+      return;
+    }
+    try {
+      const entry = await this.ensureCached(tile);
+      const panel = await this.plugin.findOpenDmControlPanel();
+      if (!panel) {
+        new Notice("Open the DM Control Panel before setting a map.", 5000);
+        return;
+      }
+      debug("HydrusExplorer: handleSetMap", entry.hash.slice(0, 12), entry.vaultPath);
+      await panel.mapPanel.setVaultMap(entry.vaultPath, mediaTypeOf(entry.mime));
+      await this.cache.markUsed(entry.hash);
+      this.close();
+    } catch (err) {
+      new Notice(`Hydrus: ${(err as Error).message}`, 6000);
+    }
+  }
+
   private async handleAddAsLayer(tile: Tile) {
     try {
       if (mediaTypeOf(tile.mime) !== "image") {
@@ -562,6 +583,15 @@ export class HydrusExplorerModal extends Modal {
         .setIcon("monitor")
         .onClick(() => {
           void this.handleSetBackground(tile);
+        })
+    );
+
+    menu.addItem((item: any) =>
+      item
+        .setTitle("Set as map")
+        .setIcon("map")
+        .onClick(() => {
+          void this.handleSetMap(tile);
         })
     );
 

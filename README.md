@@ -18,6 +18,7 @@ Built for in-person 5e games where the DM wants a clean visual layer for the pla
 - **Initiative tracker** — manual, synced from the Initiative Tracker plugin, or live from a D&D Beyond encounter.
 - **Statblock display** — inline 5e statblocks via Fantasy Statblocks.
 - **Multi-screen aware** — multiple connected players with per-client resolution detection.
+- **Map screen for TV tables** — a dedicated `/map` endpoint renders one battlemap (image or animated video) at true 1-inch-per-square physical scale for miniatures on a horizontal TV: per-screen calibration with a ruler test pattern, DM-side panning, fit/physical toggle, and an optional grid overlay for gridless maps.
 - **Send layer to webhook** — right-click an image layer to POST it to Telegram, Discord, or any `multipart/form-data` endpoint with an editable caption.
 
 ![Fog of war on the DM preview](docs/screenshots/fog-of-war.png)
@@ -31,6 +32,26 @@ Built for in-person 5e games where the DM wants a clean visual layer for the pla
 3. Click **Start Server**. The panel shows a LAN URL — open it on the device your players will look at.
 4. Use **Add Image** to push images from the active note, **Add BG** to set a background, or **Image from Hydrus** to browse your Hydrus library.
 5. In the COMBAT section, pick a source (Manual, Initiative Tracker plugin, or D&D Beyond) and start the encounter.
+
+## Map screen (TV tables)
+
+A second endpoint dedicated to battlemaps for in-person play with miniatures on a horizontal TV. It is fully independent from the player screen: clearing one never touches the other, and both can run at the same time on different devices.
+
+**Setup**
+
+1. With the server running, open `http://<lan-ip>:<port>/map` on the table TV (the MAP SCREEN section in the DM panel shows the exact URL). Use the on-screen button to go fullscreen.
+2. The TV appears as a resolution badge in the panel. Click it and enter the screen's physical **diagonal in inches**; toggle the **test pattern** (a 6-inch ruler and a 1-inch square rendered on the TV) and fine-tune until a real ruler agrees. The calibration is stored per resolution and reused forever.
+3. Click **Add Map** — same sources as the background: images embedded in the active note and `hydrus://` references (images or videos, so animated maps just work). The Hydrus explorer also has a **Set as map** action.
+
+**At the table**
+
+- **Scale toggle** — *fit screen* shows the whole map (exploration); *physical 1″* renders every grid square as exactly one real inch, so miniatures sit true to RAW scale.
+- **Pan** — in physical mode most maps overflow the TV; drag the green rectangle on the panel's preview (or click anywhere in it) to choose the visible window.
+- **Rotate** — 90° steps. In fit mode a portrait map turned sideways uses the whole landscape TV.
+- **Grid overlay** — for gridless map variants: a lattice drawn over the map, aligned to its cells. `px/square` is how many map pixels one square spans (Czepeku full-resolution exports are 140; the default for new maps is configurable in settings). `offset X/Y` shift the lattice's phase in map pixels for maps whose grid doesn't start at the image corner. Line color and opacity are adjustable.
+- Everything — scale mode, pan, rotation, grid — is remembered **per map** and restored when you push the same map again.
+
+If the TV isn't calibrated yet, physical mode falls back to 96 px/inch and both the TV and the panel show a warning until you calibrate.
 
 ## Installation
 

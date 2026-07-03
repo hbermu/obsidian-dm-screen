@@ -1,6 +1,6 @@
 # Player Screen Server
 
-> An in-Obsidian HTTP + WebSocket server that hosts the player screen. Any browser on the local network can connect to it to see the DM-pushed scene; the DM controls the server lifecycle and the broadcasts.
+> An in-Obsidian HTTP + WebSocket server that hosts the player screen (`/`) and the map screen (`/map`, see `../map-screen/overview.md`). Any browser on the local network can connect to it to see the DM-pushed scene; the DM controls the server lifecycle and the broadcasts.
 
 ## Source files
 
@@ -25,16 +25,17 @@
 2. The server shall serve `GET /` and `GET /index.html` with the inline HTML built in `buildPlayerHtml()`.
 3. The server shall serve `GET /player.js` with the bundled player script.
 4. The server shall serve `GET /player.css` with the inline CSS.
+4b. The server shall serve `GET /map` (inline HTML from `buildMapHtml()`), `GET /map.js` (bundled map script), and `GET /map.css` (inline map CSS).
 5. The server shall serve `GET /health` with JSON `{ status: "ok", clients: <count> }`.
 6. The server shall serve `GET /vault/<path>` via the vault-routing rules defined in `vault-routing.md`.
 7. The server shall return HTTP 404 for any other path.
 8. When a WebSocket client connects, the server shall reject it with close code `1013` and reason `"Max clients reached"` if `clientCount >= maxClients`.
-9. When a WebSocket client connects within the limit, the server shall add it to its client set and replay every cached broadcast message.
-10. When a WebSocket client disconnects, the server shall remove it from the client set and from `clientInfoMap`, and invoke `onClientCountChanged`.
-11. When a WebSocket client sends a `client-info` message, the server shall store its payload in `clientInfoMap` and invoke `onClientInfo`.
-12. When the DM calls `broadcast(message)`, the server shall serialise the message and send it to every client whose `readyState` is `1` (OPEN).
-13. When the DM calls `broadcast({type: "clear"})`, the server shall clear the late-joiner cache before sending.
-14. When the DM calls `broadcast(message)` with any non-`clear` type, the server shall store the serialised message in the late-joiner cache, keyed by `message.type`, overwriting any previous entry of that type.
+9. When a WebSocket client connects within the limit, the server shall tag it with its channel (`map` when the upgrade path starts with `/map`, else `player`), add it to its client set, and replay every cached broadcast message of that channel.
+10. When a WebSocket client disconnects, the server shall remove it from the client set, its channel tag, and `clientInfoMap`, and invoke `onClientCountChanged`.
+11. When a WebSocket client sends a `client-info` message, the server shall store its payload plus the connection's channel in `clientInfoMap` and invoke `onClientInfo`.
+12. When the DM calls `broadcast(message)`, the server shall serialise the message and send it to every client of the message's channel (`map-` prefixed types → map clients, all others → player clients) whose `readyState` is `1` (OPEN).
+13. When the DM calls `broadcast({type: "clear"})`, the server shall purge the `player`-channel entries from the late-joiner cache before sending; `broadcast({type: "map-clear"})` shall purge the `map-*` entries symmetrically.
+14. When the DM calls `broadcast(message)` with any type other than `clear`/`map-clear`, the server shall store the serialised message in the late-joiner cache, keyed by `message.type`, overwriting any previous entry of that type.
 15. When the server stops, the server shall close every active WebSocket connection, clear its client set, and close the HTTP listener.
 16. If `autoStartServer` is true, then on plugin load the server shall start.
 17. If the workspace contains an open DM Control Panel, when the connected-client count changes the server shall trigger that panel to re-render so it can reflect the new count and resolutions.

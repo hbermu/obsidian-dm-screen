@@ -15,6 +15,7 @@ Each row points to a directory under `features/` containing one or more spec fil
 | [`dndbeyond-integration/`](dndbeyond-integration/overview.md) | Poll a D&D Beyond encounter for live combat sync | `auth.md`, `poller.md`, `encounters-and-tracking.md`, `monster-images.md` |
 | [`statblock-display/`](statblock-display/overview.md) | Inline 5e statblock panel in the DM view | — |
 | [`webhook-send/`](webhook-send/overview.md) | Send an image layer to a configured webhook (Telegram, Discord, generic multipart) | `send-modal.md`, `webhook-config.md` |
+| [`map-screen/`](map-screen/overview.md) | Dedicated `/map` endpoint rendering one battlemap at physical 1-inch-per-square scale with grid overlay | `calibration.md`, `scale-and-grid.md` |
 
 ## Adding a new feature
 

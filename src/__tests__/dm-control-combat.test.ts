@@ -22,6 +22,7 @@ function makePlugin(overrides: Record<string, unknown> = {}) {
     },
     server: null,
     sendInitiativeUpdate: vi.fn(),
+    broadcastMapCalibration: vi.fn(),
     saveSettings: vi.fn(async () => {}),
     app: { workspace: { getLeavesOfType: () => [] } },
     ...overrides,

@@ -1,0 +1,192 @@
+/* Map Screen Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0a0a0a;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+/* Waiting Screen */
+#waiting-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 20px;
+}
+
+#waiting-screen h1 {
+  font-size: 3rem;
+  color: #c9aa71;
+  text-shadow: 0 0 20px rgba(201, 170, 113, 0.3);
+}
+
+#waiting-screen p {
+  font-size: 1.2rem;
+  color: #888;
+}
+
+.pulse-dot {
+  width: 20px;
+  height: 20px;
+  background: #c9aa71;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Map stage — translated and scaled as one unit */
+#map-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+#map-stage img,
+#map-stage video {
+  display: none;
+  max-width: none;
+  max-height: none;
+}
+
+/* Grid overlay above the map, below UI chrome */
+#grid-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* Physical-scale hint chip */
+#scale-hint {
+  display: none;
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  z-index: 9999;
+  padding: 6px 12px;
+  border: 1px solid #c9aa71;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #c9aa71;
+  font-size: 0.9rem;
+}
+
+/* Calibration card */
+#calibration-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(10, 10, 10, 0.92);
+  text-align: center;
+}
+
+#calibration-overlay h2 {
+  color: #c9aa71;
+  font-size: 2rem;
+}
+
+#calibration-overlay p {
+  color: #aaa;
+  font-size: 1rem;
+}
+
+#calibration-ruler {
+  display: flex;
+  height: 36px;
+  border: 2px solid #c9aa71;
+}
+
+#calibration-ruler .ruler-inch.even {
+  background: #c9aa71;
+}
+
+#calibration-ruler .ruler-inch.odd {
+  background: #1a1a1a;
+}
+
+#calibration-square {
+  border: 2px solid #c9aa71;
+  background: rgba(201, 170, 113, 0.15);
+}
+
+/* Fullscreen toggle button */
+#fullscreen-btn {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 9999;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #c9aa71;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #c9aa71;
+  font-size: 1.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+#fullscreen-btn:hover, #fullscreen-btn:active {
+  opacity: 1;
+}
+
+/* Disconnected overlay */
+#disconnected-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 10, 0.85);
+  z-index: 10000;
+  backdrop-filter: blur(6px);
+}
+
+#disconnected-overlay .disconnected-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+#disconnected-overlay h2 {
+  font-size: 2.4rem;
+  color: #c9aa71;
+  text-shadow: 0 0 20px rgba(201, 170, 113, 0.3);
+}
+
+#disconnected-overlay p {
+  font-size: 1.1rem;
+  color: #888;
+}

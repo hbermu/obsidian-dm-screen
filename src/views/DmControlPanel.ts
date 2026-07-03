@@ -3,6 +3,8 @@ import type DmScreenPlugin from "../main";
 import type { TrackerCombatant, ImageLayer } from "../types";
 import { renderStatblock } from "./StatblockPanel";
 import { DnDBeyondPanel } from "./DnDBeyondPanel";
+import { MapScreenPanel } from "./MapScreenPanel";
+import type { ClientInfo } from "../server";
 import { SendToWebhookModal } from "./SendToWebhookModal";
 import { buildLayerContextMenu } from "./layerContextMenu";
 import { parseHydrusRefs, resolveHydrusRefs, ensureLocalCopy, type ResolvedHydrusRef } from "../hydrus/noteRefs";
@@ -63,9 +65,12 @@ export class DmControlPanel extends ItemView {
   private dmPanY = 0;
 
   // Connected player screens info
-  connectedClients: Array<{ width: number; height: number; devicePixelRatio: number }> = [];
+  connectedClients: ClientInfo[] = [];
   playerConnected = false;
   private selectedResolution: { width: number; height: number } | null = null;
+
+  // Map screen (second endpoint) state + rendering
+  mapPanel: MapScreenPanel;
 
   get playerScreenWidth(): number {
     return this.connectedClients.length > 0 ? this.connectedClients[0].width : 0;
@@ -102,6 +107,7 @@ export class DmControlPanel extends ItemView {
   constructor(leaf: WorkspaceLeaf, plugin: DmScreenPlugin) {
     super(leaf);
     this.plugin = plugin;
+    this.mapPanel = new MapScreenPanel(plugin, this);
   }
 
   getViewType(): string {
@@ -197,6 +203,7 @@ export class DmControlPanel extends ItemView {
         this.activeBackgroundUrl = msg.payload?.url ?? null;
       } catch { /* ignore */ }
     }
+    this.mapPanel.restoreFromCache(s.lastBroadcastCache ?? {});
 
     debug(
       "DmControlPanel: restoreState — layers:", this.imageLayers.length,
@@ -222,6 +229,7 @@ export class DmControlPanel extends ItemView {
         payload: { url: this.activeBackgroundUrl, mediaType },
       });
     }
+    this.mapPanel.republish();
   }
 
   saveState() {
@@ -256,13 +264,17 @@ export class DmControlPanel extends ItemView {
     }, 1000);
   }
 
-  // Called from main.ts when a player screen browser connects or resizes
-  onPlayerConnected(clients: Array<{ width: number; height: number; devicePixelRatio: number }>) {
+  // Called from main.ts when a player or map screen browser connects or resizes
+  onPlayerConnected(clients: ClientInfo[]) {
     const wasConnected = this.playerConnected;
-    this.connectedClients = clients;
-    this.playerConnected = clients.length > 0;
-    debug("DmControlPanel: onPlayerConnected — clients:", clients.length, "was:", wasConnected);
-    if (!wasConnected && this.playerConnected) {
+    const players = clients.filter((c) => c.channel !== "map");
+    const maps = clients.filter((c) => c.channel === "map");
+    const mapCountChanged = maps.length !== this.mapPanel.mapClients.length;
+    this.connectedClients = players;
+    this.mapPanel.mapClients = maps;
+    this.playerConnected = players.length > 0;
+    debug("DmControlPanel: onPlayerConnected — players:", players.length, "maps:", maps.length, "was:", wasConnected);
+    if ((!wasConnected && this.playerConnected) || mapCountChanged) {
       this.debouncedRender();
     } else {
       this.updateViewportRect();
@@ -316,6 +328,7 @@ export class DmControlPanel extends ItemView {
 
     this.renderServerSection(container);
     this.renderPlayerScreenSection(container);
+    this.mapPanel.renderSection(container);
     this.renderInitiativeSection(container);
 
     this.broadcastInitialScale();
@@ -418,7 +431,7 @@ export class DmControlPanel extends ItemView {
     });
   }
 
-  private getLanIp(): string | null {
+  getLanIp(): string | null {
     try {
       const os = require("os");
       const interfaces = os.networkInterfaces();
@@ -1818,7 +1831,7 @@ export class DmControlPanel extends ItemView {
     });
   }
 
-  private async collectHydrusRefEntries(file: TFile): Promise<ResolvedHydrusRef[]> {
+  async collectHydrusRefEntries(file: TFile): Promise<ResolvedHydrusRef[]> {
     if (!this.plugin.hydrusCache) return [];
     const body = await this.plugin.app.vault.cachedRead(file);
     const refs = parseHydrusRefs(body);
@@ -2039,7 +2052,7 @@ export class DmControlPanel extends ItemView {
     this.render();
   }
 
-  private getImagesFromNote(file: TFile): Array<{ path: string; label: string }> {
+  getImagesFromNote(file: TFile): Array<{ path: string; label: string }> {
     const imageExts = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
     const results: Array<{ path: string; label: string }> = [];
 

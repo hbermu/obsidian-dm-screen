@@ -1716,3 +1716,63 @@
   margin: 8px 0;
 }
 
+
+/* ─── Map Screen section ────────────────────────────────────────────── */
+
+.dm-map-grid-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+
+.dm-map-grid-controls input[type="number"] {
+  width: 64px;
+}
+
+.dm-map-grid-controls input[type="range"] {
+  width: 80px;
+}
+
+.dm-map-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #111;
+  user-select: none;
+}
+
+.dm-map-preview-stage {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.dm-map-preview-stage > img,
+.dm-map-preview-stage > video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.dm-map-viewport-rect {
+  position: absolute;
+  border: 2px solid #2ecc71;
+  background: rgba(46, 204, 113, 0.12);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+}
+
+.dm-map-uncalibrated {
+  font-size: 0.85em;
+  color: var(--text-warning, #e0a030);
+  margin: 4px 0;
+}

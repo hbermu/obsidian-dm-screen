@@ -4,7 +4,7 @@ Onboarding file for AI coding agents working on this repo. Read this before touc
 
 ## Project overview
 
-DM Screen is an Obsidian plugin for running D&D 5e sessions in-person. It pairs an Obsidian-side DM Control Panel with a player screen served over HTTP + WebSocket on the local network: phones, tablets, and TVs in any browser render what the DM pushes (image layers with per-layer fog of war, background image or video, an initiative tracker). It integrates with two upstream services — a self-hosted Hydrus Network for image search and the D&D Beyond service for live encounter sync — and with two community Obsidian plugins (Initiative Tracker, Fantasy Statblocks) when they are present. Image layers can also be sent outward to configured webhooks (Telegram, Discord, or any `multipart/form-data` endpoint).
+DM Screen is an Obsidian plugin for running D&D 5e sessions in-person. It pairs an Obsidian-side DM Control Panel with a player screen served over HTTP + WebSocket on the local network: phones, tablets, and TVs in any browser render what the DM pushes (image layers with per-layer fog of war, background image or video, an initiative tracker). A second endpoint (`/map`) renders one battlemap at physical 1-inch-per-square scale for playing with miniatures on a table TV. It integrates with two upstream services — a self-hosted Hydrus Network for image search and the D&D Beyond service for live encounter sync — and with two community Obsidian plugins (Initiative Tracker, Fantasy Statblocks) when they are present. Image layers can also be sent outward to configured webhooks (Telegram, Discord, or any `multipart/form-data` endpoint).
 
 ## Hard rules
 
@@ -105,6 +105,11 @@ src/
     player.css           # Player-side styles
     safeUrl.ts           # safePlayerUrl — validates payload URLs before any DOM sink
     index.html           # Template reference (real HTML is built in server.ts)
+  map/
+    map.ts               # Map-screen WebSocket client and rendering (physical scale, grid overlay)
+    map.css              # Map-screen styles
+    transform.ts         # Pure scale/translation/grid/calibration math (shared with the DM panel)
+    types.ts             # Map payload/config/profile types
   hydrus/
     client.ts            # Hydrus Client API client
     cache.ts             # Vault-folder cache with TTL sweep
@@ -129,6 +134,8 @@ src/
     RenameMonsterModal.ts       # Ephemeral display-name override for a DDB monster row
     HydrusExplorerModal.ts  # Hydrus search/explorer modal
     HydrusTagSuggester.ts   # Tag autocomplete
+    MapScreenPanel.ts    # Map Screen section of the DM panel (picker, pan preview, grid controls)
+    MapCalibrationModal.ts  # Per-screen physical calibration (diagonal + fine-tune + test pattern)
     SendToWebhookModal.ts   # Send-layer-to-webhook modal (target, preview, caption)
     StatblockPanel.ts    # 5e statblock renderer
     layerContextMenu.ts  # Right-click context menu for image-layer rows

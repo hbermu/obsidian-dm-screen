@@ -67,7 +67,7 @@ describe("VaultServeAllowlist", () => {
 
     it("snapshot is empty by default", () => {
       const allow = new VaultServeAllowlist();
-      expect(allow.snapshot()).toEqual({ background: null, layers: [] });
+      expect(allow.snapshot()).toEqual({ background: null, map: null, layers: [] });
     });
   });
 
@@ -219,7 +219,7 @@ describe("VaultServeAllowlist", () => {
       allow.observe({ type: "clear", payload: {} });
       expect(allow.isAllowed("bg.webm")).toBe(false);
       expect(allow.isAllowed("a.png")).toBe(false);
-      expect(allow.snapshot()).toEqual({ background: null, layers: [] });
+      expect(allow.snapshot()).toEqual({ background: null, map: null, layers: [] });
     });
   });
 

@@ -1,6 +1,7 @@
 import { App, Menu, Notice, PluginSettingTab, Setting } from "obsidian";
 import type DmScreenPlugin from "./main";
 import type { WebhookConfig } from "./webhooks/types";
+import type { ScreenProfile, StoredMapState } from "./map/types";
 
 export type { WebhookConfig } from "./webhooks/types";
 
@@ -74,6 +75,10 @@ export interface DmScreenSettings {
   combatTrackerScale: number;
   // Webhooks (generic image-share targets: Telegram bot, Discord webhook, …)
   webhooks: WebhookConfig[];
+  // Map screen
+  mapScreenProfiles: Record<string, ScreenProfile>; // "WxH@dpr" → physical calibration
+  mapConfigs: Record<string, StoredMapState>; // map /vault/ URL → remembered grid/view state
+  mapDefaultPxPerSquare: number; // map pixels per grid square for maps without a remembered config
   // Server limits
   maxClients: number;
   // Waiting screen (player-side)
@@ -113,6 +118,9 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   ddbInspirationPulse: true,
   combatTrackerScale: 1,
   webhooks: [],
+  mapScreenProfiles: {},
+  mapConfigs: {},
+  mapDefaultPxPerSquare: 140,
   maxClients: 10,
   waitingTitle: "Player Screen",
   waitingSubtitle: "Waiting for DM to push content...",
@@ -193,6 +201,22 @@ export class DmScreenSettingTab extends PluginSettingTab {
             this.plugin.settings.waitingSubtitle = value;
             await this.plugin.saveSettings();
             this.plugin.broadcastWaitingScreen();
+          })
+      );
+
+    containerEl.createEl("h3", { text: "Map Screen" });
+
+    new Setting(containerEl)
+      .setName("Default grid cell size (px/square)")
+      .setDesc("Map pixels per grid square assumed for maps you haven't configured yet. Czepeku full-resolution exports use 140; VTT-sized exports use 70. Adjustable per map from the DM panel.")
+      .addText((text) =>
+        text
+          .setPlaceholder("140")
+          .setValue(String(this.plugin.settings.mapDefaultPxPerSquare))
+          .onChange(async (value) => {
+            const v = parseInt(value, 10);
+            this.plugin.settings.mapDefaultPxPerSquare = Number.isFinite(v) && v >= 5 ? v : 140;
+            await this.plugin.saveSettings();
           })
       );
 
