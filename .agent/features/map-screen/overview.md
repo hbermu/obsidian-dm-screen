@@ -17,7 +17,8 @@
 ## Settings used
 
 - `mapScreenProfiles` — `"WxH@dpr"` → `{ diagonalInches, fineTune }` physical calibration per screen (see `calibration.md`)
-- `mapConfigs` — map `/vault/` URL → remembered `StoredMapState` (grid config + mode + pan), reapplied when the same map is shown again
+- `mapConfigs` — map `/vault/` URL → remembered `StoredMapState` (grid config + mode + pan + rotation), reapplied when the same map is shown again
+- `mapDefaultPxPerSquare` — starting cell size for unconfigured maps (see `scale-and-grid.md`)
 - `hydrusDefaultLoop`, `hydrusDefaultMuted` — forwarded in `map-show` for video maps
 - `tvWidth`, `tvHeight` — fallback screen used by the DM pan preview when no map client is connected
 

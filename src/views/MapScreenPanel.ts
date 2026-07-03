@@ -48,7 +48,11 @@ export class MapScreenPanel {
     }
     this.state =
       this.plugin.settings.mapConfigs[this.activeMap.url] ??
-      defaultMapState(this.activeMap.naturalWidth, this.activeMap.naturalHeight);
+      defaultMapState(
+        this.activeMap.naturalWidth,
+        this.activeMap.naturalHeight,
+        this.plugin.settings.mapDefaultPxPerSquare
+      );
     for (const type of ["map-view", "map-config"]) {
       const cached = cache[type];
       if (!cached) continue;
@@ -125,7 +129,9 @@ export class MapScreenPanel {
     }
     const url = `/vault/${encodeForVaultUrl(vaultPath)}`;
     const stored = this.plugin.settings.mapConfigs[url];
-    this.state = stored ? { ...stored } : defaultMapState(dims.w, dims.h);
+    this.state = stored
+      ? { ...stored }
+      : defaultMapState(dims.w, dims.h, this.plugin.settings.mapDefaultPxPerSquare);
     this.activeMap = { url, mediaType, naturalWidth: dims.w, naturalHeight: dims.h };
     debug("MapScreenPanel: setVaultMap", vaultPath, mediaType, `${dims.w}×${dims.h}`, stored ? "(remembered config)" : "(defaults)");
     this.broadcastShow();

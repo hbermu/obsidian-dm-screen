@@ -14,9 +14,14 @@ export const DEFAULT_GRID_CONFIG: MapGridConfig = {
   gridOpacity: 0.35,
 };
 
-export function defaultMapState(naturalWidth: number, naturalHeight: number): StoredMapState {
+export function defaultMapState(
+  naturalWidth: number,
+  naturalHeight: number,
+  pxPerSquare: number = DEFAULT_PX_PER_SQUARE
+): StoredMapState {
   return {
     ...DEFAULT_GRID_CONFIG,
+    pxPerSquare: pxPerSquare > 0 ? pxPerSquare : DEFAULT_PX_PER_SQUARE,
     mode: "fit",
     panX: naturalWidth / 2,
     panY: naturalHeight / 2,

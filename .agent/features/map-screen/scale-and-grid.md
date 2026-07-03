@@ -11,10 +11,11 @@
 ## Settings used
 
 - `mapConfigs` — per-map remembered `StoredMapState` (all values below)
+- `mapDefaultPxPerSquare` — cell size assumed for maps without a remembered config (settings-tab field, default `140`, values < 5 rejected)
 
 ## Requirements
 
-1. Every map shall carry a `pxPerSquare` (default `140`) meaning "map pixels per grid square". Czepeku full-resolution exports use 140 px cells (e.g. 4480×7000 = 32×50 squares), and the Gridded and Gridless variants of a map share dimensions, so one value covers both.
+1. Every map shall carry a `pxPerSquare` meaning "map pixels per grid square". Maps without a remembered config start from the `mapDefaultPxPerSquare` setting (default `140` — Czepeku full-resolution exports use 140 px cells, e.g. 4480×7000 = 32×50 squares; the Gridded and Gridless variants of a map share dimensions, so one value covers both).
 1b. The view shall carry a `rotation` of `0 | 90 | 180 | 270` degrees (absent means `0`, so pre-rotation cached payloads stay valid). The map client applies it as `translate(tx,ty) rotate(θ) scale(s)` around the map origin; a Rotate button in the DM section cycles it in 90° steps.
 2. In `fit` mode, the scale shall be `min(viewportW / rotatedW, viewportH / rotatedH)` — the bounding box swaps sides at 90°/270° (`rotatedSize`), which is how a portrait map gains space on a landscape TV — and the rotated map shall be centered; pan is ignored.
 3. In `physical` mode, the scale shall be `ppi / pxPerSquare` (ppi per `calibration.md`) regardless of rotation, so one grid square renders as exactly one physical inch; `panX`/`panY` are the map-pixel coordinates rendered at the viewport center (`mapTranslation` places `s·R(θ)·pan` at the center).

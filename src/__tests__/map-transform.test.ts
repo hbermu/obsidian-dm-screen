@@ -151,6 +151,11 @@ describe("defaultMapState", () => {
     expect(state.pxPerSquare).toBe(DEFAULT_PX_PER_SQUARE);
     expect(state.showGrid).toBe(false);
   });
+
+  it("accepts a configurable default cell size and guards non-positive values", () => {
+    expect(defaultMapState(100, 100, 70).pxPerSquare).toBe(70);
+    expect(defaultMapState(100, 100, 0).pxPerSquare).toBe(DEFAULT_PX_PER_SQUARE);
+  });
 });
 
 describe("gridLinePositions", () => {
