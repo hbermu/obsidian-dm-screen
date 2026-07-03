@@ -4,7 +4,7 @@ Onboarding file for AI coding agents working on this repo. Read this before touc
 
 ## Project overview
 
-DM Screen is an Obsidian plugin for running D&D 5e sessions in-person. It pairs an Obsidian-side DM Control Panel with a player screen served over HTTP + WebSocket on the local network: phones, tablets, and TVs in any browser render what the DM pushes (image layers with per-layer fog of war, background image or video, an initiative tracker). A second endpoint (`/map`) renders one battlemap at physical 1-inch-per-square scale for playing with miniatures on a table TV. It integrates with two upstream services — a self-hosted Hydrus Network for image search and the D&D Beyond service for live encounter sync — and with two community Obsidian plugins (Initiative Tracker, Fantasy Statblocks) when they are present.
+DM Screen is an Obsidian plugin for running D&D 5e sessions in-person. It pairs an Obsidian-side DM Control Panel with a player screen served over HTTP + WebSocket on the local network: phones, tablets, and TVs in any browser render what the DM pushes (image layers with per-layer fog of war, background image or video, an initiative tracker). A second endpoint (`/map`) renders one battlemap at physical 1-inch-per-square scale for playing with miniatures on a table TV. It integrates with two upstream services — a self-hosted Hydrus Network for image search and the D&D Beyond service for live encounter sync — and with two community Obsidian plugins (Initiative Tracker, Fantasy Statblocks) when they are present. Image layers can also be sent outward to configured webhooks (Telegram, Discord, or any `multipart/form-data` endpoint).
 
 ## Hard rules
 
@@ -34,7 +34,7 @@ DM Screen is an Obsidian plugin for running D&D 5e sessions in-person. It pairs 
 ### Branching and PRs
 
 - Create a branch named `<type>/<slug>` where `<type>` is one of `feature`, `fix`, `hotfix`, `chore`, `refactor`, `docs`, `test`, `ci`. Slugs are lowercase a–z, 0–9, hyphens only — no underscores, no leading hyphen, no consecutive hyphens.
-- Open the PR via `gh pr create` against `main`. The PR title must follow Conventional Commits: `<type>(<scope>): <subject>` where `<scope>` is a feature directory name under `.agent/features/` (for example `hydrus`, `fog-of-war`, `dm-preview`) or `deps`, `release`, `repo`. The subject is at least 10 characters in imperative mood with no trailing period. Exception: `release:` titles may carry just the version (e.g. `release: v0.9.0`).
+- Open the PR via `gh pr create` against `main`. The PR title must follow Conventional Commits: `<type>(<scope>): <subject>` where `<scope>` is the feature's short slug (`hydrus`, `dndbeyond`, `fog-of-war`, `dm-preview`, `webhooks`) or `deps`, `release`, `repo`, `changelog`. The lint enforces only the shape (lowercase slug, scope optional) — choosing a meaningful scope is the author's responsibility. The subject is at least 10 characters in imperative mood with no trailing period. Exception: `release:` titles may carry just the version (e.g. `release: v0.9.0`).
 - Apply a bump label on the PR (see `Release process` below). Patch is the default and needs no label; minor / major / skip need `release:minor`, `release:major`, or `release:skip`.
 - Six status checks must pass before merge: `typecheck`, `test`, `build`, `branch-name-lint`, `pr-title-lint`, `spec-update-check`.
 - The PR title type and the bump label must align with intent. `feat:` PRs are typically `release:minor`; `fix:` and `chore:` PRs are typically `release:patch` (default).
@@ -74,7 +74,7 @@ All targets run inside Docker; the container manages `node_modules`.
 | `make dev` | esbuild watcher only, no Obsidian GUI |
 | `make up` | Obsidian GUI at `https://localhost:3001` + esbuild watcher |
 | `make down` | stop containers |
-| `make clean` | remove build artefacts |
+| `make clean` | remove build artefacts and Obsidian local state (keeps vault notes) |
 
 Run `make typecheck && make test` before every commit. CI runs the same targets plus `make build`; all three must pass on every PR. The bundle smoke test (`bundle-smoke.integration.test.ts`) re-builds `main.js` inside the test run, so changes that break the production build also fail tests.
 
@@ -103,6 +103,7 @@ src/
   player/
     player.ts            # Player-side WebSocket client and rendering
     player.css           # Player-side styles
+    safeUrl.ts           # safePlayerUrl — validates payload URLs before any DOM sink
     index.html           # Template reference (real HTML is built in server.ts)
   map/
     map.ts               # Map-screen WebSocket client and rendering (physical scale, grid overlay)
@@ -112,6 +113,7 @@ src/
   hydrus/
     client.ts            # Hydrus Client API client
     cache.ts             # Vault-folder cache with TTL sweep
+    noteRefs.ts          # Parse/resolve/download hydrus:// references embedded in notes
     pagination.ts        # Client-side pagination helper
     tagFilter.ts         # Regex tag filtering
     tagInput.ts          # Comma-delimited tag query parser
@@ -120,14 +122,23 @@ src/
     poller.ts            # Long-polling with min-gap and circuit breaker
     imageCache.ts        # Monster avatar cache
     types.ts             # D&D Beyond types
+  webhooks/
+    client.ts            # sendWebhookImage — decode → multipart build → POST via requestUrl
+    multipart.ts         # Pure multipart/form-data builder + dataUrlToBytes decoder
+    types.ts             # WebhookConfig, WebhookExtraField
   views/
     DmControlPanel.ts    # Main DM view (Player Screen + COMBAT sections)
     DnDBeyondPanel.ts    # D&D Beyond tab inside the COMBAT section
+    DnDBeyondEncounterModal.ts  # Encounter picker behind the Choose Encounter button
+    MonsterConditionsModal.ts   # Conditions + exhaustion editor for a DDB monster row
+    RenameMonsterModal.ts       # Ephemeral display-name override for a DDB monster row
     HydrusExplorerModal.ts  # Hydrus search/explorer modal
     HydrusTagSuggester.ts   # Tag autocomplete
     MapScreenPanel.ts    # Map Screen section of the DM panel (picker, pan preview, grid controls)
     MapCalibrationModal.ts  # Per-screen physical calibration (diagonal + fine-tune + test pattern)
+    SendToWebhookModal.ts   # Send-layer-to-webhook modal (target, preview, caption)
     StatblockPanel.ts    # 5e statblock renderer
+    layerContextMenu.ts  # Right-click context menu for image-layer rows
   __tests__/             # Vitest unit and integration tests
 ```
 
