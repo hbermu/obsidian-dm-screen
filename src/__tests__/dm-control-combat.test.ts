@@ -202,10 +202,11 @@ describe("DmControlPanel.restoreState rebroadcast", () => {
 
     (panel as any).restoreState();
 
-    expect(serverStub.broadcast).toHaveBeenCalledTimes(1);
+    expect(serverStub.broadcast).toHaveBeenCalledTimes(2);
     const [msg] = serverStub.broadcast.mock.calls[0];
     expect(msg.type).toBe("image-layers-sync");
     expect(msg.payload.layers).toEqual(layers);
+    expect(serverStub.broadcast.mock.calls[1][0].type).toBe("image-layers-geometry");
   });
 
   it("does not broadcast when there are no restored layers", () => {
@@ -274,9 +275,15 @@ describe("DmControlPanel.republishToServer", () => {
 
     panel.republishToServer();
 
-    expect(serverStub.broadcast).toHaveBeenCalledTimes(1);
-    const [msg] = (serverStub.broadcast as any).mock.calls[0];
-    expect(msg.type).toBe("image-layers-sync");
+    expect(serverStub.broadcast).toHaveBeenCalledTimes(2);
+    const types = (serverStub.broadcast as any).mock.calls.map(([m]: any[]) => m.type);
+    expect(types).toEqual(["image-layers-sync", "image-layers-geometry"]);
+    const geometry = (serverStub.broadcast as any).mock.calls[1][0].payload.layers[0];
+    expect(geometry).toEqual({
+      id: "l1", x: 0, y: 0, width: 30, height: 60,
+      zIndex: 1, rotation: 0, visible: true, bordered: true,
+    });
+    expect("dataUrl" in geometry).toBe(false);
   });
 
   it("is a no-op when the server is not running", () => {

@@ -15,7 +15,7 @@
 ### Preview drag
 
 1. The DM panel preview shall render each visible layer as a `.dm-layer-rect` positioning wrapper sized to the layer's percentage geometry, plus a nested `.dm-layer-rect-frame` that carries the layer's `dataUrl` background, the colored border, the fog overlay, and the fog-edit canvas. The frame is sized at image-load time to the actual rectangle the image occupies inside the wrapper (preserving its natural aspect ratio) so the DM-side colored border hugs the visible image — same behaviour as the player-side `.image-layer-frame`.
-2. When the user mousedown-drags a layer rectangle on the preview, the DM panel shall update `layer.x` and `layer.y` in real time and call `broadcastImageLayers` on mouseup.
+2. When the user mousedown-drags a layer rectangle on the preview, the DM panel shall update `layer.x` and `layer.y` in real time, stream `image-layers-geometry` during the drag (trailing-throttled at 50 ms via `broadcastLayerGeometry`), and call `broadcastImageLayers` on mouseup.
 3. While a layer is in fog-edit mode (`fogEditLayerId === layer.id`), the DM panel shall NOT install the drag handlers on that layer (drawing takes precedence).
 
 ### Layer row buttons (left column, top to bottom)
@@ -27,7 +27,7 @@
 ### Scale slider (middle column)
 
 7. The scale slider shall control `layer.width` as a percentage, range `10`–`500`.
-8. When the slider value changes, the DM panel shall adjust `layer.width` and `layer.height` so that the aspect ratio is preserved and the layer's centre stays in place; the change shall broadcast on every input event.
+8. When the slider value changes, the DM panel shall adjust `layer.width` and `layer.height` so that the aspect ratio is preserved and the layer's centre stays in place; every input event shall stream `image-layers-geometry` (trailing-throttled) and the slider's change event shall broadcast the full `image-layers-sync`.
 9. When the user holds Shift and presses ArrowLeft / ArrowRight on the slider, the slider value shall snap to the next lower or higher multiple of 10.
 
 ### Rotation, z-order, remove (right column, top row)

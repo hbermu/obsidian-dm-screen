@@ -89,6 +89,21 @@ export interface TrackerCombatant {
   source: "manual" | "tracker-plugin";
 }
 
+// Lightweight per-layer geometry, broadcast during continuous gestures
+// (drag, scale slider) so the player can follow live without re-shipping
+// the base64 payloads in ImageLayer.dataUrl / fogDataUrl.
+export interface LayerGeometry {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zIndex: number;
+  rotation: number;
+  visible: boolean;
+  bordered: boolean;
+}
+
 // Image layer for multi-image player screen display
 export interface ImageLayer {
   id: string;

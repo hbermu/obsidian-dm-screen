@@ -102,6 +102,7 @@ src/
   global.d.ts            # Window augmentations (InitiativeTracker, FantasyStatblocks)
   player/
     player.ts            # Player-side WebSocket client and rendering
+    layerRenderer.ts     # Id-keyed DOM reconciler for the image-layer stack
     player.css           # Player-side styles
     safeUrl.ts           # safePlayerUrl — validates payload URLs before any DOM sink
     index.html           # Template reference (real HTML is built in server.ts)
