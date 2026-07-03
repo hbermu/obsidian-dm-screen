@@ -7,10 +7,14 @@ export interface MapMediaPayload {
   muted?: boolean;
 }
 
+export type MapRotation = 0 | 90 | 180 | 270;
+
 export interface MapView {
   mode: "physical" | "fit";
   panX: number;
   panY: number;
+  // Optional so cached pre-rotation payloads stay valid; absent means 0.
+  rotation?: MapRotation;
 }
 
 export interface MapGridConfig {

@@ -91,8 +91,8 @@ export class MapScreenPanel {
 
   private broadcastView(immediate = false) {
     const send = () => {
-      const { mode, panX, panY } = this.state;
-      this.plugin.server?.broadcast({ type: "map-view", payload: { mode, panX, panY } });
+      const { mode, panX, panY, rotation } = this.state;
+      this.plugin.server?.broadcast({ type: "map-view", payload: { mode, panX, panY, rotation: rotation ?? 0 } });
     };
     if (immediate) {
       if (this.viewBroadcastTimer) {
@@ -302,6 +302,15 @@ export class MapScreenPanel {
       this.host.render();
     });
 
+    const rotateBtn = btnRow.createEl("button", { text: `Rotate: ${this.state.rotation ?? 0}°` });
+    rotateBtn.title = "Rotate the map on the screen in 90° steps";
+    rotateBtn.addEventListener("click", () => {
+      this.state.rotation = ((((this.state.rotation ?? 0) + 90) % 360) as 0 | 90 | 180 | 270);
+      this.broadcastView(true);
+      this.persistState();
+      this.host.render();
+    });
+
     this.renderGridControls(section);
     this.renderPanPreview(section, map);
   }
@@ -392,8 +401,11 @@ export class MapScreenPanel {
       });
     }
     const scale = ppi / this.state.pxPerSquare;
-    const visW = client.width / scale;
-    const visH = client.height / scale;
+    // The preview stays in map orientation; under a 90°/270° rotation the
+    // screen's long side runs along the map's Y axis, so the window swaps.
+    const sideways = ((this.state.rotation ?? 0) % 180) !== 0;
+    const visW = (sideways ? client.height : client.width) / scale;
+    const visH = (sideways ? client.width : client.height) / scale;
 
     const rect = preview.createDiv("dm-map-viewport-rect");
     const positionRect = () => {

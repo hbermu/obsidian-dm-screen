@@ -5,6 +5,7 @@
 import { safePlayerUrl } from "../player/safeUrl";
 import {
   cssPixelsPerInch,
+  gridAxisOffsets,
   gridLinePositions,
   mapScale,
   mapTranslation,
@@ -253,6 +254,7 @@ class MapScreen {
     }
 
     const { ppi, calibrated } = this.currentPpi();
+    const rotation = this.view.rotation ?? 0;
     const scale = mapScale(this.view, ppi, this.config.pxPerSquare, nw, nh, vw, vh);
     const { tx, ty } = mapTranslation(this.view, scale, nw, nh, vw, vh);
 
@@ -261,18 +263,19 @@ class MapScreen {
     ) as HTMLElement;
     mediaEl.style.width = `${nw}px`;
     mediaEl.style.height = `${nh}px`;
-    stage.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    stage.style.transform = `translate(${tx}px, ${ty}px) rotate(${rotation}deg) scale(${scale})`;
 
     if (this.config.showGrid) {
+      const axes = gridAxisOffsets(rotation, this.config.gridOffsetX, this.config.gridOffsetY);
       ctx.globalAlpha = this.config.gridOpacity;
       ctx.strokeStyle = this.config.gridColor;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      for (const x of gridLinePositions(tx, this.config.gridOffsetX, this.config.pxPerSquare, scale, vw)) {
+      for (const x of gridLinePositions(tx, axes.vertical, this.config.pxPerSquare, scale, vw)) {
         ctx.moveTo(x, 0);
         ctx.lineTo(x, vh);
       }
-      for (const y of gridLinePositions(ty, this.config.gridOffsetY, this.config.pxPerSquare, scale, vh)) {
+      for (const y of gridLinePositions(ty, axes.horizontal, this.config.pxPerSquare, scale, vh)) {
         ctx.moveTo(0, y);
         ctx.lineTo(vw, y);
       }

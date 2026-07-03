@@ -1,4 +1,4 @@
-import type { MapGridConfig, MapView, ScreenProfile, StoredMapState } from "./types";
+import type { MapGridConfig, MapRotation, MapView, ScreenProfile, StoredMapState } from "./types";
 
 // CSS reference DPI — browsers cannot report the true physical DPI of a
 // display, so this is the only honest fallback when no screen profile exists.
@@ -20,7 +20,28 @@ export function defaultMapState(naturalWidth: number, naturalHeight: number): St
     mode: "fit",
     panX: naturalWidth / 2,
     panY: naturalHeight / 2,
+    rotation: 0,
   };
+}
+
+// Map point → screen direction under a CSS `rotate(θ)` (clockwise, y-down).
+export function rotatePoint(x: number, y: number, rotation: MapRotation): { x: number; y: number } {
+  switch (rotation) {
+    case 90: return { x: -y, y: x };
+    case 180: return { x: -x, y: -y };
+    case 270: return { x: y, y: -x };
+    default: return { x, y };
+  }
+}
+
+export function rotatedSize(
+  naturalWidth: number,
+  naturalHeight: number,
+  rotation: MapRotation
+): { width: number; height: number } {
+  return rotation % 180 === 0
+    ? { width: naturalWidth, height: naturalHeight }
+    : { width: naturalHeight, height: naturalWidth };
 }
 
 export function profileKey(width: number, height: number, devicePixelRatio: number): string {
@@ -48,11 +69,15 @@ export function mapScale(
 ): number {
   if (view.mode === "fit") {
     if (!(naturalWidth > 0) || !(naturalHeight > 0)) return 1;
-    return Math.min(viewportWidth / naturalWidth, viewportHeight / naturalHeight);
+    const rotated = rotatedSize(naturalWidth, naturalHeight, view.rotation ?? 0);
+    return Math.min(viewportWidth / rotated.width, viewportHeight / rotated.height);
   }
   return ppi / (pxPerSquare > 0 ? pxPerSquare : DEFAULT_PX_PER_SQUARE);
 }
 
+// Translation for `translate(tx,ty) rotate(θ) scale(s)` (screen = T + s·R·p):
+// the pan point lands at the viewport center. Fit mode pans to the map
+// center, which also centers the rotated bounding box.
 export function mapTranslation(
   view: MapView,
   scale: number,
@@ -61,16 +86,32 @@ export function mapTranslation(
   viewportWidth: number,
   viewportHeight: number
 ): { tx: number; ty: number } {
-  if (view.mode === "fit") {
-    return {
-      tx: (viewportWidth - naturalWidth * scale) / 2,
-      ty: (viewportHeight - naturalHeight * scale) / 2,
-    };
-  }
+  const rotation = view.rotation ?? 0;
+  const pan =
+    view.mode === "fit"
+      ? { x: naturalWidth / 2, y: naturalHeight / 2 }
+      : { x: view.panX, y: view.panY };
+  const r = rotatePoint(pan.x, pan.y, rotation);
   return {
-    tx: viewportWidth / 2 - view.panX * scale,
-    ty: viewportHeight / 2 - view.panY * scale,
+    tx: viewportWidth / 2 - r.x * scale,
+    ty: viewportHeight / 2 - r.y * scale,
   };
+}
+
+// Which map-axis lattice feeds each screen axis under rotation, as signed
+// map-pixel offsets for gridLinePositions (vertical = screen-x lines,
+// horizontal = screen-y lines).
+export function gridAxisOffsets(
+  rotation: MapRotation,
+  gridOffsetX: number,
+  gridOffsetY: number
+): { vertical: number; horizontal: number } {
+  switch (rotation) {
+    case 90: return { vertical: -gridOffsetY, horizontal: gridOffsetX };
+    case 180: return { vertical: -gridOffsetX, horizontal: -gridOffsetY };
+    case 270: return { vertical: gridOffsetY, horizontal: -gridOffsetX };
+    default: return { vertical: gridOffsetX, horizontal: gridOffsetY };
+  }
 }
 
 export function clampPan(

@@ -41,7 +41,7 @@
 | `inspiration-style` | DM → player | `{ pulse: boolean }` | Server start; `ddbInspirationPulse` setting toggled | yes |
 | `clear` | DM → player | `{}` | DM clicks Clear Player Screen | no (purges player-channel cache) |
 | `map-show` | DM → map | `{ url: string, mediaType: "image" \| "video", naturalWidth: number, naturalHeight: number, loop?: boolean, muted?: boolean }` | DM applies a map (Add Map picker or Hydrus Set as map); `republishToServer()` | yes |
-| `map-view` | DM → map | `{ mode: "physical" \| "fit", panX: number, panY: number }` | Scale-mode toggle; pan drag (throttled) | yes |
+| `map-view` | DM → map | `{ mode: "physical" \| "fit", panX: number, panY: number, rotation: 0 \| 90 \| 180 \| 270 }` | Scale-mode toggle; Rotate button; pan drag (throttled) | yes |
 | `map-config` | DM → map | `{ pxPerSquare, gridOffsetX, gridOffsetY, showGrid, gridColor, gridOpacity }` | Any grid control change | yes |
 | `map-calibration` | DM → map | `{ profiles: Record<string, { diagonalInches, fineTune }> }` | Server start; calibration modal change | yes |
 | `map-calibration-overlay` | DM → map | `{ show: boolean }` | Calibration test-pattern toggle | yes |
