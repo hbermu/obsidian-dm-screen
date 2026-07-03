@@ -2,7 +2,7 @@ import esbuild from "esbuild";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildPlayerBundle } from "../../../scripts/build-player.mjs";
+import { buildPlayerBundle, buildMapBundle } from "../../../scripts/build-player.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../..");
@@ -15,6 +15,7 @@ export default async function globalSetup() {
   try {
     fs.mkdirSync(harnessOutDir, { recursive: true });
     const { js, css, html } = await buildPlayerBundle({ minify: true });
+    const { js: mapJs, css: mapCss } = await buildMapBundle({ minify: true });
 
     await esbuild.build({
       entryPoints: [path.join(repoRoot, "test/visual/harness/server-entry.ts")],
@@ -30,6 +31,7 @@ export default async function globalSetup() {
       define: {
         PLAYER_HTML: JSON.stringify(html),
         PLAYER_CSS: JSON.stringify(css),
+        MAP_CSS: JSON.stringify(mapCss),
       },
       plugins: [
         {
@@ -41,6 +43,19 @@ export default async function globalSetup() {
             }));
             build.onLoad({ filter: /.*/, namespace: "player-inline" }, () => ({
               contents: `module.exports = ${JSON.stringify(js)};`,
+              loader: "js",
+            }));
+          },
+        },
+        {
+          name: "map-screen-inline",
+          setup(build) {
+            build.onResolve({ filter: /^map-screen-bundle$/ }, () => ({
+              path: "map-screen-bundle",
+              namespace: "map-inline",
+            }));
+            build.onLoad({ filter: /.*/, namespace: "map-inline" }, () => ({
+              contents: `module.exports = ${JSON.stringify(mapJs)};`,
               loader: "js",
             }));
           },

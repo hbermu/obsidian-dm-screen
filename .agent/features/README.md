@@ -14,6 +14,7 @@ Each row points to a directory under `features/` containing one or more spec fil
 | [`hydrus-integration/`](hydrus-integration/overview.md) | Browse a Hydrus library and use files as backgrounds or layers | `connection-and-services.md`, `explorer.md`, `search.md`, `tag-suggester.md`, `cache.md` |
 | [`dndbeyond-integration/`](dndbeyond-integration/overview.md) | Poll a D&D Beyond encounter for live combat sync | `auth.md`, `poller.md`, `encounters-and-tracking.md`, `monster-images.md` |
 | [`statblock-display/`](statblock-display/overview.md) | Inline 5e statblock panel in the DM view | — |
+| [`map-screen/`](map-screen/overview.md) | Dedicated `/map` endpoint rendering one battlemap at physical 1-inch-per-square scale with grid overlay | `calibration.md`, `scale-and-grid.md` |
 
 ## Adding a new feature
 

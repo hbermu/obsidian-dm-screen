@@ -1,6 +1,7 @@
 import { App, Menu, Notice, PluginSettingTab, Setting } from "obsidian";
 import type DmScreenPlugin from "./main";
 import type { WebhookConfig } from "./webhooks/types";
+import type { ScreenProfile, StoredMapState } from "./map/types";
 
 export type { WebhookConfig } from "./webhooks/types";
 
@@ -74,6 +75,9 @@ export interface DmScreenSettings {
   combatTrackerScale: number;
   // Webhooks (generic image-share targets: Telegram bot, Discord webhook, …)
   webhooks: WebhookConfig[];
+  // Map screen
+  mapScreenProfiles: Record<string, ScreenProfile>; // "WxH@dpr" → physical calibration
+  mapConfigs: Record<string, StoredMapState>; // map /vault/ URL → remembered grid/view state
   // Server limits
   maxClients: number;
   // Waiting screen (player-side)
@@ -113,6 +117,8 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   ddbInspirationPulse: true,
   combatTrackerScale: 1,
   webhooks: [],
+  mapScreenProfiles: {},
+  mapConfigs: {},
   maxClients: 10,
   waitingTitle: "Player Screen",
   waitingSubtitle: "Waiting for DM to push content...",

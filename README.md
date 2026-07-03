@@ -18,6 +18,7 @@ Built for in-person 5e games where the DM wants a clean visual layer for the pla
 - **Initiative tracker** — manual, synced from the Initiative Tracker plugin, or live from a D&D Beyond encounter.
 - **Statblock display** — inline 5e statblocks via Fantasy Statblocks.
 - **Multi-screen aware** — multiple connected players with per-client resolution detection.
+- **Map screen for TV tables** — a dedicated `/map` endpoint renders one battlemap (image or animated video) at true 1-inch-per-square physical scale for miniatures on a horizontal TV: per-screen calibration with a ruler test pattern, DM-side panning, fit/physical toggle, and an optional grid overlay for gridless maps.
 - **Send layer to webhook** — right-click an image layer to POST it to Telegram, Discord, or any `multipart/form-data` endpoint with an editable caption.
 
 ![Fog of war on the DM preview](docs/screenshots/fog-of-war.png)

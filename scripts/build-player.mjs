@@ -19,3 +19,19 @@ export async function buildPlayerBundle({ minify = false } = {}) {
     : "";
   return { js, css, html };
 }
+
+export async function buildMapBundle({ minify = false } = {}) {
+  const result = await esbuild.build({
+    entryPoints: ["src/map/map.ts"],
+    bundle: true,
+    write: false,
+    format: "iife",
+    target: "es2020",
+    minify,
+  });
+  const js = result.outputFiles[0].text;
+  const css = fs.existsSync("src/map/map.css")
+    ? fs.readFileSync("src/map/map.css", "utf-8")
+    : "";
+  return { js, css };
+}

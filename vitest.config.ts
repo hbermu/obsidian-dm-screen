@@ -14,6 +14,7 @@ export default defineConfig({
     alias: {
       obsidian: resolve(__dirname, "test/stubs/obsidian.ts"),
       "player-screen-bundle": resolve(__dirname, "test/stubs/player-screen-bundle.ts"),
+      "map-screen-bundle": resolve(__dirname, "test/stubs/map-screen-bundle.ts"),
     },
   },
 });

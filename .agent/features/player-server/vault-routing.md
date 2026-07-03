@@ -4,7 +4,7 @@
 
 ## Security boundary
 
-The `/vault/` endpoint is gated by a **display allowlist** derived from the broadcast stream: the only paths it will read are those currently surfaced to the player screen by `show-background-media` or `image-layers-sync`. Any other path returns 404 before any disk read. The allowlist — not the bind address or the LAN — is the access-control boundary for this endpoint, so a future change that exposes the server beyond LAN does not re-open the file-read hole.
+The `/vault/` endpoint is gated by a **display allowlist** derived from the broadcast stream: the only paths it will read are those currently surfaced to the player screen by `show-background-media` or `image-layers-sync`, or to the map screen by `map-show`. Any other path returns 404 before any disk read. The allowlist — not the bind address or the LAN — is the access-control boundary for this endpoint, so a future change that exposes the server beyond LAN does not re-open the file-read hole.
 
 ## Source files
 
@@ -20,8 +20,8 @@ The `/vault/` endpoint is gated by a **display allowlist** derived from the broa
 
 1. The server shall accept `GET /vault/<urlencoded-relative-path>`.
 2. When the request arrives, the server shall URL-decode the path and reject the request with HTTP 400 if the decoded path contains `..` or starts with `/`.
-3. When `broadcast(message)` is called, the server shall update an in-memory display allowlist from `message`: a `show-background-media` whose `payload.url` is a `/vault/<path>` URL shall set the current background path to that decoded path; a `show-background-media` whose `payload.url` is any other value (e.g. a `data:` URL, an absolute HTTP URL, missing, non-string) shall clear the current background path; a `hide-background-media` shall clear the current background path; an `image-layers-sync` shall set the allowed layer paths to exactly the decoded `/vault/<path>` values found in each layer's `dataUrl` and `fogDataUrl` (non-`/vault/` URLs are ignored); a `clear` shall empty both the background path and the layer-path set.
-4. The display allowlist shall be the union of the current background path and the layer-path set, so revoking one channel shall not revoke the other.
+3. When `broadcast(message)` is called, the server shall update an in-memory display allowlist from `message`: a `show-background-media` whose `payload.url` is a `/vault/<path>` URL shall set the current background path to that decoded path; a `show-background-media` whose `payload.url` is any other value (e.g. a `data:` URL, an absolute HTTP URL, missing, non-string) shall clear the current background path; a `hide-background-media` shall clear the current background path; a `map-show` shall set (or, for non-`/vault/` values, clear) the current map path the same way; a `map-clear` shall clear the current map path; an `image-layers-sync` shall set the allowed layer paths to exactly the decoded `/vault/<path>` values found in each layer's `dataUrl` and `fogDataUrl` (non-`/vault/` URLs are ignored); a `clear` shall empty the background path and the layer-path set but leave the map path untouched.
+4. The display allowlist shall be the union of the current background path, the current map path, and the layer-path set, so revoking one channel shall not revoke the others.
 5. If the decoded path is not on the display allowlist, then the server shall respond with HTTP 404 `Not found` and shall not call `readVaultBytes` for that path. The `..`/leading-`/` guard from requirement 2 shall run before this check.
 6. When the path is on the allowlist, the server shall read the bytes via `readVaultBytes(app, decodedPath)`.
 7. The `readVaultBytes` helper shall first try `vault.getAbstractFileByPath` and `vault.readBinary` for files inside the indexed vault.
@@ -35,6 +35,7 @@ The `/vault/` endpoint is gated by a **display allowlist** derived from the broa
 
 - `src/__tests__/server-vault-path.test.ts` — `..` rejection, leading-slash rejection, MIME type assignment, dotfolder fallback
 - `src/__tests__/server-vault-allowlist.test.ts` — `vaultPathFromUrl` decoding and rejection of non-`/vault/` / non-string / malformed inputs; `VaultServeAllowlist` deny-by-default, background allow/replace/hide, layer collection ignoring `data:` URLs, union of background and layers, `clear` semantics
+- `src/__tests__/server-map-channel.test.ts` — map slot admit/revoke via `map-show`/`map-clear`, independence from background and `clear`, non-vault map URLs ignored
 - `src/__tests__/server-vault-allowlist.integration.test.ts` — end-to-end HTTP: undisplayed paths return 404 without touching disk; broadcasting a `/vault/` background admits its path; `hide-background-media` and `clear` revoke; layer paths admitted; traversal still 400; background/layer union honoured
 - `src/__tests__/server-bootstrap.integration.test.ts` — end-to-end `/vault/` hit with a real vault adapter mock
 

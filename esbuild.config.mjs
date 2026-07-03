@@ -2,7 +2,7 @@ import esbuild from "esbuild";
 import process from "process";
 import fs from "fs";
 import path from "path";
-import { buildPlayerBundle } from "./scripts/build-player.mjs";
+import { buildPlayerBundle, buildMapBundle } from "./scripts/build-player.mjs";
 
 const prod = process.argv[2] === "production";
 const outDir = process.env.BUILD_OUT;
@@ -16,6 +16,7 @@ if (outDir) {
 }
 
 const { css: playerCss, html: playerHtml } = await buildPlayerBundle({ minify: prod });
+const { css: mapCss } = await buildMapBundle({ minify: prod });
 
 const context = await esbuild.context({
   entryPoints: ["src/main.ts"],
@@ -32,6 +33,7 @@ const context = await esbuild.context({
   define: {
     "PLAYER_HTML": JSON.stringify(playerHtml),
     "PLAYER_CSS": JSON.stringify(playerCss),
+    "MAP_CSS": JSON.stringify(mapCss),
   },
   plugins: [
     {
@@ -45,6 +47,25 @@ const context = await esbuild.context({
           { filter: /.*/, namespace: "player-inline" },
           async () => {
             const { js } = await buildPlayerBundle({ minify: prod });
+            return {
+              contents: `export default ${JSON.stringify(js)};`,
+              loader: "js",
+            };
+          }
+        );
+      },
+    },
+    {
+      name: "map-screen-inline",
+      setup(build) {
+        build.onResolve({ filter: /^map-screen-bundle$/ }, () => ({
+          path: "map-screen-bundle",
+          namespace: "map-inline",
+        }));
+        build.onLoad(
+          { filter: /.*/, namespace: "map-inline" },
+          async () => {
+            const { js } = await buildMapBundle({ minify: prod });
             return {
               contents: `export default ${JSON.stringify(js)};`,
               loader: "js",

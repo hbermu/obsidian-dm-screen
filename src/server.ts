@@ -3,10 +3,12 @@ import { TFile } from "obsidian";
 import type DmScreenPlugin from "./main";
 import { debug, debugWarn, debugError } from "./debug";
 
-// Player screen HTML/CSS/JS are inlined at build time
+// Player/map screen HTML/CSS/JS are inlined at build time
 declare const PLAYER_HTML: string;
 declare const PLAYER_CSS: string;
+declare const MAP_CSS: string;
 import playerJs from "player-screen-bundle";
+import mapJs from "map-screen-bundle";
 
 interface WebSocketLike {
   send(data: string): void;
@@ -20,10 +22,17 @@ export interface PlayerMessage {
   payload: Record<string, unknown>;
 }
 
+export type ClientChannel = "player" | "map";
+
 export interface ClientInfo {
   width: number;
   height: number;
   devicePixelRatio: number;
+  channel?: ClientChannel;
+}
+
+export function messageChannel(type: string): ClientChannel {
+  return type.startsWith("map-") ? "map" : "player";
 }
 
 export function vaultPathFromUrl(url: unknown): string | null {
@@ -37,6 +46,7 @@ export function vaultPathFromUrl(url: unknown): string | null {
 
 export class VaultServeAllowlist {
   private background: string | null = null;
+  private map: string | null = null;
   private layers: Set<string> = new Set();
 
   observe(message: PlayerMessage): void {
@@ -46,6 +56,12 @@ export class VaultServeAllowlist {
         return;
       case "hide-background-media":
         this.background = null;
+        return;
+      case "map-show":
+        this.map = vaultPathFromUrl((message.payload as { url?: unknown }).url);
+        return;
+      case "map-clear":
+        this.map = null;
         return;
       case "image-layers-sync": {
         const raw = (message.payload as { layers?: unknown }).layers;
@@ -70,11 +86,11 @@ export class VaultServeAllowlist {
   }
 
   isAllowed(decodedPath: string): boolean {
-    return decodedPath === this.background || this.layers.has(decodedPath);
+    return decodedPath === this.background || decodedPath === this.map || this.layers.has(decodedPath);
   }
 
-  snapshot(): { background: string | null; layers: string[] } {
-    return { background: this.background, layers: [...this.layers] };
+  snapshot(): { background: string | null; map: string | null; layers: string[] } {
+    return { background: this.background, map: this.map, layers: [...this.layers] };
   }
 }
 
@@ -82,6 +98,7 @@ export class PlayerScreenServer {
   private plugin: DmScreenPlugin;
   private httpServer: Server | null = null;
   private clients: Set<WebSocketLike> = new Set();
+  private clientChannels: Map<WebSocketLike, ClientChannel> = new Map();
   private clientInfoMap: Map<WebSocketLike, ClientInfo> = new Map();
   maxClients = 10;
   onClientInfo: ((info: ClientInfo) => void) | null = null;
@@ -114,22 +131,22 @@ export class PlayerScreenServer {
       const { WebSocketServer } = require("ws") as typeof import("ws");
       const wss = new WebSocketServer({ server: this.httpServer });
 
-      wss.on("connection", (ws: WebSocketLike) => {
+      wss.on("connection", (ws: WebSocketLike, req?: { url?: string }) => {
         if (this.clients.size >= this.maxClients) {
           ws.close(1013, "Max clients reached");
           return;
         }
+        const channel: ClientChannel = req?.url?.startsWith("/map") ? "map" : "player";
         this.clients.add(ws);
-        debug("WS client connected. Total:", this.clients.size);
+        this.clientChannels.set(ws, channel);
+        debug("WS client connected on channel", channel, "- Total:", this.clients.size);
         if (this.onClientCountChanged) this.onClientCountChanged();
 
-        // Replay last state to late-joining client
-        for (const data of this.lastState.values()) {
-          if (ws.readyState === 1) ws.send(data);
-        }
+        this.replayCachedState(ws, channel);
 
         ws.on("close", () => {
           this.clients.delete(ws);
+          this.clientChannels.delete(ws);
           this.clientInfoMap.delete(ws);
           debug("WS client disconnected. Total:", this.clients.size);
           if (this.onClientCountChanged) this.onClientCountChanged();
@@ -139,9 +156,9 @@ export class PlayerScreenServer {
           try {
             const msg = JSON.parse(String(data));
             if (msg.type === "client-info") {
-              debug("WS client-info received:", msg.payload);
-              this.clientInfoMap.set(ws, msg.payload);
-              if (this.onClientInfo) this.onClientInfo(msg.payload);
+              debug("WS client-info received:", msg.payload, "channel:", channel);
+              this.clientInfoMap.set(ws, { ...msg.payload, channel });
+              if (this.onClientInfo) this.onClientInfo(this.clientInfoMap.get(ws)!);
             } else {
               debug("WS message from player:", msg.type);
             }
@@ -166,23 +183,36 @@ export class PlayerScreenServer {
         client.close();
       }
       this.clients.clear();
+      this.clientChannels.clear();
       this.httpServer.close();
       this.httpServer = null;
     }
   }
 
+  // Replay cached broadcasts of the client's own channel to a late joiner.
+  private replayCachedState(ws: WebSocketLike, channel: ClientChannel) {
+    for (const [type, data] of this.lastState.entries()) {
+      if (messageChannel(type) !== channel) continue;
+      if (ws.readyState === 1) ws.send(data);
+    }
+  }
+
   broadcast(message: PlayerMessage) {
     this.allowlist.observe(message);
+    const channel = messageChannel(message.type);
     const data = JSON.stringify(message);
-    debug("broadcast:", message.type, "→", this.clients.size, "client(s)", `(${data.length} bytes)`);
+    debug("broadcast:", message.type, "→ channel", channel, `(${data.length} bytes)`);
 
-    if (message.type === "clear") {
-      this.lastState.clear();
+    if (message.type === "clear" || message.type === "map-clear") {
+      for (const type of [...this.lastState.keys()]) {
+        if (messageChannel(type) === channel) this.lastState.delete(type);
+      }
     } else {
       this.lastState.set(message.type, data);
     }
 
     for (const client of this.clients) {
+      if ((this.clientChannels.get(client) ?? "player") !== channel) continue;
       if (client.readyState === 1) {
         client.send(data);
       }
@@ -203,6 +233,15 @@ export class PlayerScreenServer {
     } else if (url === "/player.css") {
       res.writeHead(200, { "Content-Type": "text/css; charset=utf-8" });
       res.end(PLAYER_CSS);
+    } else if (url === "/map") {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(buildMapHtml());
+    } else if (url === "/map.js") {
+      res.writeHead(200, { "Content-Type": "application/javascript; charset=utf-8" });
+      res.end(mapJs);
+    } else if (url === "/map.css") {
+      res.writeHead(200, { "Content-Type": "text/css; charset=utf-8" });
+      res.end(MAP_CSS);
     } else if (url === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ status: "ok", clients: this.clients.size }));
@@ -297,6 +336,36 @@ export class PlayerScreenServer {
 </body>
 </html>`;
   }
+}
+
+function buildMapHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DM Screen - Map View</title>
+  <link rel="stylesheet" href="/map.css">
+</head>
+<body>
+  <div id="app">
+    <div id="waiting-screen">
+      <h1>Map Screen</h1>
+      <p>Waiting for DM to push a map...</p>
+      <div class="pulse-dot"></div>
+    </div>
+    <div id="map-stage">
+      <video id="map-video" muted loop playsinline></video>
+      <img id="map-image" alt="" />
+    </div>
+    <canvas id="grid-overlay"></canvas>
+    <div id="calibration-overlay"></div>
+    <div id="scale-hint"></div>
+    <button id="fullscreen-btn" aria-label="Toggle fullscreen">⛶</button>
+  </div>
+  <script src="/map.js"></script>
+</body>
+</html>`;
 }
 
 function escapeHtml(s: string): string {

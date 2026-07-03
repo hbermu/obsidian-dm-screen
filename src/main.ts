@@ -176,14 +176,16 @@ export default class DmScreenPlugin extends Plugin {
       const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
       for (const leaf of leaves) {
         const view = leaf.view as DmControlPanel;
-        view.connectedClients = clients;
-        view.playerConnected = clients.length > 0;
+        view.connectedClients = clients.filter((c) => c.channel !== "map");
+        view.mapPanel.mapClients = clients.filter((c) => c.channel === "map");
+        view.playerConnected = view.connectedClients.length > 0;
         view.debouncedRender?.();
       }
     };
     this.server.start(this.settings.serverPort);
     this.broadcastWaitingScreen();
     this.broadcastInspirationStyle();
+    this.broadcastMapCalibration();
     const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
     for (const leaf of leaves) {
       const view = leaf.view as DmControlPanel;
@@ -213,6 +215,15 @@ export default class DmScreenPlugin extends Plugin {
     });
   }
 
+  broadcastMapCalibration(): void {
+    if (!this.server) return;
+    debug("broadcastMapCalibration: profiles=", Object.keys(this.settings.mapScreenProfiles).length);
+    this.server.broadcast({
+      type: "map-calibration",
+      payload: { profiles: this.settings.mapScreenProfiles },
+    });
+  }
+
   refreshOpenDmPanels(): void {
     const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
     for (const leaf of leaves) {
@@ -221,7 +232,7 @@ export default class DmScreenPlugin extends Plugin {
     }
   }
 
-  private onPlayerClientInfo(_info: { width: number; height: number; devicePixelRatio: number }) {
+  private onPlayerClientInfo(_info: { width: number; height: number; devicePixelRatio: number; channel?: "player" | "map" }) {
     const leaves = this.app.workspace.getLeavesOfType(DM_CONTROL_VIEW_TYPE);
     for (const leaf of leaves) {
       const view = leaf.view as DmControlPanel;
