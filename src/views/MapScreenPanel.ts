@@ -369,14 +369,26 @@ export class MapScreenPanel {
     if (!(nw > 0) || !(nh > 0)) return;
 
     const preview = section.createDiv("dm-map-preview");
-    preview.style.aspectRatio = `${nw} / ${nh}`;
+    // The stage is sized to the map's exact rendered box; the rectangle and
+    // the drag math reference it, so panel letterboxing can't skew them.
+    const stage = preview.createDiv("dm-map-preview-stage");
+    const layoutStage = () => {
+      const availW = preview.clientWidth;
+      if (!availW) return;
+      const s = Math.min(availW / nw, 340 / nh);
+      stage.style.width = `${nw * s}px`;
+      stage.style.height = `${nh * s}px`;
+      preview.style.height = `${nh * s}px`;
+    };
+    layoutStage();
+    requestAnimationFrame(layoutStage);
 
     const vaultPath = vaultPathFromUrl(map.url);
     const adapter = this.plugin.app.vault.adapter as { getResourcePath?: (p: string) => string };
     const resourceUrl = vaultPath ? adapter.getResourcePath?.(vaultPath) : null;
     if (resourceUrl) {
       if (map.mediaType === "video") {
-        const v = preview.createEl("video");
+        const v = stage.createEl("video");
         v.src = resourceUrl;
         v.muted = true;
         v.loop = true;
@@ -384,7 +396,7 @@ export class MapScreenPanel {
         v.playsInline = true;
         v.play().catch(() => {});
       } else {
-        const img = preview.createEl("img");
+        const img = stage.createEl("img");
         img.src = resourceUrl;
         img.alt = "";
       }
@@ -407,7 +419,7 @@ export class MapScreenPanel {
     const visW = (sideways ? client.height : client.width) / scale;
     const visH = (sideways ? client.width : client.height) / scale;
 
-    const rect = preview.createDiv("dm-map-viewport-rect");
+    const rect = stage.createDiv("dm-map-viewport-rect");
     const positionRect = () => {
       rect.style.width = `${Math.min((visW / nw) * 100, 100)}%`;
       rect.style.height = `${Math.min((visH / nh) * 100, 100)}%`;
@@ -426,7 +438,7 @@ export class MapScreenPanel {
 
     preview.addEventListener("mousedown", (e: MouseEvent) => {
       e.preventDefault();
-      const bounds = preview.getBoundingClientRect();
+      const bounds = stage.getBoundingClientRect();
       if (!bounds.width) return;
       const toMapPx = nw / bounds.width;
       const startPanX = this.state.panX;

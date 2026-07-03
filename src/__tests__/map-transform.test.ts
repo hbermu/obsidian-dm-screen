@@ -42,11 +42,11 @@ describe("cssPixelsPerInch", () => {
 });
 
 describe("mapScale", () => {
-  it("physical mode renders one 70px map square as one screen inch", () => {
+  it("physical mode renders one 140px map square as one screen inch", () => {
     const ppi = cssPixelsPerInch(1920, 1080, { diagonalInches: 43, fineTune: 1 });
-    const scale = mapScale({ mode: "physical", panX: 0, panY: 0 }, ppi, 70, 4480, 7000, 1920, 1080);
-    // 70 map px × scale must equal ppi screen px (= 1 physical inch)
-    expect(70 * scale).toBeCloseTo(ppi, 6);
+    const scale = mapScale({ mode: "physical", panX: 0, panY: 0 }, ppi, 140, 4480, 7000, 1920, 1080);
+    // 140 map px × scale must equal ppi screen px (= 1 physical inch)
+    expect(140 * scale).toBeCloseTo(ppi, 6);
   });
 
   it("physical mode guards against a non-positive pxPerSquare", () => {

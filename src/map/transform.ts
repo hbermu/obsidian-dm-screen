@@ -3,7 +3,7 @@ import type { MapGridConfig, MapRotation, MapView, ScreenProfile, StoredMapState
 // CSS reference DPI — browsers cannot report the true physical DPI of a
 // display, so this is the only honest fallback when no screen profile exists.
 export const FALLBACK_PPI = 96;
-export const DEFAULT_PX_PER_SQUARE = 70;
+export const DEFAULT_PX_PER_SQUARE = 140;
 
 export const DEFAULT_GRID_CONFIG: MapGridConfig = {
   pxPerSquare: DEFAULT_PX_PER_SQUARE,
