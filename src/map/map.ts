@@ -290,10 +290,8 @@ class MapScreen {
       ctx.globalAlpha = 1;
     }
 
-    if (this.aoes.length > 0) {
-      for (const aoe of this.aoes) {
-        renderAoe(ctx, aoe, scale, tx, ty, this.config.pxPerSquare);
-      }
+    for (const aoe of this.aoes) {
+      renderAoe(ctx, aoe, scale, tx, ty, this.config.pxPerSquare, rotation);
     }
 
     if (this.view.mode === "physical" && !calibrated) {

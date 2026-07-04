@@ -10,7 +10,7 @@ import {
   defaultMapState,
   profileKey,
 } from "../map/transform";
-import type { MapAoe, StoredMapState } from "../map/types";
+import type { AoePreset, AoeShape, MapAoe, StoredMapState } from "../map/types";
 import { AOE_PRESETS } from "../map/types";
 import { MapCalibrationModal } from "./MapCalibrationModal";
 import { debug } from "../debug";
@@ -24,6 +24,17 @@ export interface ActiveMap {
 
 const VIEW_BROADCAST_THROTTLE_MS = 80;
 
+const AOE_SHAPES: AoeShape[] = ["circle", "square", "cone", "line"];
+
+const CUSTOM_AOE_PRESET: AoePreset = {
+  name: "Custom",
+  shape: "circle",
+  sizeFt: 20,
+  widthFt: 5,
+  color: "#ff4400",
+  opacity: 0.3,
+};
+
 let nextAoeId = 1;
 
 export class MapScreenPanel {
@@ -32,6 +43,7 @@ export class MapScreenPanel {
   mapClients: ClientInfo[] = [];
   aoes: MapAoe[] = [];
   private viewBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+  private aoeBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private plugin: DmScreenPlugin, private host: DmControlPanel) {}
 
@@ -64,7 +76,14 @@ export class MapScreenPanel {
         Object.assign(this.state, JSON.parse(cached).payload);
       } catch { /* ignore */ }
     }
-    debug("MapScreenPanel: restoreFromCache —", this.activeMap.url, this.state.mode);
+    const aoeCache = cache["map-aoe-sync"];
+    if (aoeCache) {
+      try {
+        this.aoes = ((JSON.parse(aoeCache).payload as { aoes?: MapAoe[] })?.aoes ?? []);
+      } catch { /* ignore */ }
+    }
+    this.clampStateToViewport();
+    debug("MapScreenPanel: restoreFromCache —", this.activeMap.url, this.state.mode, `${this.aoes.length} AoEs`);
   }
 
   republish() {
@@ -75,7 +94,7 @@ export class MapScreenPanel {
     this.broadcastShow();
     this.broadcastConfig();
     this.broadcastView(true);
-    if (this.aoes.length > 0) this.broadcastAoes();
+    if (this.aoes.length > 0) this.broadcastAoes(true);
   }
 
   private broadcastShow() {
@@ -118,8 +137,41 @@ export class MapScreenPanel {
     }, VIEW_BROADCAST_THROTTLE_MS);
   }
 
-  private broadcastAoes() {
-    this.plugin.server?.broadcast({ type: "map-aoe-sync", payload: { aoes: this.aoes } });
+  private broadcastAoes(immediate = false) {
+    const send = () => {
+      this.plugin.server?.broadcast({ type: "map-aoe-sync", payload: { aoes: this.aoes } });
+    };
+    if (immediate) {
+      if (this.aoeBroadcastTimer) {
+        clearTimeout(this.aoeBroadcastTimer);
+        this.aoeBroadcastTimer = null;
+      }
+      send();
+      return;
+    }
+    if (this.aoeBroadcastTimer) return;
+    this.aoeBroadcastTimer = setTimeout(() => {
+      this.aoeBroadcastTimer = null;
+      send();
+    }, VIEW_BROADCAST_THROTTLE_MS);
+  }
+
+  private clampStateToViewport() {
+    if (!this.activeMap || this.state.mode !== "physical") return;
+    const client = this.effectiveMapClient();
+    const { ppi } = this.clientPpi(client);
+    const clamped = clampPan(
+      this.state.panX,
+      this.state.panY,
+      this.activeMap.naturalWidth,
+      this.activeMap.naturalHeight,
+      client.width,
+      client.height,
+      ppi / this.state.pxPerSquare,
+      this.state.rotation ?? 0
+    );
+    this.state.panX = clamped.panX;
+    this.state.panY = clamped.panY;
   }
 
   private persistState() {
@@ -142,10 +194,13 @@ export class MapScreenPanel {
       ? { ...stored }
       : defaultMapState(dims.w, dims.h, this.plugin.settings.mapDefaultPxPerSquare);
     this.activeMap = { url, mediaType, naturalWidth: dims.w, naturalHeight: dims.h };
+    this.aoes = [];
+    this.clampStateToViewport();
     debug("MapScreenPanel: setVaultMap", vaultPath, mediaType, `${dims.w}×${dims.h}`, stored ? "(remembered config)" : "(defaults)");
     this.broadcastShow();
     this.broadcastConfig();
     this.broadcastView(true);
+    this.broadcastAoes(true);
     this.persistState();
     this.host.render();
   }
@@ -153,6 +208,7 @@ export class MapScreenPanel {
   stopMap() {
     debug("MapScreenPanel: stopMap");
     this.activeMap = null;
+    this.aoes = [];
     this.plugin.server?.broadcast({ type: "map-clear", payload: {} });
     this.host.render();
   }
@@ -302,6 +358,7 @@ export class MapScreenPanel {
     });
     modeBtn.addEventListener("click", () => {
       this.state.mode = this.state.mode === "physical" ? "fit" : "physical";
+      this.clampStateToViewport();
       this.broadcastView(true);
       this.persistState();
       this.host.render();
@@ -321,6 +378,7 @@ export class MapScreenPanel {
     rotateBtn.title = "Rotate the map on the screen in 90° steps";
     rotateBtn.addEventListener("click", () => {
       this.state.rotation = ((((this.state.rotation ?? 0) + 90) % 360) as 0 | 90 | 180 | 270);
+      this.clampStateToViewport();
       this.broadcastView(true);
       this.persistState();
       this.host.render();
@@ -418,6 +476,39 @@ export class MapScreenPanel {
       }
     }
 
+    for (const aoe of this.aoes) {
+      const dot = stage.createDiv("dm-map-aoe-dot");
+      dot.style.left = `${(aoe.x / nw) * 100}%`;
+      dot.style.top = `${(aoe.y / nh) * 100}%`;
+      dot.style.background = aoe.color;
+      dot.title = `${aoe.shape} ${aoe.sizeFt}ft`;
+      dot.addEventListener("mousedown", (ev: MouseEvent) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const bounds = stage.getBoundingClientRect();
+        if (!bounds.width) return;
+        const toMapPx = nw / bounds.width;
+        const startX = ev.clientX;
+        const startY = ev.clientY;
+        const startAoeX = aoe.x;
+        const startAoeY = aoe.y;
+        const onMove = (me: MouseEvent) => {
+          aoe.x = Math.max(0, Math.min(nw, startAoeX + (me.clientX - startX) * toMapPx));
+          aoe.y = Math.max(0, Math.min(nh, startAoeY + (me.clientY - startY) * toMapPx));
+          dot.style.left = `${(aoe.x / nw) * 100}%`;
+          dot.style.top = `${(aoe.y / nh) * 100}%`;
+          this.broadcastAoes();
+        };
+        const onUp = () => {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          this.broadcastAoes(true);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    }
+
     if (this.state.mode !== "physical") return;
 
     const client = this.effectiveMapClient();
@@ -451,38 +542,6 @@ export class MapScreenPanel {
       positionRect();
       this.broadcastView();
     };
-
-    for (const aoe of this.aoes) {
-      const dot = stage.createDiv("dm-map-aoe-dot");
-      dot.style.left = `${(aoe.x / nw) * 100}%`;
-      dot.style.top = `${(aoe.y / nh) * 100}%`;
-      dot.style.background = aoe.color;
-      dot.title = `${aoe.shape} ${aoe.sizeFt}ft`;
-      dot.addEventListener("mousedown", (ev: MouseEvent) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        const bounds = stage.getBoundingClientRect();
-        if (!bounds.width) return;
-        const toMapPx = nw / bounds.width;
-        const startX = ev.clientX;
-        const startY = ev.clientY;
-        const startAoeX = aoe.x;
-        const startAoeY = aoe.y;
-        const onMove = (me: MouseEvent) => {
-          aoe.x = Math.max(0, Math.min(nw, startAoeX + (me.clientX - startX) * toMapPx));
-          aoe.y = Math.max(0, Math.min(nh, startAoeY + (me.clientY - startY) * toMapPx));
-          dot.style.left = `${(aoe.x / nw) * 100}%`;
-          dot.style.top = `${(aoe.y / nh) * 100}%`;
-          this.broadcastAoes();
-        };
-        const onUp = () => {
-          document.removeEventListener("mousemove", onMove);
-          document.removeEventListener("mouseup", onUp);
-        };
-        document.addEventListener("mousemove", onMove);
-        document.addEventListener("mouseup", onUp);
-      });
-    }
 
     preview.addEventListener("mousedown", (e: MouseEvent) => {
       e.preventDefault();
@@ -527,14 +586,10 @@ export class MapScreenPanel {
     addBtn.addEventListener("click", (evt: MouseEvent) => {
       const menu = new Menu();
       for (const preset of AOE_PRESETS) {
-        menu.addItem((item) =>
-          item.setTitle(preset.name).onClick(() => this.addAoeFromPreset(preset, map))
-        );
+        menu.addItem((item) => item.setTitle(preset.name).onClick(() => this.addAoe(preset, map)));
       }
       menu.addSeparator();
-      menu.addItem((item) =>
-        item.setTitle("Custom...").onClick(() => this.addCustomAoe(map))
-      );
+      menu.addItem((item) => item.setTitle("Custom…").onClick(() => this.addAoe(CUSTOM_AOE_PRESET, map)));
       menu.showAtMouseEvent(evt);
     });
 
@@ -543,25 +598,63 @@ export class MapScreenPanel {
     const clearBtn = header.createEl("button", { text: "Clear All" });
     clearBtn.addEventListener("click", () => {
       this.aoes = [];
-      this.broadcastAoes();
+      this.broadcastAoes(true);
       this.host.render();
     });
 
     for (const aoe of this.aoes) {
-      this.renderAoeRow(wrap, aoe, map);
+      this.renderAoeRow(wrap, aoe);
     }
   }
 
-  private renderAoeRow(container: HTMLElement, aoe: MapAoe, _map: ActiveMap) {
+  private renderAoeRow(container: HTMLElement, aoe: MapAoe) {
     const row = container.createDiv("dm-map-aoe-row");
-    const shapeLabel = `${aoe.shape} ${aoe.sizeFt}ft`;
-    row.createSpan({ text: shapeLabel, cls: "dm-map-aoe-label" });
+
+    const shapeSelect = row.createEl("select");
+    for (const shape of AOE_SHAPES) {
+      shapeSelect.createEl("option", { text: shape, value: shape });
+    }
+    shapeSelect.value = aoe.shape;
+    shapeSelect.addEventListener("change", () => {
+      aoe.shape = shapeSelect.value as AoeShape;
+      this.broadcastAoes(true);
+      this.host.render();
+    });
+
+    const sizeInput = row.createEl("input", { type: "number" });
+    sizeInput.value = String(aoe.sizeFt);
+    sizeInput.min = "5";
+    sizeInput.step = "5";
+    sizeInput.title = aoe.shape === "circle" ? "Radius (ft)" : aoe.shape === "line" ? "Length (ft)" : "Size (ft)";
+    sizeInput.addEventListener("change", () => {
+      const v = parseFloat(sizeInput.value);
+      if (!Number.isFinite(v) || v <= 0) return;
+      aoe.sizeFt = v;
+      this.broadcastAoes(true);
+    });
+    row.createSpan({ text: "ft", cls: "dm-status-detail" });
+
+    if (aoe.shape === "line") {
+      const widthInput = row.createEl("input", { type: "number" });
+      widthInput.value = String(aoe.widthFt);
+      widthInput.min = "5";
+      widthInput.step = "5";
+      widthInput.title = "Width (ft)";
+      widthInput.addEventListener("change", () => {
+        const v = parseFloat(widthInput.value);
+        if (!Number.isFinite(v) || v <= 0) return;
+        aoe.widthFt = v;
+        this.broadcastAoes(true);
+      });
+      row.createSpan({ text: "wide", cls: "dm-status-detail" });
+    }
 
     const colorSwatch = row.createEl("input", { type: "color" });
     colorSwatch.value = aoe.color;
     colorSwatch.addEventListener("change", () => {
       aoe.color = colorSwatch.value;
-      this.broadcastAoes();
+      this.broadcastAoes(true);
+      this.host.render();
     });
 
     const opacityInput = row.createEl("input", { type: "range" });
@@ -569,9 +662,14 @@ export class MapScreenPanel {
     opacityInput.max = "0.8";
     opacityInput.step = "0.05";
     opacityInput.value = String(aoe.opacity);
+    opacityInput.title = "Opacity";
     opacityInput.addEventListener("input", () => {
       aoe.opacity = parseFloat(opacityInput.value);
       this.broadcastAoes();
+    });
+    opacityInput.addEventListener("change", () => {
+      aoe.opacity = parseFloat(opacityInput.value);
+      this.broadcastAoes(true);
     });
 
     const rotInput = row.createEl("input", { type: "number" });
@@ -579,22 +677,22 @@ export class MapScreenPanel {
     rotInput.min = "0";
     rotInput.max = "359";
     rotInput.step = "15";
-    rotInput.style.width = "50px";
+    rotInput.title = "Rotation (°)";
     rotInput.addEventListener("change", () => {
       aoe.rotation = parseInt(rotInput.value, 10) || 0;
-      this.broadcastAoes();
+      this.broadcastAoes(true);
     });
 
     const removeBtn = row.createEl("button", { text: "✕" });
     removeBtn.addEventListener("click", () => {
       this.aoes = this.aoes.filter((a) => a.id !== aoe.id);
-      this.broadcastAoes();
+      this.broadcastAoes(true);
       this.host.render();
     });
   }
 
-  private addAoeFromPreset(preset: typeof AOE_PRESETS[number], map: ActiveMap) {
-    const aoe: MapAoe = {
+  private addAoe(preset: AoePreset, map: ActiveMap) {
+    this.aoes.push({
       id: `aoe-${nextAoeId++}`,
       shape: preset.shape,
       sizeFt: preset.sizeFt,
@@ -604,26 +702,8 @@ export class MapScreenPanel {
       rotation: 0,
       x: map.naturalWidth / 2,
       y: map.naturalHeight / 2,
-    };
-    this.aoes.push(aoe);
-    this.broadcastAoes();
-    this.host.render();
-  }
-
-  private addCustomAoe(map: ActiveMap) {
-    const aoe: MapAoe = {
-      id: `aoe-${nextAoeId++}`,
-      shape: "circle",
-      sizeFt: 20,
-      widthFt: 5,
-      color: "#ff4400",
-      opacity: 0.3,
-      rotation: 0,
-      x: map.naturalWidth / 2,
-      y: map.naturalHeight / 2,
-    };
-    this.aoes.push(aoe);
-    this.broadcastAoes();
+    });
+    this.broadcastAoes(true);
     this.host.render();
   }
 }

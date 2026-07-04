@@ -1,19 +1,24 @@
-import type { MapAoe } from "./types";
+import { rotatePoint } from "./transform";
+import type { MapAoe, MapRotation } from "./types";
 
 const CONE_ANGLE_RAD = (53 * Math.PI) / 180;
 
+// The stage renders as `translate(tx,ty) rotate(θ) scale(s)`, so a map point
+// lands at T + s·R·p; the shape's own rotation composes on top of the map's.
 export function renderAoe(
   ctx: CanvasRenderingContext2D,
   aoe: MapAoe,
   scale: number,
   tx: number,
   ty: number,
-  pxPerSquare: number
+  pxPerSquare: number,
+  mapRotation: MapRotation
 ): void {
   const ftToPx = pxPerSquare / 5;
-  const screenX = tx + aoe.x * scale;
-  const screenY = ty + aoe.y * scale;
-  const rot = (aoe.rotation * Math.PI) / 180;
+  const p = rotatePoint(aoe.x, aoe.y, mapRotation);
+  const screenX = tx + p.x * scale;
+  const screenY = ty + p.y * scale;
+  const rot = ((aoe.rotation + mapRotation) * Math.PI) / 180;
 
   ctx.save();
   ctx.translate(screenX, screenY);
@@ -44,8 +49,7 @@ function buildPath(
 ): void {
   switch (shape) {
     case "circle": {
-      const r = sizeFt * ftScale;
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.arc(0, 0, sizeFt * ftScale, 0, Math.PI * 2);
       break;
     }
     case "square": {
@@ -54,17 +58,14 @@ function buildPath(
       break;
     }
     case "cone": {
-      const len = sizeFt * ftScale;
       const halfAngle = CONE_ANGLE_RAD / 2;
       ctx.moveTo(0, 0);
-      ctx.arc(0, 0, len, -halfAngle, halfAngle);
-      ctx.lineTo(0, 0);
+      ctx.arc(0, 0, sizeFt * ftScale, -halfAngle, halfAngle);
       break;
     }
     case "line": {
-      const len = sizeFt * ftScale;
       const halfW = (widthFt * ftScale) / 2;
-      ctx.rect(0, -halfW, len, halfW * 2);
+      ctx.rect(0, -halfW, sizeFt * ftScale, halfW * 2);
       break;
     }
   }

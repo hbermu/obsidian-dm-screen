@@ -136,9 +136,8 @@ describe("rotation", () => {
 });
 
 describe("clampPan", () => {
-  it("clamps the pan point inside the map bounds (legacy no-viewport)", () => {
-    expect(clampPan(-50, 8000, 4480, 7000)).toEqual({ panX: 0, panY: 7000 });
-    expect(clampPan(100, 200, 4480, 7000)).toEqual({ panX: 100, panY: 200 });
+  it("centres both axes when the scale is degenerate", () => {
+    expect(clampPan(100, 200, 4480, 7000, 1920, 1080, 0, 0)).toEqual({ panX: 2240, panY: 3500 });
   });
 
   it("prevents the viewport from showing black edges", () => {

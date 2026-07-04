@@ -1811,7 +1811,6 @@
   width: 60px;
 }
 
-.dm-map-aoe-label {
-  font-size: 0.85em;
-  min-width: 70px;
+.dm-map-aoe-row input[type="number"] {
+  width: 56px;
 }
