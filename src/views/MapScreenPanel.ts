@@ -10,7 +10,8 @@ import {
   defaultMapState,
   profileKey,
 } from "../map/transform";
-import type { StoredMapState } from "../map/types";
+import type { MapAoe, StoredMapState } from "../map/types";
+import { AOE_PRESETS } from "../map/types";
 import { MapCalibrationModal } from "./MapCalibrationModal";
 import { debug } from "../debug";
 
@@ -23,10 +24,13 @@ export interface ActiveMap {
 
 const VIEW_BROADCAST_THROTTLE_MS = 80;
 
+let nextAoeId = 1;
+
 export class MapScreenPanel {
   activeMap: ActiveMap | null = null;
   state: StoredMapState = defaultMapState(0, 0);
   mapClients: ClientInfo[] = [];
+  aoes: MapAoe[] = [];
   private viewBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private plugin: DmScreenPlugin, private host: DmControlPanel) {}
@@ -71,6 +75,7 @@ export class MapScreenPanel {
     this.broadcastShow();
     this.broadcastConfig();
     this.broadcastView(true);
+    if (this.aoes.length > 0) this.broadcastAoes();
   }
 
   private broadcastShow() {
@@ -111,6 +116,10 @@ export class MapScreenPanel {
       this.viewBroadcastTimer = null;
       send();
     }, VIEW_BROADCAST_THROTTLE_MS);
+  }
+
+  private broadcastAoes() {
+    this.plugin.server?.broadcast({ type: "map-aoe-sync", payload: { aoes: this.aoes } });
   }
 
   private persistState() {
@@ -319,6 +328,7 @@ export class MapScreenPanel {
 
     this.renderGridControls(section);
     this.renderPanPreview(section, map);
+    this.renderAoeControls(section, map);
   }
 
   private renderGridControls(section: HTMLElement) {
@@ -435,12 +445,44 @@ export class MapScreenPanel {
     positionRect();
 
     const applyPan = (panX: number, panY: number) => {
-      const clamped = clampPan(panX, panY, nw, nh);
+      const clamped = clampPan(panX, panY, nw, nh, client.width, client.height, scale, this.state.rotation ?? 0);
       this.state.panX = clamped.panX;
       this.state.panY = clamped.panY;
       positionRect();
       this.broadcastView();
     };
+
+    for (const aoe of this.aoes) {
+      const dot = stage.createDiv("dm-map-aoe-dot");
+      dot.style.left = `${(aoe.x / nw) * 100}%`;
+      dot.style.top = `${(aoe.y / nh) * 100}%`;
+      dot.style.background = aoe.color;
+      dot.title = `${aoe.shape} ${aoe.sizeFt}ft`;
+      dot.addEventListener("mousedown", (ev: MouseEvent) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const bounds = stage.getBoundingClientRect();
+        if (!bounds.width) return;
+        const toMapPx = nw / bounds.width;
+        const startX = ev.clientX;
+        const startY = ev.clientY;
+        const startAoeX = aoe.x;
+        const startAoeY = aoe.y;
+        const onMove = (me: MouseEvent) => {
+          aoe.x = Math.max(0, Math.min(nw, startAoeX + (me.clientX - startX) * toMapPx));
+          aoe.y = Math.max(0, Math.min(nh, startAoeY + (me.clientY - startY) * toMapPx));
+          dot.style.left = `${(aoe.x / nw) * 100}%`;
+          dot.style.top = `${(aoe.y / nh) * 100}%`;
+          this.broadcastAoes();
+        };
+        const onUp = () => {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    }
 
     preview.addEventListener("mousedown", (e: MouseEvent) => {
       e.preventDefault();
@@ -474,6 +516,115 @@ export class MapScreenPanel {
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     });
+  }
+
+  private renderAoeControls(section: HTMLElement, map: ActiveMap) {
+    const wrap = section.createDiv("dm-map-aoe-section");
+    const header = wrap.createDiv("dm-layer-btn-row");
+    header.createSpan({ text: "AoE Overlays", cls: "dm-status-detail" });
+
+    const addBtn = header.createEl("button", { text: "Add AoE" });
+    addBtn.addEventListener("click", (evt: MouseEvent) => {
+      const menu = new Menu();
+      for (const preset of AOE_PRESETS) {
+        menu.addItem((item) =>
+          item.setTitle(preset.name).onClick(() => this.addAoeFromPreset(preset, map))
+        );
+      }
+      menu.addSeparator();
+      menu.addItem((item) =>
+        item.setTitle("Custom...").onClick(() => this.addCustomAoe(map))
+      );
+      menu.showAtMouseEvent(evt);
+    });
+
+    if (this.aoes.length === 0) return;
+
+    const clearBtn = header.createEl("button", { text: "Clear All" });
+    clearBtn.addEventListener("click", () => {
+      this.aoes = [];
+      this.broadcastAoes();
+      this.host.render();
+    });
+
+    for (const aoe of this.aoes) {
+      this.renderAoeRow(wrap, aoe, map);
+    }
+  }
+
+  private renderAoeRow(container: HTMLElement, aoe: MapAoe, _map: ActiveMap) {
+    const row = container.createDiv("dm-map-aoe-row");
+    const shapeLabel = `${aoe.shape} ${aoe.sizeFt}ft`;
+    row.createSpan({ text: shapeLabel, cls: "dm-map-aoe-label" });
+
+    const colorSwatch = row.createEl("input", { type: "color" });
+    colorSwatch.value = aoe.color;
+    colorSwatch.addEventListener("change", () => {
+      aoe.color = colorSwatch.value;
+      this.broadcastAoes();
+    });
+
+    const opacityInput = row.createEl("input", { type: "range" });
+    opacityInput.min = "0.05";
+    opacityInput.max = "0.8";
+    opacityInput.step = "0.05";
+    opacityInput.value = String(aoe.opacity);
+    opacityInput.addEventListener("input", () => {
+      aoe.opacity = parseFloat(opacityInput.value);
+      this.broadcastAoes();
+    });
+
+    const rotInput = row.createEl("input", { type: "number" });
+    rotInput.value = String(aoe.rotation);
+    rotInput.min = "0";
+    rotInput.max = "359";
+    rotInput.step = "15";
+    rotInput.style.width = "50px";
+    rotInput.addEventListener("change", () => {
+      aoe.rotation = parseInt(rotInput.value, 10) || 0;
+      this.broadcastAoes();
+    });
+
+    const removeBtn = row.createEl("button", { text: "✕" });
+    removeBtn.addEventListener("click", () => {
+      this.aoes = this.aoes.filter((a) => a.id !== aoe.id);
+      this.broadcastAoes();
+      this.host.render();
+    });
+  }
+
+  private addAoeFromPreset(preset: typeof AOE_PRESETS[number], map: ActiveMap) {
+    const aoe: MapAoe = {
+      id: `aoe-${nextAoeId++}`,
+      shape: preset.shape,
+      sizeFt: preset.sizeFt,
+      widthFt: preset.widthFt,
+      color: preset.color,
+      opacity: preset.opacity,
+      rotation: 0,
+      x: map.naturalWidth / 2,
+      y: map.naturalHeight / 2,
+    };
+    this.aoes.push(aoe);
+    this.broadcastAoes();
+    this.host.render();
+  }
+
+  private addCustomAoe(map: ActiveMap) {
+    const aoe: MapAoe = {
+      id: `aoe-${nextAoeId++}`,
+      shape: "circle",
+      sizeFt: 20,
+      widthFt: 5,
+      color: "#ff4400",
+      opacity: 0.3,
+      rotation: 0,
+      x: map.naturalWidth / 2,
+      y: map.naturalHeight / 2,
+    };
+    this.aoes.push(aoe);
+    this.broadcastAoes();
+    this.host.render();
   }
 }
 

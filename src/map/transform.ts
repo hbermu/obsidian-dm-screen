@@ -123,8 +123,25 @@ export function clampPan(
   panX: number,
   panY: number,
   naturalWidth: number,
-  naturalHeight: number
+  naturalHeight: number,
+  viewportWidth?: number,
+  viewportHeight?: number,
+  scale?: number,
+  rotation?: MapRotation
 ): { panX: number; panY: number } {
+  if (viewportWidth && viewportHeight && scale && scale > 0) {
+    const r = rotation ?? 0;
+    const halfVisW = (r % 180 === 0 ? viewportWidth : viewportHeight) / (2 * scale);
+    const halfVisH = (r % 180 === 0 ? viewportHeight : viewportWidth) / (2 * scale);
+    const minX = Math.min(halfVisW, naturalWidth / 2);
+    const maxX = Math.max(naturalWidth - halfVisW, naturalWidth / 2);
+    const minY = Math.min(halfVisH, naturalHeight / 2);
+    const maxY = Math.max(naturalHeight - halfVisH, naturalHeight / 2);
+    return {
+      panX: Math.min(Math.max(panX, minX), maxX),
+      panY: Math.min(Math.max(panY, minY), maxY),
+    };
+  }
   return {
     panX: Math.min(Math.max(panX, 0), Math.max(naturalWidth, 0)),
     panY: Math.min(Math.max(panY, 0), Math.max(naturalHeight, 0)),

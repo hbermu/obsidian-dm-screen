@@ -136,9 +136,29 @@ describe("rotation", () => {
 });
 
 describe("clampPan", () => {
-  it("clamps the pan point inside the map bounds", () => {
+  it("clamps the pan point inside the map bounds (legacy no-viewport)", () => {
     expect(clampPan(-50, 8000, 4480, 7000)).toEqual({ panX: 0, panY: 7000 });
     expect(clampPan(100, 200, 4480, 7000)).toEqual({ panX: 100, panY: 200 });
+  });
+
+  it("prevents the viewport from showing black edges", () => {
+    // Map 4480×7000, viewport 1920×1080, scale=1 → halfVisW=960, halfVisH=540
+    // panX min=960, max=4480-960=3520; panY min=540, max=7000-540=6460
+    expect(clampPan(0, 0, 4480, 7000, 1920, 1080, 1, 0)).toEqual({ panX: 960, panY: 540 });
+    expect(clampPan(5000, 8000, 4480, 7000, 1920, 1080, 1, 0)).toEqual({ panX: 3520, panY: 6460 });
+    expect(clampPan(2000, 3000, 4480, 7000, 1920, 1080, 1, 0)).toEqual({ panX: 2000, panY: 3000 });
+  });
+
+  it("centres on an axis when the map is smaller than the viewport", () => {
+    // Map 800×600, viewport 1920×1080, scale=1 → halfVisW=960 > 400 (half map)
+    // min=400 (naturalWidth/2), max=400 → forced to center
+    expect(clampPan(0, 0, 800, 600, 1920, 1080, 1, 0)).toEqual({ panX: 400, panY: 300 });
+  });
+
+  it("accounts for rotation swapping viewport axes", () => {
+    // Rotation 90: viewport W/H swap for map-space calculation
+    // halfVisW uses viewportHeight(1080)/2=540, halfVisH uses viewportWidth(1920)/2=960
+    expect(clampPan(0, 0, 4480, 7000, 1920, 1080, 1, 90)).toEqual({ panX: 540, panY: 960 });
   });
 });
 
