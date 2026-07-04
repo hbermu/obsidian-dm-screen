@@ -50,6 +50,8 @@ All map traffic uses the `map` channel (types prefixed `map-`); the full table l
 ## Tests covering this
 
 - `src/__tests__/map-transform.test.ts` — scale, translation, clamping (including viewport-aware pan clamping), grid phase, calibration math
+- `src/__tests__/map-aoe-render.test.ts` — AoE canvas shapes, ft→px sizing, rotation-composed placement, fill/stroke styling
+- `src/__tests__/map-screen-panel-aoe.test.ts` — AoE restore from cache, pan re-clamp on restore, stopMap reset, republish inclusion, broadcast throttling
 - `src/__tests__/server-map-channel.test.ts` — channel-filtered broadcast and replay, channel-scoped cache purge, allowlist map slot
 - `src/__tests__/bundle-smoke.integration.test.ts` — production build inlines the map bundle
 
