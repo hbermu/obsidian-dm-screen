@@ -1777,6 +1777,15 @@
   margin: 4px 0;
 }
 
+.dm-map-aoe-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
 .dm-map-aoe-dot {
   position: absolute;
   width: 10px;
@@ -1785,6 +1794,16 @@
   border: 2px solid rgba(255, 255, 255, 0.9);
   transform: translate(-50%, -50%);
   cursor: move;
+  z-index: 5;
+}
+
+.dm-map-aoe-rot-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  transform: translate(-50%, -50%) rotate(45deg);
+  cursor: grab;
   z-index: 5;
 }
 

@@ -12,6 +12,7 @@ import {
 } from "../map/transform";
 import type { AoePreset, AoeShape, MapAoe, StoredMapState } from "../map/types";
 import { AOE_PRESETS } from "../map/types";
+import { renderAoe } from "../map/aoe";
 import { MapCalibrationModal } from "./MapCalibrationModal";
 import { debug } from "../debug";
 
@@ -44,6 +45,7 @@ export class MapScreenPanel {
   aoes: MapAoe[] = [];
   private viewBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
   private aoeBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+  private redrawPreviewAoes: (() => void) | null = null;
 
   constructor(private plugin: DmScreenPlugin, private host: DmControlPanel) {}
 
@@ -446,6 +448,20 @@ export class MapScreenPanel {
     // The stage is sized to the map's exact rendered box; the rectangle and
     // the drag math reference it, so panel letterboxing can't skew them.
     const stage = preview.createDiv("dm-map-preview-stage");
+    const aoeCanvas = stage.createEl("canvas", { cls: "dm-map-aoe-canvas" });
+    const redrawAoes = () => {
+      const w = stage.clientWidth;
+      const h = stage.clientHeight;
+      if (!w || !h) return;
+      aoeCanvas.width = w;
+      aoeCanvas.height = h;
+      const ctx = aoeCanvas.getContext("2d")!;
+      ctx.clearRect(0, 0, w, h);
+      const s = w / nw;
+      for (const aoe of this.aoes) {
+        renderAoe(ctx, aoe, s, 0, 0, this.state.pxPerSquare, 0);
+      }
+    };
     const layoutStage = () => {
       const availW = preview.clientWidth;
       if (!availW) return;
@@ -453,7 +469,9 @@ export class MapScreenPanel {
       stage.style.width = `${nw * s}px`;
       stage.style.height = `${nh * s}px`;
       preview.style.height = `${nh * s}px`;
+      redrawAoes();
     };
+    this.redrawPreviewAoes = redrawAoes;
     layoutStage();
     requestAnimationFrame(layoutStage);
 
@@ -478,10 +496,30 @@ export class MapScreenPanel {
 
     for (const aoe of this.aoes) {
       const dot = stage.createDiv("dm-map-aoe-dot");
-      dot.style.left = `${(aoe.x / nw) * 100}%`;
-      dot.style.top = `${(aoe.y / nh) * 100}%`;
       dot.style.background = aoe.color;
-      dot.title = `${aoe.shape} ${aoe.sizeFt}ft`;
+      dot.title = `${aoe.shape} ${aoe.sizeFt}ft — drag to move`;
+      const handle = aoe.shape === "circle" ? null : stage.createDiv("dm-map-aoe-rot-handle");
+      if (handle) {
+        handle.style.background = aoe.color;
+        handle.title = "Drag to rotate";
+      }
+      const ftToPx = this.state.pxPerSquare / 5;
+      // The handle sits where the shape "points": tip of cone/line, mid-edge
+      // of a square.
+      const handleDistPx = () => (aoe.shape === "square" ? aoe.sizeFt / 2 : aoe.sizeFt) * ftToPx;
+      const positionMarkers = () => {
+        dot.style.left = `${(aoe.x / nw) * 100}%`;
+        dot.style.top = `${(aoe.y / nh) * 100}%`;
+        if (handle) {
+          const rad = (aoe.rotation * Math.PI) / 180;
+          const hx = aoe.x + Math.cos(rad) * handleDistPx();
+          const hy = aoe.y + Math.sin(rad) * handleDistPx();
+          handle.style.left = `${(hx / nw) * 100}%`;
+          handle.style.top = `${(hy / nh) * 100}%`;
+        }
+      };
+      positionMarkers();
+
       dot.addEventListener("mousedown", (ev: MouseEvent) => {
         ev.preventDefault();
         ev.stopPropagation();
@@ -495,8 +533,31 @@ export class MapScreenPanel {
         const onMove = (me: MouseEvent) => {
           aoe.x = Math.max(0, Math.min(nw, startAoeX + (me.clientX - startX) * toMapPx));
           aoe.y = Math.max(0, Math.min(nh, startAoeY + (me.clientY - startY) * toMapPx));
-          dot.style.left = `${(aoe.x / nw) * 100}%`;
-          dot.style.top = `${(aoe.y / nh) * 100}%`;
+          positionMarkers();
+          redrawAoes();
+          this.broadcastAoes();
+        };
+        const onUp = () => {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          this.broadcastAoes(true);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+
+      handle?.addEventListener("mousedown", (ev: MouseEvent) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const onMove = (me: MouseEvent) => {
+          const bounds = stage.getBoundingClientRect();
+          if (!bounds.width) return;
+          const centerX = bounds.left + (aoe.x / nw) * bounds.width;
+          const centerY = bounds.top + (aoe.y / nh) * bounds.height;
+          const deg = (Math.atan2(me.clientY - centerY, me.clientX - centerX) * 180) / Math.PI;
+          aoe.rotation = (Math.round(deg / 5) * 5 + 360) % 360;
+          positionMarkers();
+          redrawAoes();
           this.broadcastAoes();
         };
         const onUp = () => {
@@ -631,6 +692,7 @@ export class MapScreenPanel {
       if (!Number.isFinite(v) || v <= 0) return;
       aoe.sizeFt = v;
       this.broadcastAoes(true);
+      this.redrawPreviewAoes?.();
     });
     row.createSpan({ text: "ft", cls: "dm-status-detail" });
 
@@ -645,6 +707,7 @@ export class MapScreenPanel {
         if (!Number.isFinite(v) || v <= 0) return;
         aoe.widthFt = v;
         this.broadcastAoes(true);
+        this.redrawPreviewAoes?.();
       });
       row.createSpan({ text: "wide", cls: "dm-status-detail" });
     }
@@ -666,10 +729,12 @@ export class MapScreenPanel {
     opacityInput.addEventListener("input", () => {
       aoe.opacity = parseFloat(opacityInput.value);
       this.broadcastAoes();
+      this.redrawPreviewAoes?.();
     });
     opacityInput.addEventListener("change", () => {
       aoe.opacity = parseFloat(opacityInput.value);
       this.broadcastAoes(true);
+      this.redrawPreviewAoes?.();
     });
 
     const rotInput = row.createEl("input", { type: "number" });
@@ -681,6 +746,7 @@ export class MapScreenPanel {
     rotInput.addEventListener("change", () => {
       aoe.rotation = parseInt(rotInput.value, 10) || 0;
       this.broadcastAoes(true);
+      this.host.render();
     });
 
     const removeBtn = row.createEl("button", { text: "✕" });
