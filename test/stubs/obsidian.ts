@@ -27,6 +27,22 @@ export class Modal {
 export class Notice {
   constructor(_message: string, _timeout?: number) {}
 }
+export class FuzzySuggestModal<T> {
+  app: unknown;
+  constructor(app: unknown) {
+    this.app = app;
+  }
+  setPlaceholder(_placeholder: string): void {}
+  open(): void {}
+  close(): void {}
+  getItems(): T[] {
+    return [];
+  }
+  getItemText(_item: T): string {
+    return "";
+  }
+  onChooseItem(_item: T, _evt?: unknown): void {}
+}
 export class MenuItem {
   private _title = "";
   private _checked = false;

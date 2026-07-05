@@ -6,7 +6,7 @@
 
 - `src/server.ts` — `PlayerScreenServer` class, HTTP handler, WebSocket connection accounting, late-joiner cache, `readVaultBytes` helper
 - `src/main.ts` — wires `startServer` / `stopServer` / `toggleServer`, applies `maxClients`, forwards client-info callbacks to the DM panel
-- `src/views/DmControlPanel.ts` — renders the server status row, Start/Stop button, local URL, LAN URL, connected-client badges
+- `src/views/DmControlPanel.ts` — renders the server status row, Start/Stop button, and connected-client badges; the player LAN URL + Copy row lives at the top of the Player Screen section (mirroring the Map Screen section's URL row)
 - `src/player/player.ts` — client side of the WebSocket connection, handles reconnect
 
 ## Settings used

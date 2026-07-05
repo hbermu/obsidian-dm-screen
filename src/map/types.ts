@@ -32,3 +32,27 @@ export interface ScreenProfile {
 }
 
 export interface StoredMapState extends MapGridConfig, MapView {}
+
+export type AoeShape = "circle" | "square" | "cone" | "line";
+
+export interface MapAoe {
+  id: string;
+  shape: AoeShape;
+  sizeFt: number;
+  widthFt: number;
+  color: string;
+  opacity: number;
+  rotation: number;
+  x: number;
+  y: number;
+  label?: string;
+}
+
+export interface AoePreset {
+  name: string;
+  shape: AoeShape;
+  sizeFt: number;
+  widthFt: number;
+  color: string;
+  opacity: number;
+}

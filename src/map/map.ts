@@ -13,7 +13,8 @@ import {
   DEFAULT_GRID_CONFIG,
   FALLBACK_PPI,
 } from "./transform";
-import type { MapGridConfig, MapMediaPayload, MapView, ScreenProfile } from "./types";
+import type { MapAoe, MapGridConfig, MapMediaPayload, MapView, ScreenProfile } from "./types";
+import { renderAoe } from "./aoe";
 
 interface MapMessage {
   type: string;
@@ -30,6 +31,7 @@ class MapScreen {
   private config: MapGridConfig = { ...DEFAULT_GRID_CONFIG };
   private profiles: Record<string, ScreenProfile> = {};
   private calibrationVisible = false;
+  private aoes: MapAoe[] = [];
 
   constructor() {
     this.connect();
@@ -155,6 +157,10 @@ class MapScreen {
         this.calibrationVisible = !!(msg.payload as { show?: boolean }).show;
         this.renderCalibrationCard();
         break;
+      case "map-aoe-sync":
+        this.aoes = ((msg.payload as { aoes?: unknown }).aoes ?? []) as MapAoe[];
+        this.applyLayout();
+        break;
       case "map-clear":
         this.clearMap();
         break;
@@ -214,6 +220,7 @@ class MapScreen {
     image.src = "";
     image.style.display = "none";
     this.media = null;
+    this.aoes = [];
     document.getElementById("waiting-screen")!.style.display = "flex";
     this.applyLayout();
   }
@@ -281,6 +288,10 @@ class MapScreen {
       }
       ctx.stroke();
       ctx.globalAlpha = 1;
+    }
+
+    for (const aoe of this.aoes) {
+      renderAoe(ctx, aoe, scale, tx, ty, this.config.pxPerSquare, rotation);
     }
 
     if (this.view.mode === "physical" && !calibrated) {

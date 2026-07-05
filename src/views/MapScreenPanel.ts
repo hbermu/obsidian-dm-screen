@@ -9,8 +9,11 @@ import {
   cssPixelsPerInch,
   defaultMapState,
   profileKey,
+  rotatePoint,
 } from "../map/transform";
-import type { StoredMapState } from "../map/types";
+import type { AoePreset, AoeShape, MapAoe, MapRotation, StoredMapState } from "../map/types";
+import { renderAoe } from "../map/aoe";
+import { SpellAoeModal } from "./SpellAoeModal";
 import { MapCalibrationModal } from "./MapCalibrationModal";
 import { debug } from "../debug";
 
@@ -23,11 +26,29 @@ export interface ActiveMap {
 
 const VIEW_BROADCAST_THROTTLE_MS = 80;
 
+const AOE_SHAPES: AoeShape[] = ["circle", "square", "cone", "line"];
+
+const SHAPE_PRESETS: AoePreset[] = [
+  { name: "Circle", shape: "circle", sizeFt: 20, widthFt: 5, color: "#ff4400", opacity: 0.3 },
+  { name: "Square", shape: "square", sizeFt: 15, widthFt: 5, color: "#44aaff", opacity: 0.3 },
+  { name: "Cone", shape: "cone", sizeFt: 15, widthFt: 5, color: "#ff9900", opacity: 0.3 },
+  { name: "Line", shape: "line", sizeFt: 30, widthFt: 5, color: "#f5d90a", opacity: 0.3 },
+];
+
+let nextAoeId = 1;
+
 export class MapScreenPanel {
   activeMap: ActiveMap | null = null;
   state: StoredMapState = defaultMapState(0, 0);
   mapClients: ClientInfo[] = [];
+  aoes: MapAoe[] = [];
   private viewBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+  private aoeBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+  private redrawPreviewAoes: (() => void) | null = null;
+  private previewZoom = 1;
+  private previewPanX = 0;
+  private previewPanY = 0;
+  private previewLocked = false;
 
   constructor(private plugin: DmScreenPlugin, private host: DmControlPanel) {}
 
@@ -60,7 +81,14 @@ export class MapScreenPanel {
         Object.assign(this.state, JSON.parse(cached).payload);
       } catch { /* ignore */ }
     }
-    debug("MapScreenPanel: restoreFromCache —", this.activeMap.url, this.state.mode);
+    const aoeCache = cache["map-aoe-sync"];
+    if (aoeCache) {
+      try {
+        this.aoes = ((JSON.parse(aoeCache).payload as { aoes?: MapAoe[] })?.aoes ?? []);
+      } catch { /* ignore */ }
+    }
+    this.clampStateToViewport();
+    debug("MapScreenPanel: restoreFromCache —", this.activeMap.url, this.state.mode, `${this.aoes.length} AoEs`);
   }
 
   republish() {
@@ -71,6 +99,7 @@ export class MapScreenPanel {
     this.broadcastShow();
     this.broadcastConfig();
     this.broadcastView(true);
+    if (this.aoes.length > 0) this.broadcastAoes(true);
   }
 
   private broadcastShow() {
@@ -113,6 +142,43 @@ export class MapScreenPanel {
     }, VIEW_BROADCAST_THROTTLE_MS);
   }
 
+  private broadcastAoes(immediate = false) {
+    const send = () => {
+      this.plugin.server?.broadcast({ type: "map-aoe-sync", payload: { aoes: this.aoes } });
+    };
+    if (immediate) {
+      if (this.aoeBroadcastTimer) {
+        clearTimeout(this.aoeBroadcastTimer);
+        this.aoeBroadcastTimer = null;
+      }
+      send();
+      return;
+    }
+    if (this.aoeBroadcastTimer) return;
+    this.aoeBroadcastTimer = setTimeout(() => {
+      this.aoeBroadcastTimer = null;
+      send();
+    }, VIEW_BROADCAST_THROTTLE_MS);
+  }
+
+  private clampStateToViewport() {
+    if (!this.activeMap || this.state.mode !== "physical") return;
+    const client = this.effectiveMapClient();
+    const { ppi } = this.clientPpi(client);
+    const clamped = clampPan(
+      this.state.panX,
+      this.state.panY,
+      this.activeMap.naturalWidth,
+      this.activeMap.naturalHeight,
+      client.width,
+      client.height,
+      ppi / this.state.pxPerSquare,
+      this.state.rotation ?? 0
+    );
+    this.state.panX = clamped.panX;
+    this.state.panY = clamped.panY;
+  }
+
   private persistState() {
     if (!this.activeMap) return;
     this.plugin.settings.mapConfigs[this.activeMap.url] = { ...this.state };
@@ -133,10 +199,16 @@ export class MapScreenPanel {
       ? { ...stored }
       : defaultMapState(dims.w, dims.h, this.plugin.settings.mapDefaultPxPerSquare);
     this.activeMap = { url, mediaType, naturalWidth: dims.w, naturalHeight: dims.h };
+    this.aoes = [];
+    this.previewZoom = 1;
+    this.previewPanX = 0;
+    this.previewPanY = 0;
+    this.clampStateToViewport();
     debug("MapScreenPanel: setVaultMap", vaultPath, mediaType, `${dims.w}×${dims.h}`, stored ? "(remembered config)" : "(defaults)");
     this.broadcastShow();
     this.broadcastConfig();
     this.broadcastView(true);
+    this.broadcastAoes(true);
     this.persistState();
     this.host.render();
   }
@@ -144,6 +216,7 @@ export class MapScreenPanel {
   stopMap() {
     debug("MapScreenPanel: stopMap");
     this.activeMap = null;
+    this.aoes = [];
     this.plugin.server?.broadcast({ type: "map-clear", payload: {} });
     this.host.render();
   }
@@ -224,7 +297,8 @@ export class MapScreenPanel {
 
   renderSection(container: HTMLElement) {
     const section = container.createDiv("dm-section");
-    section.createEl("h3", { text: "Map Screen" });
+    const title = section.createEl("h3", { text: "Map Screen" });
+    this.host.makeCollapsible(section, title, "map-screen");
 
     const isRunning = !!this.plugin.server;
     if (isRunning) {
@@ -293,6 +367,7 @@ export class MapScreenPanel {
     });
     modeBtn.addEventListener("click", () => {
       this.state.mode = this.state.mode === "physical" ? "fit" : "physical";
+      this.clampStateToViewport();
       this.broadcastView(true);
       this.persistState();
       this.host.render();
@@ -312,6 +387,7 @@ export class MapScreenPanel {
     rotateBtn.title = "Rotate the map on the screen in 90° steps";
     rotateBtn.addEventListener("click", () => {
       this.state.rotation = ((((this.state.rotation ?? 0) + 90) % 360) as 0 | 90 | 180 | 270);
+      this.clampStateToViewport();
       this.broadcastView(true);
       this.persistState();
       this.host.render();
@@ -319,6 +395,7 @@ export class MapScreenPanel {
 
     this.renderGridControls(section);
     this.renderPanPreview(section, map);
+    this.renderAoeControls(section, map);
   }
 
   private renderGridControls(section: HTMLElement) {
@@ -374,20 +451,157 @@ export class MapScreenPanel {
     const nh = map.naturalHeight;
     if (!(nw > 0) || !(nh > 0)) return;
 
+    const rotation = this.state.rotation ?? 0;
+    const invRotation = ((360 - rotation) % 360) as MapRotation;
     const preview = section.createDiv("dm-map-preview");
     // The stage is sized to the map's exact rendered box; the rectangle and
     // the drag math reference it, so panel letterboxing can't skew them.
+    // It renders rotated to the TV's orientation and zoomed by the local
+    // preview zoom; screen↔map conversions divide by the effective scale and
+    // un-rotate through invRotation.
     const stage = preview.createDiv("dm-map-preview-stage");
+    const aoeCanvas = stage.createEl("canvas", { cls: "dm-map-aoe-canvas" });
+
+    const effectiveScale = () => (stage.offsetWidth / nw) * this.previewZoom;
+    const screenToMap = (clientX: number, clientY: number) => {
+      const b = stage.getBoundingClientRect();
+      const r = rotatePoint(clientX - (b.left + b.width / 2), clientY - (b.top + b.height / 2), invRotation);
+      const s = effectiveScale();
+      return { x: nw / 2 + r.x / s, y: nh / 2 + r.y / s };
+    };
+    const deltaToMap = (dx: number, dy: number) => {
+      const r = rotatePoint(dx, dy, invRotation);
+      const s = effectiveScale();
+      return { x: r.x / s, y: r.y / s };
+    };
+
+    const applyTransform = () => {
+      stage.style.transform =
+        `translate(-50%, -50%) translate(${this.previewPanX}px, ${this.previewPanY}px) ` +
+        `rotate(${rotation}deg) scale(${this.previewZoom})`;
+      stage.style.setProperty("--dm-map-zoom", String(this.previewZoom));
+    };
+
+    const redrawAoes = () => {
+      const w = stage.clientWidth;
+      const h = stage.clientHeight;
+      if (!w || !h) return;
+      const z = this.previewZoom;
+      aoeCanvas.width = Math.round(w * z);
+      aoeCanvas.height = Math.round(h * z);
+      const ctx = aoeCanvas.getContext("2d")!;
+      ctx.clearRect(0, 0, aoeCanvas.width, aoeCanvas.height);
+      const s = (w * z) / nw;
+      for (const aoe of this.aoes) {
+        renderAoe(ctx, aoe, s, 0, 0, this.state.pxPerSquare, 0);
+      }
+    };
+
+    const sideways = rotation % 180 !== 0;
+    const client = this.effectiveMapClient();
+    const { ppi, calibrated } = this.clientPpi(client);
+    const scale = ppi / this.state.pxPerSquare;
+    // The rect lives in map coordinates; under a 90°/270° rotation the
+    // screen's long side runs along the map's Y axis, so the window swaps.
+    const visW = (sideways ? client.height : client.width) / scale;
+    const visH = (sideways ? client.width : client.height) / scale;
+    // Zoom bounds: 1× shows the whole map, the max zoom fills the preview
+    // with exactly the player's visible window.
+    const zoomMax =
+      this.state.mode === "physical" ? Math.max(1, Math.min(nw / visW, nh / visH)) : 6;
+    if (this.previewZoom > zoomMax) this.previewZoom = zoomMax;
+
     const layoutStage = () => {
       const availW = preview.clientWidth;
       if (!availW) return;
-      const s = Math.min(availW / nw, 340 / nh);
+      const rotW = sideways ? nh : nw;
+      const rotH = sideways ? nw : nh;
+      const s = Math.min(availW / rotW, 340 / rotH);
       stage.style.width = `${nw * s}px`;
       stage.style.height = `${nh * s}px`;
-      preview.style.height = `${nh * s}px`;
+      preview.style.height = `${rotH * s}px`;
+      applyTransform();
+      redrawAoes();
     };
+    this.redrawPreviewAoes = redrawAoes;
     layoutStage();
     requestAnimationFrame(layoutStage);
+
+    const zoomControls = preview.createDiv("dm-map-zoom-controls");
+    // Clicks on the overlay controls must never fall through to the preview's
+    // click-to-center pan handler.
+    zoomControls.addEventListener("mousedown", (e: MouseEvent) => e.stopPropagation());
+
+    const lockBtn = zoomControls.createEl("button", { text: this.previewLocked ? "🔒" : "🔓" });
+    lockBtn.title = "Lock the map view — pan can't be moved from the preview";
+    lockBtn.addEventListener("click", () => {
+      this.previewLocked = !this.previewLocked;
+      lockBtn.textContent = this.previewLocked ? "🔒" : "🔓";
+      preview.classList.toggle("dm-map-view-locked", this.previewLocked);
+    });
+    preview.classList.toggle("dm-map-view-locked", this.previewLocked);
+
+    const zoomSlider = zoomControls.createEl("input", { type: "range" });
+    zoomSlider.min = "1";
+    zoomSlider.max = String(zoomMax);
+    zoomSlider.step = "0.01";
+    zoomSlider.value = String(this.previewZoom);
+    zoomSlider.title = "Preview zoom — min: whole map, max: the player's view";
+    zoomSlider.disabled = zoomMax <= 1;
+
+    const zoomAt = (factor: number, clientX: number, clientY: number) => {
+      const zOld = this.previewZoom;
+      const zNew = Math.min(zoomMax, Math.max(1, zOld * factor));
+      if (zNew === zOld) return;
+      const pb = preview.getBoundingClientRect();
+      const cx = clientX - (pb.left + pb.width / 2);
+      const cy = clientY - (pb.top + pb.height / 2);
+      const k = zNew / zOld;
+      this.previewPanX = cx * (1 - k) + k * this.previewPanX;
+      this.previewPanY = cy * (1 - k) + k * this.previewPanY;
+      this.previewZoom = zNew;
+      if (zNew === 1) {
+        this.previewPanX = 0;
+        this.previewPanY = 0;
+      }
+      zoomSlider.value = String(zNew);
+      applyTransform();
+      redrawAoes();
+    };
+
+    zoomSlider.addEventListener("input", () => {
+      const pb = preview.getBoundingClientRect();
+      zoomAt(parseFloat(zoomSlider.value) / this.previewZoom, pb.left + pb.width / 2, pb.top + pb.height / 2);
+    });
+
+    preview.addEventListener(
+      "wheel",
+      (e: WheelEvent) => {
+        e.preventDefault();
+        zoomAt(e.deltaY < 0 ? 1.25 : 0.8, e.clientX, e.clientY);
+      },
+      { passive: false }
+    );
+
+    preview.addEventListener("mousedown", (e: MouseEvent) => {
+      if (e.button !== 1) return;
+      e.preventDefault();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startPanX = this.previewPanX;
+      const startPanY = this.previewPanY;
+      const onMove = (ev: MouseEvent) => {
+        this.previewPanX = startPanX + (ev.clientX - startX);
+        this.previewPanY = startPanY + (ev.clientY - startY);
+        applyTransform();
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
 
     const vaultPath = vaultPathFromUrl(map.url);
     const adapter = this.plugin.app.vault.adapter as { getResourcePath?: (p: string) => string };
@@ -408,22 +622,93 @@ export class MapScreenPanel {
       }
     }
 
+    for (const aoe of this.aoes) {
+      const dot = stage.createDiv("dm-map-aoe-dot");
+      dot.style.background = aoe.color;
+      dot.title = `${aoe.label ?? aoe.shape} ${aoe.sizeFt}ft — drag to move`;
+      const handle = aoe.shape === "circle" ? null : stage.createDiv("dm-map-aoe-rot-handle");
+      if (handle) {
+        handle.style.background = aoe.color;
+        handle.title = "Drag to rotate";
+      }
+      const ftToPx = this.state.pxPerSquare / 5;
+      // The handle sits where the shape "points": tip of cone/line, mid-edge
+      // of a square.
+      const handleDistPx = () => (aoe.shape === "square" ? aoe.sizeFt / 2 : aoe.sizeFt) * ftToPx;
+      const positionMarkers = () => {
+        dot.style.left = `${(aoe.x / nw) * 100}%`;
+        dot.style.top = `${(aoe.y / nh) * 100}%`;
+        if (handle) {
+          const rad = (aoe.rotation * Math.PI) / 180;
+          const hx = aoe.x + Math.cos(rad) * handleDistPx();
+          const hy = aoe.y + Math.sin(rad) * handleDistPx();
+          handle.style.left = `${(hx / nw) * 100}%`;
+          handle.style.top = `${(hy / nh) * 100}%`;
+        }
+      };
+      positionMarkers();
+
+      dot.addEventListener("mousedown", (ev: MouseEvent) => {
+        if (ev.button !== 0) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (!stage.offsetWidth) return;
+        const startX = ev.clientX;
+        const startY = ev.clientY;
+        const startAoeX = aoe.x;
+        const startAoeY = aoe.y;
+        const onMove = (me: MouseEvent) => {
+          const d = deltaToMap(me.clientX - startX, me.clientY - startY);
+          aoe.x = Math.max(0, Math.min(nw, startAoeX + d.x));
+          aoe.y = Math.max(0, Math.min(nh, startAoeY + d.y));
+          positionMarkers();
+          redrawAoes();
+          this.broadcastAoes();
+        };
+        const onUp = () => {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          this.broadcastAoes(true);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+
+      handle?.addEventListener("mousedown", (ev: MouseEvent) => {
+        if (ev.button !== 0) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        const onMove = (me: MouseEvent) => {
+          const b = stage.getBoundingClientRect();
+          if (!b.width) return;
+          const s = effectiveScale();
+          const r = rotatePoint(aoe.x - nw / 2, aoe.y - nh / 2, rotation);
+          const centerX = b.left + b.width / 2 + r.x * s;
+          const centerY = b.top + b.height / 2 + r.y * s;
+          const deg = (Math.atan2(me.clientY - centerY, me.clientX - centerX) * 180) / Math.PI - rotation;
+          aoe.rotation = ((Math.round(deg / 5) * 5) % 360 + 360) % 360;
+          positionMarkers();
+          redrawAoes();
+          this.broadcastAoes();
+        };
+        const onUp = () => {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          this.broadcastAoes(true);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    }
+
     if (this.state.mode !== "physical") return;
 
-    const client = this.effectiveMapClient();
-    const { ppi, calibrated } = this.clientPpi(client);
     if (!calibrated) {
       section.createDiv({
         cls: "dm-map-uncalibrated",
         text: "Screen not calibrated — physical scale assumes 96 px/inch. Click its resolution badge to calibrate.",
       });
     }
-    const scale = ppi / this.state.pxPerSquare;
-    // The preview stays in map orientation; under a 90°/270° rotation the
-    // screen's long side runs along the map's Y axis, so the window swaps.
-    const sideways = ((this.state.rotation ?? 0) % 180) !== 0;
-    const visW = (sideways ? client.height : client.width) / scale;
-    const visH = (sideways ? client.width : client.height) / scale;
 
     const rect = stage.createDiv("dm-map-viewport-rect");
     const positionRect = () => {
@@ -435,7 +720,7 @@ export class MapScreenPanel {
     positionRect();
 
     const applyPan = (panX: number, panY: number) => {
-      const clamped = clampPan(panX, panY, nw, nh);
+      const clamped = clampPan(panX, panY, nw, nh, client.width, client.height, scale, this.state.rotation ?? 0);
       this.state.panX = clamped.panX;
       this.state.panY = clamped.panY;
       positionRect();
@@ -443,26 +728,26 @@ export class MapScreenPanel {
     };
 
     preview.addEventListener("mousedown", (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      if (this.previewLocked) return;
       e.preventDefault();
-      const bounds = stage.getBoundingClientRect();
-      if (!bounds.width) return;
-      const toMapPx = nw / bounds.width;
+      if (!stage.offsetWidth) return;
       const startPanX = this.state.panX;
       const startPanY = this.state.panY;
       const startX = e.clientX;
       const startY = e.clientY;
       const fromRect = e.target === rect;
       if (!fromRect) {
-        applyPan(
-          (e.clientX - bounds.left) * toMapPx,
-          (e.clientY - bounds.top) * toMapPx
-        );
+        const m = screenToMap(e.clientX, e.clientY);
+        applyPan(m.x, m.y);
       }
       const onMove = (ev: MouseEvent) => {
         if (fromRect) {
-          applyPan(startPanX + (ev.clientX - startX) * toMapPx, startPanY + (ev.clientY - startY) * toMapPx);
+          const d = deltaToMap(ev.clientX - startX, ev.clientY - startY);
+          applyPan(startPanX + d.x, startPanY + d.y);
         } else {
-          applyPan((ev.clientX - bounds.left) * toMapPx, (ev.clientY - bounds.top) * toMapPx);
+          const m = screenToMap(ev.clientX, ev.clientY);
+          applyPan(m.x, m.y);
         }
       };
       const onUp = () => {
@@ -474,6 +759,155 @@ export class MapScreenPanel {
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     });
+  }
+
+  private renderAoeControls(section: HTMLElement, map: ActiveMap) {
+    const wrap = section.createDiv("dm-map-aoe-section");
+    const header = wrap.createDiv("dm-layer-btn-row");
+    header.createSpan({ text: "AoE Overlays", cls: "dm-status-detail" });
+
+    const addBtn = header.createEl("button", { text: "Add AoE" });
+    addBtn.addEventListener("click", (evt: MouseEvent) => {
+      const menu = new Menu();
+      for (const preset of SHAPE_PRESETS) {
+        menu.addItem((item) => item.setTitle(preset.name).onClick(() => this.addAoe(preset, map)));
+      }
+      menu.addSeparator();
+      menu.addItem((item) =>
+        item.setTitle("Spells…").onClick(() => {
+          new SpellAoeModal(this.plugin.app, (spell) =>
+            this.addAoe(
+              { name: spell.name, shape: spell.shape, sizeFt: spell.sizeFt, widthFt: spell.widthFt, color: spell.color, opacity: 0.3 },
+              map,
+              spell.name
+            )
+          ).open();
+        })
+      );
+      menu.showAtMouseEvent(evt);
+    });
+
+    if (this.aoes.length === 0) return;
+
+    const clearBtn = header.createEl("button", { text: "Clear All" });
+    clearBtn.addEventListener("click", () => {
+      this.aoes = [];
+      this.broadcastAoes(true);
+      this.host.render();
+    });
+
+    for (const aoe of this.aoes) {
+      this.renderAoeRow(wrap, aoe);
+    }
+  }
+
+  private renderAoeRow(container: HTMLElement, aoe: MapAoe) {
+    const row = container.createDiv("dm-map-aoe-row");
+    if (aoe.label) {
+      row.createSpan({ text: aoe.label, cls: "dm-map-aoe-label" });
+    }
+
+    const shapeSelect = row.createEl("select");
+    for (const shape of AOE_SHAPES) {
+      shapeSelect.createEl("option", { text: shape, value: shape });
+    }
+    shapeSelect.value = aoe.shape;
+    shapeSelect.addEventListener("change", () => {
+      aoe.shape = shapeSelect.value as AoeShape;
+      this.broadcastAoes(true);
+      this.host.render();
+    });
+
+    const sizeInput = row.createEl("input", { type: "number" });
+    sizeInput.value = String(aoe.sizeFt);
+    sizeInput.min = "5";
+    sizeInput.step = "5";
+    sizeInput.title = aoe.shape === "circle" ? "Radius (ft)" : aoe.shape === "line" ? "Length (ft)" : "Size (ft)";
+    sizeInput.addEventListener("change", () => {
+      const v = parseFloat(sizeInput.value);
+      if (!Number.isFinite(v) || v <= 0) return;
+      aoe.sizeFt = v;
+      this.broadcastAoes(true);
+      this.redrawPreviewAoes?.();
+    });
+    row.createSpan({ text: "ft", cls: "dm-status-detail" });
+
+    if (aoe.shape === "line") {
+      const widthInput = row.createEl("input", { type: "number" });
+      widthInput.value = String(aoe.widthFt);
+      widthInput.min = "5";
+      widthInput.step = "5";
+      widthInput.title = "Width (ft)";
+      widthInput.addEventListener("change", () => {
+        const v = parseFloat(widthInput.value);
+        if (!Number.isFinite(v) || v <= 0) return;
+        aoe.widthFt = v;
+        this.broadcastAoes(true);
+        this.redrawPreviewAoes?.();
+      });
+      row.createSpan({ text: "wide", cls: "dm-status-detail" });
+    }
+
+    const colorSwatch = row.createEl("input", { type: "color" });
+    colorSwatch.value = aoe.color;
+    colorSwatch.addEventListener("change", () => {
+      aoe.color = colorSwatch.value;
+      this.broadcastAoes(true);
+      this.host.render();
+    });
+
+    const opacityInput = row.createEl("input", { type: "range" });
+    opacityInput.min = "0.05";
+    opacityInput.max = "0.8";
+    opacityInput.step = "0.05";
+    opacityInput.value = String(aoe.opacity);
+    opacityInput.title = "Opacity";
+    opacityInput.addEventListener("input", () => {
+      aoe.opacity = parseFloat(opacityInput.value);
+      this.broadcastAoes();
+      this.redrawPreviewAoes?.();
+    });
+    opacityInput.addEventListener("change", () => {
+      aoe.opacity = parseFloat(opacityInput.value);
+      this.broadcastAoes(true);
+      this.redrawPreviewAoes?.();
+    });
+
+    const rotInput = row.createEl("input", { type: "number" });
+    rotInput.value = String(aoe.rotation);
+    rotInput.min = "0";
+    rotInput.max = "359";
+    rotInput.step = "15";
+    rotInput.title = "Rotation (°)";
+    rotInput.addEventListener("change", () => {
+      aoe.rotation = parseInt(rotInput.value, 10) || 0;
+      this.broadcastAoes(true);
+      this.host.render();
+    });
+
+    const removeBtn = row.createEl("button", { text: "✕" });
+    removeBtn.addEventListener("click", () => {
+      this.aoes = this.aoes.filter((a) => a.id !== aoe.id);
+      this.broadcastAoes(true);
+      this.host.render();
+    });
+  }
+
+  private addAoe(preset: AoePreset, map: ActiveMap, label?: string) {
+    this.aoes.push({
+      id: `aoe-${nextAoeId++}`,
+      shape: preset.shape,
+      sizeFt: preset.sizeFt,
+      widthFt: preset.widthFt,
+      color: preset.color,
+      opacity: preset.opacity,
+      rotation: 0,
+      x: map.naturalWidth / 2,
+      y: map.naturalHeight / 2,
+      ...(label ? { label } : {}),
+    });
+    this.broadcastAoes(true);
+    this.host.render();
   }
 }
 

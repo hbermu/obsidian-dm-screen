@@ -328,15 +328,23 @@ export class DmControlPanel extends ItemView {
 
   render() {
     const container = this.contentEl;
+    const scrollTop = container.scrollTop;
     container.empty();
     container.addClass("dm-control-panel");
 
     this.renderServerSection(container);
+    this.renderHydrusBar(container);
     this.renderPlayerScreenSection(container);
     this.mapPanel.renderSection(container);
     this.renderInitiativeSection(container);
 
     this.broadcastInitialScale();
+    container.scrollTop = scrollTop;
+    // The map pan preview sizes itself on the next frame, which can shift
+    // content after the synchronous restore — re-apply once it has settled.
+    requestAnimationFrame(() => {
+      container.scrollTop = scrollTop;
+    });
   }
 
   private hasBroadcastInitialScale = false;
@@ -351,11 +359,24 @@ export class DmControlPanel extends ItemView {
     this.hasBroadcastInitialScale = true;
   }
 
+  private collapsedSections = new Set<string>();
+
+  makeCollapsible(section: HTMLElement, title: HTMLElement, key: string) {
+    title.classList.add("dm-section-toggle");
+    if (this.collapsedSections.has(key)) section.classList.add("dm-section-collapsed");
+    title.addEventListener("click", () => {
+      const collapsed = !this.collapsedSections.delete(key);
+      if (collapsed) this.collapsedSections.add(key);
+      section.classList.toggle("dm-section-collapsed", collapsed);
+    });
+  }
+
   // ─── Server Section ─────────────────────────────────────────────────
 
   private renderServerSection(container: HTMLElement) {
     const section = container.createDiv("dm-section");
-    section.createEl("h3", { text: "Player Screen Server" });
+    const title = section.createEl("h3", { text: "Player Screen Server" });
+    this.makeCollapsible(section, title, "server");
 
     const isRunning = !!this.plugin.server;
     const statusEl = section.createDiv("dm-server-status");
@@ -369,32 +390,6 @@ export class DmControlPanel extends ItemView {
         text: ` on port ${this.plugin.settings.serverPort}`,
         cls: "dm-status-detail",
       });
-
-      const port = this.plugin.settings.serverPort;
-      const lanIp = this.getLanIp();
-      const lanUrl = lanIp ? `http://${lanIp}:${port}` : null;
-
-      // LAN URL — localhost row removed (it doesn't help any LAN client and
-      // ate vertical space on narrow panels).
-      if (lanUrl) {
-        const lanRow = section.createDiv("dm-server-url");
-        const lanLink = lanRow.createEl("a", {
-          text: `LAN: ${lanUrl}`,
-          href: lanUrl,
-          cls: "dm-server-url-link",
-        });
-        lanLink.setAttr("target", "_blank");
-
-        const lanCopyBtn = lanRow.createEl("button", {
-          text: "Copy",
-          cls: "dm-copy-url-btn",
-        });
-        lanCopyBtn.addEventListener("click", () => {
-          navigator.clipboard.writeText(lanUrl);
-          lanCopyBtn.textContent = "Copied!";
-          setTimeout(() => { lanCopyBtn.textContent = "Copy"; }, 1500);
-        });
-      }
 
       if (this.connectedClients.length > 0) {
         const clientInfo = section.createDiv("dm-client-info");
@@ -451,11 +446,46 @@ export class DmControlPanel extends ItemView {
     return null;
   }
 
+  // Standalone bar between sections: always visible, never collapsible.
+  private renderHydrusBar(container: HTMLElement) {
+    if (!this.plugin.settings.hydrusEnabled || !this.plugin.settings.hydrusApiUrl) return;
+    const bar = container.createDiv("dm-hydrus-bar");
+    const hydrusBtn = bar.createEl("button", { text: "Image from Hydrus" });
+    hydrusBtn.addEventListener("click", async () => {
+      try {
+        const { HydrusExplorerModal } = await import("./HydrusExplorerModal");
+        new HydrusExplorerModal(this.plugin.app, this.plugin).open();
+      } catch (err) {
+        debugError("Hydrus modal failed:", err);
+      }
+    });
+  }
+
   // ─── Player Screen Section ──────────────────────────────────────────
 
   private renderPlayerScreenSection(container: HTMLElement) {
     const section = container.createDiv("dm-section");
-    section.createEl("h3", { text: "Player Screen" });
+    const title = section.createEl("h3", { text: "Player Screen" });
+    this.makeCollapsible(section, title, "player-screen");
+
+    if (this.plugin.server) {
+      const port = this.plugin.settings.serverPort;
+      const lanIp = this.getLanIp();
+      const playerUrl = `http://${lanIp ?? "localhost"}:${port}`;
+      const urlRow = section.createDiv("dm-server-url");
+      const link = urlRow.createEl("a", {
+        text: `Player: ${playerUrl}`,
+        href: playerUrl,
+        cls: "dm-server-url-link",
+      });
+      link.setAttr("target", "_blank");
+      const copyBtn = urlRow.createEl("button", { text: "Copy", cls: "dm-copy-url-btn" });
+      copyBtn.addEventListener("click", () => {
+        void navigator.clipboard.writeText(playerUrl);
+        copyBtn.textContent = "Copied!";
+        setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+      });
+    }
 
     // Button row
     const btnRow = section.createDiv("dm-layer-btn-row");
@@ -483,20 +513,6 @@ export class DmControlPanel extends ItemView {
         void this.showBackgroundPicker(evt);
       }
     });
-
-    if (this.plugin.settings.hydrusEnabled && this.plugin.settings.hydrusApiUrl) {
-      const hydrusBtn = btnRow.createEl("button", { text: "Image from Hydrus" });
-      hydrusBtn.addEventListener("click", async () => {
-        try {
-          const { HydrusExplorerModal } = await import("./HydrusExplorerModal");
-          new HydrusExplorerModal(this.plugin.app, this.plugin).open();
-        } catch (err) {
-          debugError("Hydrus modal failed:", err);
-        }
-      });
-    }
-
-
 
     // Preview area with pan/zoom — always use configured TV size for stable layout
     const { width: tvW, height: tvH } = this.getEffectiveResolution();
@@ -936,7 +952,8 @@ export class DmControlPanel extends ItemView {
 
     // Header: COMBAT title + emit toggle
     const header = section.createDiv("dm-section-header");
-    header.createEl("h3", { text: "COMBAT" });
+    const title = header.createEl("h3", { text: "COMBAT" });
+    this.makeCollapsible(section, title, "combat");
 
     const broadcasting = this.isCombatBroadcasting();
     const emitToggle = header.createEl("button", {
