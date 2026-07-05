@@ -21,6 +21,7 @@
 6. Pan/zoom controls are specified in `pan-zoom.md`.
 7. The green viewport indicator (when exactly one client is connected) is specified in `viewport-indicator.md`.
 8. `render()` shall preserve the panel's scroll position across full rebuilds: the container's `scrollTop` is captured before emptying and re-applied after the rebuild (and once more on the next animation frame, since the map pan preview sizes itself a frame later).
+9. Each top-level panel section (Player Screen Server, Player Screen, Map Screen, COMBAT) shall be collapsible by clicking its title: `makeCollapsible` adds a ▾/▸ chevron to the title, and while collapsed only the section's first child (the title, or COMBAT's header row with the Live indicator) stays visible. The state lives in the in-memory `collapsedSections` set — it survives re-renders (toggling flips a CSS class without re-rendering) but resets when the panel reopens; all sections start expanded.
 
 ## Tests covering this
 

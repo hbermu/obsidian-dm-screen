@@ -297,7 +297,8 @@ export class MapScreenPanel {
 
   renderSection(container: HTMLElement) {
     const section = container.createDiv("dm-section");
-    section.createEl("h3", { text: "Map Screen" });
+    const title = section.createEl("h3", { text: "Map Screen" });
+    this.host.makeCollapsible(section, title, "map-screen");
 
     const isRunning = !!this.plugin.server;
     if (isRunning) {

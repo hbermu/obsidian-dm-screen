@@ -1735,6 +1735,27 @@
   width: 80px;
 }
 
+.dm-section-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.dm-section-toggle::before {
+  content: "▾ ";
+  font-size: 0.75em;
+  color: var(--text-muted);
+}
+
+.dm-section-collapsed .dm-section-toggle::before {
+  content: "▸ ";
+}
+
+/* The first child is the title (or the COMBAT header row, which keeps the
+   Live indicator visible); everything else folds away. */
+.dm-section-collapsed > *:not(:first-child) {
+  display: none;
+}
+
 .dm-map-preview {
   position: relative;
   display: flex;

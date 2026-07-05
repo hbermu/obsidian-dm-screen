@@ -358,11 +358,24 @@ export class DmControlPanel extends ItemView {
     this.hasBroadcastInitialScale = true;
   }
 
+  private collapsedSections = new Set<string>();
+
+  makeCollapsible(section: HTMLElement, title: HTMLElement, key: string) {
+    title.classList.add("dm-section-toggle");
+    if (this.collapsedSections.has(key)) section.classList.add("dm-section-collapsed");
+    title.addEventListener("click", () => {
+      const collapsed = !this.collapsedSections.delete(key);
+      if (collapsed) this.collapsedSections.add(key);
+      section.classList.toggle("dm-section-collapsed", collapsed);
+    });
+  }
+
   // ─── Server Section ─────────────────────────────────────────────────
 
   private renderServerSection(container: HTMLElement) {
     const section = container.createDiv("dm-section");
-    section.createEl("h3", { text: "Player Screen Server" });
+    const title = section.createEl("h3", { text: "Player Screen Server" });
+    this.makeCollapsible(section, title, "server");
 
     const isRunning = !!this.plugin.server;
     const statusEl = section.createDiv("dm-server-status");
@@ -462,7 +475,8 @@ export class DmControlPanel extends ItemView {
 
   private renderPlayerScreenSection(container: HTMLElement) {
     const section = container.createDiv("dm-section");
-    section.createEl("h3", { text: "Player Screen" });
+    const title = section.createEl("h3", { text: "Player Screen" });
+    this.makeCollapsible(section, title, "player-screen");
 
     // Button row
     const btnRow = section.createDiv("dm-layer-btn-row");
@@ -943,7 +957,8 @@ export class DmControlPanel extends ItemView {
 
     // Header: COMBAT title + emit toggle
     const header = section.createDiv("dm-section-header");
-    header.createEl("h3", { text: "COMBAT" });
+    const title = header.createEl("h3", { text: "COMBAT" });
+    this.makeCollapsible(section, title, "combat");
 
     const broadcasting = this.isCombatBroadcasting();
     const emitToggle = header.createEl("button", {
