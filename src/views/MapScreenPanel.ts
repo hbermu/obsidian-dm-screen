@@ -50,6 +50,7 @@ export class MapScreenPanel {
   private previewZoom = 1;
   private previewPanX = 0;
   private previewPanY = 0;
+  private previewLocked = false;
 
   constructor(private plugin: DmScreenPlugin, private host: DmControlPanel) {}
 
@@ -514,6 +515,27 @@ export class MapScreenPanel {
     layoutStage();
     requestAnimationFrame(layoutStage);
 
+    const zoomControls = preview.createDiv("dm-map-zoom-controls");
+
+    const lockBtn = zoomControls.createEl("button", { text: this.previewLocked ? "🔒" : "🔓" });
+    lockBtn.title = "Lock the map view — pan can't be moved from the preview";
+    lockBtn.addEventListener("click", () => {
+      this.previewLocked = !this.previewLocked;
+      lockBtn.textContent = this.previewLocked ? "🔒" : "🔓";
+      preview.classList.toggle("dm-map-view-locked", this.previewLocked);
+    });
+    preview.classList.toggle("dm-map-view-locked", this.previewLocked);
+
+    const zoomSlider = zoomControls.createEl("input", { type: "range" });
+    zoomSlider.min = "1";
+    zoomSlider.max = "6";
+    zoomSlider.step = "0.1";
+    zoomSlider.value = String(this.previewZoom);
+    zoomSlider.title = "Preview zoom";
+
+    const homeBtn = zoomControls.createEl("button", { text: "⌂" });
+    homeBtn.title = "Center and reset zoom";
+
     const zoomAt = (factor: number, clientX: number, clientY: number) => {
       const zOld = this.previewZoom;
       const zNew = Math.min(6, Math.max(1, zOld * factor));
@@ -529,34 +551,26 @@ export class MapScreenPanel {
         this.previewPanX = 0;
         this.previewPanY = 0;
       }
+      zoomSlider.value = String(zNew);
       applyTransform();
       redrawAoes();
     };
 
-    const zoomControls = preview.createDiv("dm-map-zoom-controls");
-    const zoomBtn = (label: string, title: string, onClick: () => void) => {
-      const btn = zoomControls.createEl("button", { text: label });
-      btn.title = title;
-      btn.addEventListener("click", onClick);
-    };
     const previewCenter = () => {
       const pb = preview.getBoundingClientRect();
       return { x: pb.left + pb.width / 2, y: pb.top + pb.height / 2 };
     };
-    zoomBtn("−", "Zoom out", () => {
+    zoomSlider.addEventListener("input", () => {
       const c = previewCenter();
-      zoomAt(0.8, c.x, c.y);
+      zoomAt(parseFloat(zoomSlider.value) / this.previewZoom, c.x, c.y);
     });
-    zoomBtn("⌂", "Center and reset zoom", () => {
+    homeBtn.addEventListener("click", () => {
       this.previewZoom = 1;
       this.previewPanX = 0;
       this.previewPanY = 0;
+      zoomSlider.value = "1";
       applyTransform();
       redrawAoes();
-    });
-    zoomBtn("+", "Zoom in", () => {
-      const c = previewCenter();
-      zoomAt(1.25, c.x, c.y);
     });
 
     preview.addEventListener(
@@ -721,6 +735,7 @@ export class MapScreenPanel {
 
     preview.addEventListener("mousedown", (e: MouseEvent) => {
       if (e.button !== 0) return;
+      if (this.previewLocked) return;
       e.preventDefault();
       if (!stage.offsetWidth) return;
       const startPanX = this.state.panX;

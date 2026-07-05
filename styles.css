@@ -1771,6 +1771,16 @@
   min-width: 26px;
 }
 
+.dm-map-zoom-controls input[type="range"] {
+  width: 90px;
+}
+
+.dm-map-view-locked .dm-map-viewport-rect {
+  pointer-events: none;
+  border-style: dashed;
+  cursor: default;
+}
+
 .dm-map-preview-stage > img,
 .dm-map-preview-stage > video {
   position: absolute;
