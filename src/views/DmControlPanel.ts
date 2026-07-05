@@ -328,6 +328,7 @@ export class DmControlPanel extends ItemView {
 
   render() {
     const container = this.contentEl;
+    const scrollTop = container.scrollTop;
     container.empty();
     container.addClass("dm-control-panel");
 
@@ -337,6 +338,12 @@ export class DmControlPanel extends ItemView {
     this.renderInitiativeSection(container);
 
     this.broadcastInitialScale();
+    container.scrollTop = scrollTop;
+    // The map pan preview sizes itself on the next frame, which can shift
+    // content after the synchronous restore — re-apply once it has settled.
+    requestAnimationFrame(() => {
+      container.scrollTop = scrollTop;
+    });
   }
 
   private hasBroadcastInitialScale = false;

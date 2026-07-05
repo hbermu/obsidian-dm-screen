@@ -20,6 +20,7 @@
 5. When a layer is hidden (`layer.visible === false`), the preview shall render it with `opacity: 0.25` and a dashed border.
 6. Pan/zoom controls are specified in `pan-zoom.md`.
 7. The green viewport indicator (when exactly one client is connected) is specified in `viewport-indicator.md`.
+8. `render()` shall preserve the panel's scroll position across full rebuilds: the container's `scrollTop` is captured before emptying and re-applied after the rebuild (and once more on the next animation frame, since the map pan preview sizes itself a frame later).
 
 ## Tests covering this
 
