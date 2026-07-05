@@ -55,7 +55,9 @@ jobs:
         env:
           BUMP: ${{ steps.pr_bump.outputs.type }}
         run: |
-          latest=$(git tag --list 'v*' --sort=-version:refname \
+          # Find the latest stable tag — supports both legacy v-prefixed and
+          # new bare tags. Strip the v prefix for version arithmetic.
+          latest=$(git tag --list '[0-9]*' --list 'v[0-9]*' --sort=-version:refname \
               | grep -vE -- '-beta\.[0-9]+$' | head -1)
           if [ -z "$latest" ]; then
             current="0.0.0"
@@ -83,6 +85,15 @@ jobs:
           tmp=$(mktemp)
           jq --arg v "$VERSION" '.packages[""].version = $v' package-lock.json > "$tmp" && mv "$tmp" package-lock.json
 
+      - name: Update versions.json with new entry
+        if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
+        env:
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          MIN_APP=$(jq -r .minAppVersion manifest.json)
+          tmp=$(mktemp)
+          jq --arg v "$VERSION" --arg m "$MIN_APP" '. + {($v): $m}' versions.json > "$tmp" && mv "$tmp" versions.json
+
       - name: Build artefacts (merge path)
         if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
         run: make build
@@ -97,19 +108,19 @@ jobs:
           PR_NUM: ${{ github.event.pull_request.number }}
         run: |
           # Previous stable tag (any tier), used as the compare-link footer
-          # baseline for patch releases.
-          prev_tag=$(git tag --list 'v*' --sort=-version:refname \
+          # baseline for patch releases. Supports both v-prefixed and bare tags.
+          prev_tag=$(git tag --list '[0-9]*' --list 'v[0-9]*' --sort=-version:refname \
               | grep -vE -- '-beta\.[0-9]+$' | head -1)
 
           # Tier-specific previous tag, used as the aggregation window for
-          # minor (prev v*.*.0) and major (prev v*.0.0) releases.
+          # minor (prev *.*.0) and major (prev *.0.0) releases.
           case "$BUMP" in
             major)
-              prev_window=$(git tag --list 'v*.0.0' --sort=-version:refname \
+              prev_window=$(git tag --list '[0-9]*.0.0' --list 'v[0-9]*.0.0' --sort=-version:refname \
                   | grep -vE -- '-beta\.[0-9]+$' | head -1)
               ;;
             minor)
-              prev_window=$(git tag --list 'v*.*.0' --sort=-version:refname \
+              prev_window=$(git tag --list '[0-9]*.*.0' --list 'v[0-9]*.*.0' --sort=-version:refname \
                   | grep -vE -- '-beta\.[0-9]+$' | head -1)
               ;;
             *)
@@ -130,12 +141,12 @@ jobs:
                 echo "- ${PR_TITLE} (#${PR_NUM})"
                 if [ -n "$prev_tag" ]; then
                   echo ""
-                  echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...v${VERSION}"
+                  echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...${VERSION}"
                 fi
               } > notes.md
               ;;
             minor)
-              # Aggregate every PR merged since the previous minor (v*.*.0),
+              # Aggregate every PR merged since the previous minor (*.*.0),
               # categorized by conventional-commit type.
               if [ -n "$prev_window" ]; then
                 since=$(git log -1 --format=%cI "$prev_window")
@@ -157,20 +168,20 @@ jobs:
                 [ -n "$ci" ]       && printf "### Build & CI\n%s\n\n" "$ci"
                 [ -n "$other" ]    && printf "### Other\n%s\n\n" "$other"
                 if [ -n "$prev_window" ]; then
-                  echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_window}...v${VERSION}"
+                  echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_window}...${VERSION}"
                 fi
               } > notes.md
               ;;
             major)
               # Summary from the PR body (strip the boilerplate '## Test plan'
               # tail that Claude-generated PRs append) + bullet list of every
-              # minor (v*.*.0) shipped since the previous major + a pointer to
+              # minor (*.*.0) shipped since the previous major + a pointer to
               # CHANGELOG.md for the full detail.
               PR_BODY=$(gh pr view "$PR_NUM" --json body --jq .body)
               SUMMARY=$(printf '%s\n' "$PR_BODY" | awk '/^## Test plan/{exit} {print}')
-              minors=$(git tag --list 'v*.*.0' --sort=-version:refname \
+              minors=$(git tag --list '[0-9]*.*.0' --list 'v[0-9]*.*.0' --sort=-version:refname \
                   | grep -vE -- '-beta\.[0-9]+$' \
-                  | awk -v lo="$prev_window" -v hi="v${VERSION}" '$0!=hi && (lo=="" || $0>lo)')
+                  | awk -v lo="$prev_window" -v hi="${VERSION}" '$0!=hi && (lo=="" || $0>lo)')
               {
                 if [ -n "$SUMMARY" ]; then
                   printf '%s\n\n' "$SUMMARY"
@@ -186,7 +197,7 @@ jobs:
                 echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) for the full detail of every change since ${prev_window:-the start of the project}."
                 echo ""
                 if [ -n "$prev_window" ]; then
-                  echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_window}...v${VERSION}"
+                  echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_window}...${VERSION}"
                 fi
               } > notes.md
               ;;
@@ -202,21 +213,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Commit the bump on a detached head so we can tag a commit that
-          # contains the new version files. The branch is never pushed; only
-          # the tag is, so main stays untouched and protection is respected.
-          # When the merged PR already bumped manifest.json to the target
-          # version (per the pre-push manifest check rule in AGENTS.md), the
-          # version-files step is a no-op and `git add` stages nothing; in
-          # that case we tag the merge commit directly without an extra
-          # release commit.
           git checkout --detach
-          git add package.json package-lock.json manifest.json
+          git add package.json package-lock.json manifest.json versions.json
           if ! git diff --cached --quiet; then
-            git commit -m "release: v$VERSION"
+            git commit -m "release: $VERSION"
           fi
-          git tag -a "v$VERSION" -m "v$VERSION"
-          git push origin "v$VERSION"
+          git tag -a "$VERSION" -m "$VERSION"
+          git push origin "$VERSION"
 
       - name: Publish stable release
         if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
@@ -224,8 +227,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.next.outputs.version }}
         run: |
-          gh release create "v$VERSION" \
-              --title "v$VERSION" \
+          gh release create "$VERSION" \
+              --title "$VERSION" \
               --notes-file notes.md \
               main.js manifest.json styles.css
 
@@ -238,7 +241,7 @@ jobs:
           gh release list --limit 200 --json tagName --jq '.[] | .tagName' \
             | while read -r tag; do
                 case "$tag" in
-                  *-beta.*) echo "Deleting prerelease $tag (stable v$VERSION published)"
+                  *-beta.*) echo "Deleting prerelease $tag (stable $VERSION published)"
                             gh release delete "$tag" --yes --cleanup-tag ;;
                 esac
               done
@@ -250,15 +253,11 @@ jobs:
           VERSION: ${{ steps.next.outputs.version }}
           BUMP: ${{ steps.pr_bump.outputs.type }}
         run: |
-          # Switch back to main from the detached tag commit. The working
-          # tree carries leftover bumped version files and a fresh main.js
-          # build artefact; --force discards them (we only want CHANGELOG.md
-          # touched on main).
           git checkout --force main
           git pull --ff-only origin main
 
           DATE=$(date -u +%Y-%m-%d)
-          HEADING="## v${VERSION} — ${BUMP} — ${DATE}"
+          HEADING="## ${VERSION} — ${BUMP} — ${DATE}"
 
           {
             echo "$HEADING"
@@ -288,12 +287,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md
-          git commit -m "chore(changelog): update for v${VERSION}"
-          # Direct push to main; allowed because the workflow trigger
-          # is `pull_request: closed` and `push: branches-ignore: [main]`,
-          # so this push does NOT re-fire the workflow. Requires repo
-          # branch-protection rules to allow github-actions[bot] to bypass
-          # required reviews / status checks for pushes to main.
+          git commit -m "chore(changelog): update for ${VERSION}"
           git push origin main
 
       # ────────────── Push-to-any-non-main-branch path: beta only ──────────────
@@ -322,15 +316,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          # actions/checkout@v4 does not fetch tags by default, so checking
-          # `git rev-parse "v$VERSION"` against the workflow's local repo
-          # always misses on a fresh checkout. Check the remote tag list and
-          # the GitHub releases API instead — either signal means we already
-          # published this prerelease and the push is a re-run.
-          if gh release view "v$VERSION" >/dev/null 2>&1 \
-             || git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+          if gh release view "$VERSION" >/dev/null 2>&1 \
+             || git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "::notice::Tag v$VERSION already exists on remote; nothing to publish."
+            echo "::notice::Tag $VERSION already exists on remote; nothing to publish."
           else
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
@@ -342,16 +331,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          # Strip the -beta.N suffix to get the corresponding stable version.
-          # If a stable release for that line already exists, the prerelease
-          # is orphan-by-construction: it would either re-create a release
-          # that the previous stable's cleanup deleted (the exact bug this
-          # guard catches) or sit alongside a shipped stable, which makes
-          # no sense for BRAT subscribers.
           BASE="${VERSION%-beta.*}"
-          if gh release view "v$BASE" >/dev/null 2>&1; then
+          if gh release view "$BASE" >/dev/null 2>&1 \
+             || gh release view "v$BASE" >/dev/null 2>&1; then
             echo "stable_exists=true" >> $GITHUB_OUTPUT
-            echo "::notice::Stable release v$BASE already exists; refusing to publish v$VERSION. Bump manifest.json on main to the next planned dev version (or to the latest stable) to re-arm beta publishing."
+            echo "::notice::Stable release $BASE already exists; refusing to publish $VERSION."
           else
             echo "stable_exists=false" >> $GITHUB_OUTPUT
           fi
@@ -367,8 +351,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v$VERSION" -m "v$VERSION"
-          git push origin "v$VERSION"
+          git tag -a "$VERSION" -m "$VERSION"
+          git push origin "$VERSION"
 
       - name: Publish prerelease
         if: github.event_name == 'push' && steps.ver.outputs.is_prerelease == 'true' && steps.tag_check.outputs.exists == 'false' && steps.stable_check.outputs.stable_exists == 'false'
@@ -376,8 +360,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          gh release create "v$VERSION" \
-              --title "v$VERSION" \
+          gh release create "$VERSION" \
+              --title "$VERSION" \
               --generate-notes \
               --prerelease \
               main.js manifest.json styles.css

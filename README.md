@@ -121,6 +121,17 @@ DM Screen integrates with two community plugins when they are installed and enab
 - [Initiative Tracker](https://github.com/javalent/initiative-tracker) — auto-syncs combatants, HP, statuses, and rounds.
 - [Fantasy Statblocks](https://github.com/javalent/fantasy-statblocks) — inline 5e statblock display in the DM combat panel.
 
+## Network usage & privacy
+
+DM Screen is a **desktop-only** plugin that starts a local HTTP + WebSocket server on your machine:
+
+- **Player screen server** — listens on a configurable port (default `7070`) on all network interfaces (`0.0.0.0`). Any device on the same LAN can connect; there is no authentication layer (by design — it's meant for the same room).
+- **Hydrus Network** (optional) — connects to your self-hosted Hydrus Client API (`http://localhost:45869` by default) to search and download images. No data leaves your LAN.
+- **D&D Beyond** (optional) — polls the D&D Beyond encounter API to sync combatants and HP. Requires a session cookie you provide; no credentials are stored beyond what you paste into settings.
+- **Webhooks** (optional) — POSTs image layers to endpoints you configure (Telegram, Discord, custom). Only triggered explicitly by the user via the "Send to webhook" action.
+
+The plugin does not collect telemetry, phone home, or transmit any data to third parties without explicit user action. All cached files (Hydrus images, D&D Beyond avatars) are stored locally inside your vault.
+
 ## Support & contributing
 
 - Found a bug or want to request a feature? [Open an issue](https://github.com/hbermu/obsidian-dm-screen/issues).
