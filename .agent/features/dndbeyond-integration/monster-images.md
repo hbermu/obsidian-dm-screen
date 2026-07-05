@@ -7,7 +7,7 @@
 - `src/dndbeyond/client.ts` — `getMonsterImages(ids)` — issues individual GETs to the monster service and returns a `Map<id, avatarUrl>`
 - `src/dndbeyond/imageCache.ts` — `DdbImageCache`, `getOrDownload(monsterId, imageUrl, name)`, `sweep`
 - `src/views/DnDBeyondPanel.ts` — `loadMonsterImages(encounter)` orchestrates dedupe → fetch → cache → layer add
-- `src/main.ts` — owns the shared `ddbImageCache` instance (constructed in `initHydrusCache`, cleared on `onunload`), and schedules its 24-hour sweep alongside the Hydrus cache sweep
+- `src/main.ts` — owns the shared `ddbImageCache` instance (constructed in `initHydrusCache`), and schedules its 24-hour sweep via `registerInterval` alongside the Hydrus cache sweep
 
 ## Settings used
 

@@ -102,14 +102,6 @@ export default class DmScreenPlugin extends Plugin {
   async onunload() {
     debug("Plugin unloading");
     this.stopServer();
-    if (this.hydrusSweepInterval !== null) {
-      window.clearInterval(this.hydrusSweepInterval);
-      this.hydrusSweepInterval = null;
-    }
-    if (this.ddbImageSweepInterval !== null) {
-      window.clearInterval(this.ddbImageSweepInterval);
-      this.ddbImageSweepInterval = null;
-    }
   }
 
   async loadSettings() {
@@ -144,9 +136,9 @@ export default class DmScreenPlugin extends Plugin {
         debugError("Hydrus cache sweep failed:", e)
       );
       if (this.hydrusSweepInterval === null) {
-        this.hydrusSweepInterval = window.setInterval(() => {
+        this.hydrusSweepInterval = this.registerInterval(window.setInterval(() => {
           void this.hydrusCache?.sweep().catch(() => {});
-        }, 24 * 60 * 60 * 1000);
+        }, 24 * 60 * 60 * 1000));
       }
     }
 
@@ -159,9 +151,9 @@ export default class DmScreenPlugin extends Plugin {
       if (n > 0) debug("DDB image cache sweep removed", n, "stale image(s)");
     }).catch(() => {});
     if (this.ddbImageSweepInterval === null) {
-      this.ddbImageSweepInterval = window.setInterval(() => {
+      this.ddbImageSweepInterval = this.registerInterval(window.setInterval(() => {
         void this.ddbImageCache?.sweep().catch(() => {});
-      }, 24 * 60 * 60 * 1000);
+      }, 24 * 60 * 60 * 1000));
     }
   }
 

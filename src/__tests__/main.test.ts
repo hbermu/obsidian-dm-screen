@@ -92,6 +92,7 @@ function makePlugin(settingsOverrides: Record<string, unknown> = {}): DmScreenPl
   (plugin as any).saveData = vi.fn(async () => {});
   (plugin as any).registerView = vi.fn();
   (plugin as any).registerEvent = vi.fn();
+  (plugin as any).registerInterval = vi.fn((id: number) => id);
   (plugin as any).addCommand = vi.fn();
   (plugin as any).addSettingTab = vi.fn();
   (plugin as any).addRibbonIcon = vi.fn();
@@ -646,25 +647,18 @@ describe("DmScreenPlugin", () => {
   // ─── onunload ────────────────────────────────────────────────
 
   describe("onunload", () => {
-    it("stops server and clears both sweep intervals", async () => {
+    it("stops server on unload (intervals cleaned by registerInterval)", async () => {
       const plugin = makePlugin();
       const fakeServer = makeFakeServer();
       plugin.server = fakeServer as any;
-      (plugin as any).hydrusSweepInterval = 12345;
-      (plugin as any).ddbImageSweepInterval = 67890;
-      const clearIntervalSpy = vi.spyOn(window, "clearInterval");
 
       await plugin.onunload();
 
       expect(plugin.server).toBeNull();
       expect(fakeServer.stop).toHaveBeenCalled();
-      expect(clearIntervalSpy).toHaveBeenCalledWith(12345);
-      expect(clearIntervalSpy).toHaveBeenCalledWith(67890);
-      expect((plugin as any).hydrusSweepInterval).toBeNull();
-      expect((plugin as any).ddbImageSweepInterval).toBeNull();
     });
 
-    it("handles case when no server and no interval", async () => {
+    it("handles case when no server is running", async () => {
       const plugin = makePlugin();
       await plugin.onunload(); // should not throw
     });
