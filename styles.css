@@ -1750,8 +1750,25 @@
 }
 
 .dm-map-preview-stage {
-  position: relative;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   flex-shrink: 0;
+}
+
+.dm-map-zoom-controls {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 10;
+  display: flex;
+  gap: 4px;
+}
+
+.dm-map-zoom-controls button {
+  padding: 0 8px;
+  min-width: 26px;
 }
 
 .dm-map-preview-stage > img,
@@ -1792,7 +1809,7 @@
   height: 10px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.9);
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(calc(1 / var(--dm-map-zoom, 1)));
   cursor: move;
   z-index: 5;
 }
@@ -1802,7 +1819,7 @@
   width: 8px;
   height: 8px;
   border: 2px solid rgba(255, 255, 255, 0.9);
-  transform: translate(-50%, -50%) rotate(45deg);
+  transform: translate(-50%, -50%) rotate(45deg) scale(calc(1 / var(--dm-map-zoom, 1)));
   cursor: grab;
   z-index: 5;
 }

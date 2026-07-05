@@ -9,8 +9,9 @@ import {
   cssPixelsPerInch,
   defaultMapState,
   profileKey,
+  rotatePoint,
 } from "../map/transform";
-import type { AoePreset, AoeShape, MapAoe, StoredMapState } from "../map/types";
+import type { AoePreset, AoeShape, MapAoe, MapRotation, StoredMapState } from "../map/types";
 import { AOE_PRESETS } from "../map/types";
 import { renderAoe } from "../map/aoe";
 import { MapCalibrationModal } from "./MapCalibrationModal";
@@ -46,6 +47,9 @@ export class MapScreenPanel {
   private viewBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
   private aoeBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
   private redrawPreviewAoes: (() => void) | null = null;
+  private previewZoom = 1;
+  private previewPanX = 0;
+  private previewPanY = 0;
 
   constructor(private plugin: DmScreenPlugin, private host: DmControlPanel) {}
 
@@ -197,6 +201,9 @@ export class MapScreenPanel {
       : defaultMapState(dims.w, dims.h, this.plugin.settings.mapDefaultPxPerSquare);
     this.activeMap = { url, mediaType, naturalWidth: dims.w, naturalHeight: dims.h };
     this.aoes = [];
+    this.previewZoom = 1;
+    this.previewPanX = 0;
+    this.previewPanY = 0;
     this.clampStateToViewport();
     debug("MapScreenPanel: setVaultMap", vaultPath, mediaType, `${dims.w}×${dims.h}`, stored ? "(remembered config)" : "(defaults)");
     this.broadcastShow();
@@ -444,36 +451,142 @@ export class MapScreenPanel {
     const nh = map.naturalHeight;
     if (!(nw > 0) || !(nh > 0)) return;
 
+    const rotation = this.state.rotation ?? 0;
+    const invRotation = ((360 - rotation) % 360) as MapRotation;
     const preview = section.createDiv("dm-map-preview");
     // The stage is sized to the map's exact rendered box; the rectangle and
     // the drag math reference it, so panel letterboxing can't skew them.
+    // It renders rotated to the TV's orientation and zoomed by the local
+    // preview zoom; screen↔map conversions divide by the effective scale and
+    // un-rotate through invRotation.
     const stage = preview.createDiv("dm-map-preview-stage");
     const aoeCanvas = stage.createEl("canvas", { cls: "dm-map-aoe-canvas" });
+
+    const effectiveScale = () => (stage.offsetWidth / nw) * this.previewZoom;
+    const screenToMap = (clientX: number, clientY: number) => {
+      const b = stage.getBoundingClientRect();
+      const r = rotatePoint(clientX - (b.left + b.width / 2), clientY - (b.top + b.height / 2), invRotation);
+      const s = effectiveScale();
+      return { x: nw / 2 + r.x / s, y: nh / 2 + r.y / s };
+    };
+    const deltaToMap = (dx: number, dy: number) => {
+      const r = rotatePoint(dx, dy, invRotation);
+      const s = effectiveScale();
+      return { x: r.x / s, y: r.y / s };
+    };
+
+    const applyTransform = () => {
+      stage.style.transform =
+        `translate(-50%, -50%) translate(${this.previewPanX}px, ${this.previewPanY}px) ` +
+        `rotate(${rotation}deg) scale(${this.previewZoom})`;
+      stage.style.setProperty("--dm-map-zoom", String(this.previewZoom));
+    };
+
     const redrawAoes = () => {
       const w = stage.clientWidth;
       const h = stage.clientHeight;
       if (!w || !h) return;
-      aoeCanvas.width = w;
-      aoeCanvas.height = h;
+      const z = this.previewZoom;
+      aoeCanvas.width = Math.round(w * z);
+      aoeCanvas.height = Math.round(h * z);
       const ctx = aoeCanvas.getContext("2d")!;
-      ctx.clearRect(0, 0, w, h);
-      const s = w / nw;
+      ctx.clearRect(0, 0, aoeCanvas.width, aoeCanvas.height);
+      const s = (w * z) / nw;
       for (const aoe of this.aoes) {
         renderAoe(ctx, aoe, s, 0, 0, this.state.pxPerSquare, 0);
       }
     };
+
+    const sideways = rotation % 180 !== 0;
     const layoutStage = () => {
       const availW = preview.clientWidth;
       if (!availW) return;
-      const s = Math.min(availW / nw, 340 / nh);
+      const rotW = sideways ? nh : nw;
+      const rotH = sideways ? nw : nh;
+      const s = Math.min(availW / rotW, 340 / rotH);
       stage.style.width = `${nw * s}px`;
       stage.style.height = `${nh * s}px`;
-      preview.style.height = `${nh * s}px`;
+      preview.style.height = `${rotH * s}px`;
+      applyTransform();
       redrawAoes();
     };
     this.redrawPreviewAoes = redrawAoes;
     layoutStage();
     requestAnimationFrame(layoutStage);
+
+    const zoomAt = (factor: number, clientX: number, clientY: number) => {
+      const zOld = this.previewZoom;
+      const zNew = Math.min(6, Math.max(1, zOld * factor));
+      if (zNew === zOld) return;
+      const pb = preview.getBoundingClientRect();
+      const cx = clientX - (pb.left + pb.width / 2);
+      const cy = clientY - (pb.top + pb.height / 2);
+      const k = zNew / zOld;
+      this.previewPanX = cx * (1 - k) + k * this.previewPanX;
+      this.previewPanY = cy * (1 - k) + k * this.previewPanY;
+      this.previewZoom = zNew;
+      if (zNew === 1) {
+        this.previewPanX = 0;
+        this.previewPanY = 0;
+      }
+      applyTransform();
+      redrawAoes();
+    };
+
+    const zoomControls = preview.createDiv("dm-map-zoom-controls");
+    const zoomBtn = (label: string, title: string, onClick: () => void) => {
+      const btn = zoomControls.createEl("button", { text: label });
+      btn.title = title;
+      btn.addEventListener("click", onClick);
+    };
+    const previewCenter = () => {
+      const pb = preview.getBoundingClientRect();
+      return { x: pb.left + pb.width / 2, y: pb.top + pb.height / 2 };
+    };
+    zoomBtn("−", "Zoom out", () => {
+      const c = previewCenter();
+      zoomAt(0.8, c.x, c.y);
+    });
+    zoomBtn("⌂", "Center and reset zoom", () => {
+      this.previewZoom = 1;
+      this.previewPanX = 0;
+      this.previewPanY = 0;
+      applyTransform();
+      redrawAoes();
+    });
+    zoomBtn("+", "Zoom in", () => {
+      const c = previewCenter();
+      zoomAt(1.25, c.x, c.y);
+    });
+
+    preview.addEventListener(
+      "wheel",
+      (e: WheelEvent) => {
+        e.preventDefault();
+        zoomAt(e.deltaY < 0 ? 1.25 : 0.8, e.clientX, e.clientY);
+      },
+      { passive: false }
+    );
+
+    preview.addEventListener("mousedown", (e: MouseEvent) => {
+      if (e.button !== 1) return;
+      e.preventDefault();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startPanX = this.previewPanX;
+      const startPanY = this.previewPanY;
+      const onMove = (ev: MouseEvent) => {
+        this.previewPanX = startPanX + (ev.clientX - startX);
+        this.previewPanY = startPanY + (ev.clientY - startY);
+        applyTransform();
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
 
     const vaultPath = vaultPathFromUrl(map.url);
     const adapter = this.plugin.app.vault.adapter as { getResourcePath?: (p: string) => string };
@@ -521,18 +634,18 @@ export class MapScreenPanel {
       positionMarkers();
 
       dot.addEventListener("mousedown", (ev: MouseEvent) => {
+        if (ev.button !== 0) return;
         ev.preventDefault();
         ev.stopPropagation();
-        const bounds = stage.getBoundingClientRect();
-        if (!bounds.width) return;
-        const toMapPx = nw / bounds.width;
+        if (!stage.offsetWidth) return;
         const startX = ev.clientX;
         const startY = ev.clientY;
         const startAoeX = aoe.x;
         const startAoeY = aoe.y;
         const onMove = (me: MouseEvent) => {
-          aoe.x = Math.max(0, Math.min(nw, startAoeX + (me.clientX - startX) * toMapPx));
-          aoe.y = Math.max(0, Math.min(nh, startAoeY + (me.clientY - startY) * toMapPx));
+          const d = deltaToMap(me.clientX - startX, me.clientY - startY);
+          aoe.x = Math.max(0, Math.min(nw, startAoeX + d.x));
+          aoe.y = Math.max(0, Math.min(nh, startAoeY + d.y));
           positionMarkers();
           redrawAoes();
           this.broadcastAoes();
@@ -547,15 +660,18 @@ export class MapScreenPanel {
       });
 
       handle?.addEventListener("mousedown", (ev: MouseEvent) => {
+        if (ev.button !== 0) return;
         ev.preventDefault();
         ev.stopPropagation();
         const onMove = (me: MouseEvent) => {
-          const bounds = stage.getBoundingClientRect();
-          if (!bounds.width) return;
-          const centerX = bounds.left + (aoe.x / nw) * bounds.width;
-          const centerY = bounds.top + (aoe.y / nh) * bounds.height;
-          const deg = (Math.atan2(me.clientY - centerY, me.clientX - centerX) * 180) / Math.PI;
-          aoe.rotation = (Math.round(deg / 5) * 5 + 360) % 360;
+          const b = stage.getBoundingClientRect();
+          if (!b.width) return;
+          const s = effectiveScale();
+          const r = rotatePoint(aoe.x - nw / 2, aoe.y - nh / 2, rotation);
+          const centerX = b.left + b.width / 2 + r.x * s;
+          const centerY = b.top + b.height / 2 + r.y * s;
+          const deg = (Math.atan2(me.clientY - centerY, me.clientX - centerX) * 180) / Math.PI - rotation;
+          aoe.rotation = ((Math.round(deg / 5) * 5) % 360 + 360) % 360;
           positionMarkers();
           redrawAoes();
           this.broadcastAoes();
@@ -581,9 +697,8 @@ export class MapScreenPanel {
       });
     }
     const scale = ppi / this.state.pxPerSquare;
-    // The preview stays in map orientation; under a 90°/270° rotation the
+    // The rect lives in map coordinates; under a 90°/270° rotation the
     // screen's long side runs along the map's Y axis, so the window swaps.
-    const sideways = ((this.state.rotation ?? 0) % 180) !== 0;
     const visW = (sideways ? client.height : client.width) / scale;
     const visH = (sideways ? client.width : client.height) / scale;
 
@@ -605,26 +720,25 @@ export class MapScreenPanel {
     };
 
     preview.addEventListener("mousedown", (e: MouseEvent) => {
+      if (e.button !== 0) return;
       e.preventDefault();
-      const bounds = stage.getBoundingClientRect();
-      if (!bounds.width) return;
-      const toMapPx = nw / bounds.width;
+      if (!stage.offsetWidth) return;
       const startPanX = this.state.panX;
       const startPanY = this.state.panY;
       const startX = e.clientX;
       const startY = e.clientY;
       const fromRect = e.target === rect;
       if (!fromRect) {
-        applyPan(
-          (e.clientX - bounds.left) * toMapPx,
-          (e.clientY - bounds.top) * toMapPx
-        );
+        const m = screenToMap(e.clientX, e.clientY);
+        applyPan(m.x, m.y);
       }
       const onMove = (ev: MouseEvent) => {
         if (fromRect) {
-          applyPan(startPanX + (ev.clientX - startX) * toMapPx, startPanY + (ev.clientY - startY) * toMapPx);
+          const d = deltaToMap(ev.clientX - startX, ev.clientY - startY);
+          applyPan(startPanX + d.x, startPanY + d.y);
         } else {
-          applyPan((ev.clientX - bounds.left) * toMapPx, (ev.clientY - bounds.top) * toMapPx);
+          const m = screenToMap(ev.clientX, ev.clientY);
+          applyPan(m.x, m.y);
         }
       };
       const onUp = () => {
