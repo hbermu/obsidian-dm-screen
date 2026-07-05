@@ -31,7 +31,7 @@
 
 ## Requirements
 
-1. The DM Control Panel shall expose an Image from Hydrus button if and only if `hydrusEnabled` is true and `hydrusApiUrl` is non-empty.
+1. The DM Control Panel shall expose an Image from Hydrus button if and only if `hydrusEnabled` is true and `hydrusApiUrl` is non-empty; it renders as a standalone full-width bar between the Player Screen Server and Player Screen sections, always visible and outside every collapsible section.
 2. When the button is clicked, the panel shall open `HydrusExplorerModal`.
 3. The plugin shall instantiate `HydrusCache` (and `DdbImageCache`) on load and whenever a cache-related setting changes (`hydrusEnabled`, `cacheBaseFolder`, `hydrusCacheTtlDays`). It shall NOT re-instantiate on every unrelated settings save — bulk paths like `DmControlPanel.saveState` fire on every layer broadcast and rebuilding caches there would be wasteful.
 4. While `hydrusEnabled` is true, the plugin shall sweep the Hydrus cache once on load and then every 24 hours. The `DdbImageCache` sweep schedule is independent of `hydrusEnabled` — it always sweeps on load and on a 24-hour interval while the plugin is loaded.

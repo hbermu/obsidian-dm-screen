@@ -1735,6 +1735,15 @@
   width: 80px;
 }
 
+.dm-hydrus-bar {
+  display: flex;
+  margin: 4px 0 10px;
+}
+
+.dm-hydrus-bar button {
+  width: 100%;
+}
+
 .dm-section-toggle {
   cursor: pointer;
   user-select: none;
