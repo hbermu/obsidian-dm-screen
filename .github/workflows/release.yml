@@ -175,8 +175,7 @@ jobs:
             major)
               # Summary from the PR body (strip the boilerplate '## Test plan'
               # tail that Claude-generated PRs append) + bullet list of every
-              # minor (*.*.0) shipped since the previous major + a pointer to
-              # CHANGELOG.md for the full detail.
+              # minor (*.*.0) shipped since the previous major.
               PR_BODY=$(gh pr view "$PR_NUM" --json body --jq .body)
               SUMMARY=$(printf '%s\n' "$PR_BODY" | awk '/^## Test plan/{exit} {print}')
               minors=$(git tag --list '[0-9]*.*.0' --list 'v[0-9]*.*.0' --sort=-version:refname \
@@ -194,8 +193,6 @@ jobs:
                   done
                   echo ""
                 fi
-                echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) for the full detail of every change since ${prev_window:-the start of the project}."
-                echo ""
                 if [ -n "$prev_window" ]; then
                   echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_window}...${VERSION}"
                 fi
@@ -245,50 +242,6 @@ jobs:
                             gh release delete "$tag" --yes --cleanup-tag ;;
                 esac
               done
-
-      - name: Update CHANGELOG.md on main
-        if: github.event_name == 'pull_request' && steps.pr_bump.outputs.type != 'skip'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.next.outputs.version }}
-          BUMP: ${{ steps.pr_bump.outputs.type }}
-        run: |
-          git checkout --force main
-          git pull --ff-only origin main
-
-          DATE=$(date -u +%Y-%m-%d)
-          HEADING="## ${VERSION} — ${BUMP} — ${DATE}"
-
-          {
-            echo "$HEADING"
-            echo ""
-            cat notes.md
-            echo ""
-          } > new-section.md
-
-          if [ -f CHANGELOG.md ]; then
-            awk -v ns_file=new-section.md '
-              BEGIN { while ((getline line < ns_file) > 0) ns = ns line "\n" }
-              /^# Changelog/ && !done { print; print ""; printf "%s", ns; done=1; next }
-              { print }
-            ' CHANGELOG.md > CHANGELOG.md.new
-            mv CHANGELOG.md.new CHANGELOG.md
-          else
-            {
-              echo "# Changelog"
-              echo ""
-              echo "Automatically maintained by \`.github/workflows/release.yml\` after every stable release. Do not edit by hand — changes are overwritten on the next publish."
-              echo ""
-              cat new-section.md
-            } > CHANGELOG.md
-          fi
-          rm -f new-section.md
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          git commit -m "chore(changelog): update for ${VERSION}"
-          git push origin main
 
       # ────────────── Push-to-any-non-main-branch path: beta only ──────────────
 
