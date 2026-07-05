@@ -45,6 +45,7 @@ export interface MapAoe {
   rotation: number;
   x: number;
   y: number;
+  label?: string;
 }
 
 export interface AoePreset {
@@ -55,8 +56,3 @@ export interface AoePreset {
   color: string;
   opacity: number;
 }
-
-export const AOE_PRESETS: AoePreset[] = [
-  { name: "Fireball", shape: "circle", sizeFt: 20, widthFt: 5, color: "#ff4400", opacity: 0.3 },
-  { name: "Spirit Guardians", shape: "circle", sizeFt: 15, widthFt: 5, color: "#44aaff", opacity: 0.25 },
-];

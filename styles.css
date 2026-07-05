@@ -1860,3 +1860,11 @@
 .dm-map-aoe-row input[type="number"] {
   width: 56px;
 }
+
+.dm-map-aoe-label {
+  font-size: 0.85em;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

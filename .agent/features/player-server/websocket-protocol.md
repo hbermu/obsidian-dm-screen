@@ -47,7 +47,7 @@
 | `map-config` | DM → map | `{ pxPerSquare, gridOffsetX, gridOffsetY, showGrid, gridColor, gridOpacity }` | Any grid control change | yes |
 | `map-calibration` | DM → map | `{ profiles: Record<string, { diagonalInches, fineTune }> }` | Server start; calibration modal change | yes |
 | `map-calibration-overlay` | DM → map | `{ show: boolean }` | Calibration test-pattern toggle | yes |
-| `map-aoe-sync` | DM → map | `{ aoes: Array<{ id, shape, sizeFt, widthFt, color, opacity, rotation, x, y }> }` | DM adds/edits/moves/removes an AoE overlay (drags throttled, immediate on release); map apply resets to `[]`; `republishToServer()` when non-empty | yes |
+| `map-aoe-sync` | DM → map | `{ aoes: Array<{ id, shape, sizeFt, widthFt, color, opacity, rotation, x, y, label? }> }` | DM adds/edits/moves/removes an AoE overlay (drags throttled, immediate on release); map apply resets to `[]`; `republishToServer()` when non-empty | yes |
 | `map-clear` | DM → map | `{}` | DM clicks Stop Map | no (purges map-channel cache) |
 | `client-info` | player/map → DM | `{ width: number, height: number, devicePixelRatio: number, channel?: "map" }` | Client connects; window resizes. The server stores it with the connection's channel regardless of the payload field | n/a (received only) |
 
