@@ -80,6 +80,12 @@ export class App {}
 export const Platform = { isDesktop: true, isMobile: false };
 export type MarkdownPostProcessorContext = unknown;
 
+// Standalone helper: real Obsidian injects a lucide SVG into the element.
+// The stub just records the icon name so tests can assert on it.
+export function setIcon(el: { setAttribute?: (k: string, v: string) => void }, iconName: string): void {
+  el.setAttribute?.("data-icon", iconName);
+}
+
 // `requestUrl` shape mirrors Obsidian's real signature so tests can stub it.
 export interface RequestUrlParam {
   url: string;

@@ -33,7 +33,7 @@ export interface ScreenProfile {
 
 export interface StoredMapState extends MapGridConfig, MapView {}
 
-export type AoeShape = "circle" | "square" | "cone" | "line";
+export type AoeShape = "circle" | "square" | "cone" | "line" | "ring";
 
 export interface MapAoe {
   id: string;

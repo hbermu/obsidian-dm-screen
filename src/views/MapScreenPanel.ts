@@ -1,4 +1,4 @@
-import { Menu, Notice } from "obsidian";
+import { Menu, Notice, setIcon } from "obsidian";
 import type DmScreenPlugin from "../main";
 import type { DmControlPanel } from "./DmControlPanel";
 import { encodeForVaultUrl } from "./HydrusExplorerModal";
@@ -26,13 +26,14 @@ export interface ActiveMap {
 
 const VIEW_BROADCAST_THROTTLE_MS = 80;
 
-const AOE_SHAPES: AoeShape[] = ["circle", "square", "cone", "line"];
+const AOE_SHAPES: AoeShape[] = ["circle", "square", "cone", "line", "ring"];
 
 const SHAPE_PRESETS: AoePreset[] = [
   { name: "Circle", shape: "circle", sizeFt: 20, widthFt: 5, color: "#ff4400", opacity: 0.3 },
   { name: "Square", shape: "square", sizeFt: 15, widthFt: 5, color: "#44aaff", opacity: 0.3 },
   { name: "Cone", shape: "cone", sizeFt: 15, widthFt: 5, color: "#ff9900", opacity: 0.3 },
   { name: "Line", shape: "line", sizeFt: 30, widthFt: 5, color: "#f5d90a", opacity: 0.3 },
+  { name: "Ring", shape: "ring", sizeFt: 20, widthFt: 10, color: "#ff4400", opacity: 0.3 },
 ];
 
 let nextAoeId = 1;
@@ -532,15 +533,6 @@ export class MapScreenPanel {
     // click-to-center pan handler.
     zoomControls.addEventListener("mousedown", (e: MouseEvent) => e.stopPropagation());
 
-    const lockBtn = zoomControls.createEl("button", { text: this.previewLocked ? "🔒" : "🔓" });
-    lockBtn.title = "Lock the map view — pan can't be moved from the preview";
-    lockBtn.addEventListener("click", () => {
-      this.previewLocked = !this.previewLocked;
-      lockBtn.textContent = this.previewLocked ? "🔒" : "🔓";
-      preview.classList.toggle("dm-map-view-locked", this.previewLocked);
-    });
-    preview.classList.toggle("dm-map-view-locked", this.previewLocked);
-
     const zoomSlider = zoomControls.createEl("input", { type: "range" });
     zoomSlider.min = "1";
     zoomSlider.max = String(zoomMax);
@@ -548,6 +540,22 @@ export class MapScreenPanel {
     zoomSlider.value = String(this.previewZoom);
     zoomSlider.title = "Preview zoom — min: whole map, max: the player's view";
     zoomSlider.disabled = zoomMax <= 1;
+
+    // Lock sits on its own row below the zoom slider, pushed hard right.
+    const lockBtn = zoomControls.createEl("button", { cls: "dm-map-lock-btn" });
+    const syncLockIcon = () => {
+      setIcon(lockBtn, this.previewLocked ? "lock" : "unlock");
+      lockBtn.title = this.previewLocked
+        ? "View locked — left-drag looks around without moving the players' view"
+        : "Lock the map view — pan can't be moved from the preview";
+    };
+    syncLockIcon();
+    lockBtn.addEventListener("click", () => {
+      this.previewLocked = !this.previewLocked;
+      syncLockIcon();
+      preview.classList.toggle("dm-map-view-locked", this.previewLocked);
+    });
+    preview.classList.toggle("dm-map-view-locked", this.previewLocked);
 
     const zoomAt = (factor: number, clientX: number, clientY: number) => {
       const zOld = this.previewZoom;
@@ -583,8 +591,10 @@ export class MapScreenPanel {
       { passive: false }
     );
 
-    preview.addEventListener("mousedown", (e: MouseEvent) => {
-      if (e.button !== 1) return;
+    // DM-local "look around": pans the preview stage only (previewPanX/Y),
+    // never broadcast, so the players' view stays put. Bound to middle-drag
+    // always, and to left-drag while the view is locked.
+    const startLookAround = (e: MouseEvent) => {
       e.preventDefault();
       const startX = e.clientX;
       const startY = e.clientY;
@@ -601,6 +611,12 @@ export class MapScreenPanel {
       };
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
+    };
+
+    preview.addEventListener("mousedown", (e: MouseEvent) => {
+      // Middle-drag always looks around; left-drag looks around only while the
+      // view is locked (unlocked left-drag moves the players' viewport below).
+      if (e.button === 1 || (e.button === 0 && this.previewLocked)) startLookAround(e);
     });
 
     const vaultPath = vaultPathFromUrl(map.url);
@@ -626,7 +642,9 @@ export class MapScreenPanel {
       const dot = stage.createDiv("dm-map-aoe-dot");
       dot.style.background = aoe.color;
       dot.title = `${aoe.label ?? aoe.shape} ${aoe.sizeFt}ft — drag to move`;
-      const handle = aoe.shape === "circle" ? null : stage.createDiv("dm-map-aoe-rot-handle");
+      // Circle and ring are rotationally symmetric — no rotation handle.
+      const handle =
+        aoe.shape === "circle" || aoe.shape === "ring" ? null : stage.createDiv("dm-map-aoe-rot-handle");
       if (handle) {
         handle.style.background = aoe.color;
         handle.title = "Drag to rotate";
@@ -822,7 +840,12 @@ export class MapScreenPanel {
     sizeInput.value = String(aoe.sizeFt);
     sizeInput.min = "5";
     sizeInput.step = "5";
-    sizeInput.title = aoe.shape === "circle" ? "Radius (ft)" : aoe.shape === "line" ? "Length (ft)" : "Size (ft)";
+    sizeInput.title =
+      aoe.shape === "circle" || aoe.shape === "ring"
+        ? "Radius (ft)"
+        : aoe.shape === "line"
+          ? "Length (ft)"
+          : "Size (ft)";
     sizeInput.addEventListener("change", () => {
       const v = parseFloat(sizeInput.value);
       if (!Number.isFinite(v) || v <= 0) return;
@@ -832,12 +855,12 @@ export class MapScreenPanel {
     });
     row.createSpan({ text: "ft", cls: "dm-status-detail" });
 
-    if (aoe.shape === "line") {
+    if (aoe.shape === "line" || aoe.shape === "ring") {
       const widthInput = row.createEl("input", { type: "number" });
       widthInput.value = String(aoe.widthFt);
       widthInput.min = "5";
       widthInput.step = "5";
-      widthInput.title = "Width (ft)";
+      widthInput.title = aoe.shape === "ring" ? "Band thickness (ft)" : "Width (ft)";
       widthInput.addEventListener("change", () => {
         const v = parseFloat(widthInput.value);
         if (!Number.isFinite(v) || v <= 0) return;
@@ -845,7 +868,7 @@ export class MapScreenPanel {
         this.broadcastAoes(true);
         this.redrawPreviewAoes?.();
       });
-      row.createSpan({ text: "wide", cls: "dm-status-detail" });
+      row.createSpan({ text: aoe.shape === "ring" ? "thick" : "wide", cls: "dm-status-detail" });
     }
 
     const colorSwatch = row.createEl("input", { type: "color" });

@@ -62,6 +62,21 @@ describe("renderAoe", () => {
     expect(raw.arc).toHaveBeenCalledWith(0, 0, 280, 0, Math.PI * 2);
   });
 
+  it("draws a ring as an outer circle and a reversed inner circle (hollow band)", () => {
+    const { ctx, raw } = makeCtx();
+    // sizeFt=20 outer, widthFt=10 band → inner radius = 10 ft; 28 px/ft
+    renderAoe(ctx, { ...BASE, shape: "ring", sizeFt: 20, widthFt: 10 }, 1, 0, 0, 140, 0);
+    expect(raw.arc).toHaveBeenCalledWith(0, 0, 20 * 28, 0, Math.PI * 2, false);
+    expect(raw.moveTo).toHaveBeenCalledWith(10 * 28, 0);
+    expect(raw.arc).toHaveBeenCalledWith(0, 0, 10 * 28, 0, Math.PI * 2, true);
+  });
+
+  it("clamps a ring's inner radius to zero when the band is wider than the radius", () => {
+    const { ctx, raw } = makeCtx();
+    renderAoe(ctx, { ...BASE, shape: "ring", sizeFt: 10, widthFt: 30 }, 1, 0, 0, 140, 0);
+    expect(raw.arc).toHaveBeenCalledWith(0, 0, 0, 0, Math.PI * 2, true);
+  });
+
   it("draws a square centered on the anchor with sizeFt as side", () => {
     const { ctx, raw } = makeCtx();
     renderAoe(ctx, { ...BASE, shape: "square", sizeFt: 10 }, 1, 0, 0, 140, 0);
