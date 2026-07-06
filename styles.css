@@ -1804,8 +1804,14 @@
 
 /* Lock lives on its own row below the zoom slider, pushed hard right.
    Monochrome lucide icon tinted to the muted theme colour so it doesn't
-   clash with the map. */
-.dm-map-lock-btn {
+   clash with the map. No button chrome — force transparent across every
+   state so Obsidian's interactive-hover/active backgrounds can't leak in;
+   a drop-shadow on the icon itself makes it legible over the map. */
+.dm-map-lock-btn,
+.dm-map-lock-btn:hover,
+.dm-map-lock-btn:active,
+.dm-map-lock-btn:focus,
+.dm-map-lock-btn:focus-visible {
   padding: 2px;
   min-width: 0;
   display: inline-flex;
@@ -1815,7 +1821,12 @@
   background: transparent;
   border: none;
   box-shadow: none;
+  outline: none;
   cursor: pointer;
+}
+
+.dm-map-lock-btn > svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
 }
 
 .dm-map-lock-btn:hover {
