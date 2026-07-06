@@ -9,7 +9,9 @@ export interface SpellAoe {
 }
 
 // Generated from the 5etools spell data: every spell with a parseable
-// area of effect, colored by its primary damage type.
+// area of effect, colored by its primary damage type. A few spells whose
+// area cannot be parsed automatically (e.g. Wall of Fire's line/ring forms)
+// are hand-added and kept in alphabetical order.
 export const SPELL_AOES: SpellAoe[] = [
   { name: "Abi-Dalzim's Horrid Wilting", shape: "square", sizeFt: 30, widthFt: 5, color: "#7a33aa" },
   { name: "Aganazzar's Scorcher", shape: "line", sizeFt: 30, widthFt: 5, color: "#ff4400" },
@@ -116,6 +118,8 @@ export const SPELL_AOES: SpellAoe[] = [
   { name: "Thunderwave", shape: "square", sizeFt: 15, widthFt: 5, color: "#6f8bff" },
   { name: "Transmute Rock", shape: "square", sizeFt: 40, widthFt: 5, color: "#aaaaaa" },
   { name: "Vitriolic Sphere", shape: "circle", sizeFt: 20, widthFt: 5, color: "#66cc00" },
+  { name: "Wall of Fire (Line)", shape: "line", sizeFt: 60, widthFt: 10, color: "#ff4400" },
+  { name: "Wall of Fire (Ring)", shape: "ring", sizeFt: 20, widthFt: 10, color: "#ff4400" },
   { name: "Watery Sphere", shape: "circle", sizeFt: 5, widthFt: 5, color: "#44aaff" },
   { name: "Web", shape: "square", sizeFt: 20, widthFt: 5, color: "#ff4400" },
   { name: "Weird", shape: "circle", sizeFt: 30, widthFt: 5, color: "#ff66cc" },

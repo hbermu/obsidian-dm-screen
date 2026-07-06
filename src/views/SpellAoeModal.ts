@@ -12,7 +12,10 @@ export class SpellAoeModal extends FuzzySuggestModal<SpellAoe> {
   }
 
   getItemText(spell: SpellAoe): string {
-    const dims = spell.shape === "line" ? `${spell.sizeFt}×${spell.widthFt} ft` : `${spell.sizeFt} ft`;
+    const dims =
+      spell.shape === "line" || spell.shape === "ring"
+        ? `${spell.sizeFt}×${spell.widthFt} ft`
+        : `${spell.sizeFt} ft`;
     return `${spell.name} — ${spell.shape} ${dims}`;
   }
 

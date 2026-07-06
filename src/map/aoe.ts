@@ -52,6 +52,17 @@ function buildPath(
       ctx.arc(0, 0, sizeFt * ftScale, 0, Math.PI * 2);
       break;
     }
+    case "ring": {
+      // Hollow band: outer radius = sizeFt, inner radius = sizeFt − widthFt.
+      // The two arcs run in opposite directions so the default nonzero
+      // winding rule leaves the hole; stroking both draws each band edge.
+      const outer = sizeFt * ftScale;
+      const inner = Math.max(0, sizeFt - widthFt) * ftScale;
+      ctx.arc(0, 0, outer, 0, Math.PI * 2, false);
+      ctx.moveTo(inner, 0);
+      ctx.arc(0, 0, inner, 0, Math.PI * 2, true);
+      break;
+    }
     case "square": {
       const half = (sizeFt * ftScale) / 2;
       ctx.rect(-half, -half, half * 2, half * 2);
