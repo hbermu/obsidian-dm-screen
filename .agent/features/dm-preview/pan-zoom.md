@@ -1,10 +1,10 @@
 # DM Preview Pan & Zoom
 
-> Local-only navigation of the DM preview canvas. Middle-click drag = pan, slider + Reset View button drive the zoom. Not broadcast to players.
+> Local-only navigation of the DM preview canvas. Middle-click drag = pan, a slider + Reset View button overlaid inside the preview (top-right, like the map panel) drive the zoom. Not broadcast to players.
 
 ## Source files
 
-- `src/views/DmControlPanel.ts` — `setupPreviewPanZoom`, `resetDmView`, the zoom slider and Reset View button in `dm-preview-view-controls`
+- `src/views/DmControlPanel.ts` — `setupPreviewPanZoom`, `resetDmView`, the zoom slider and Reset View button in `dm-preview-zoom-controls` (overlay inside `dm-layer-preview`)
 
 ## Settings used
 
@@ -16,8 +16,8 @@
 2. When the user mousedown-middle-clicks the preview area, the panel shall start a pan: subsequent mousemove events (anywhere on the document) shall update `dmPanX` and `dmPanY` proportionally to the cursor delta over the preview's bounds.
 3. When the middle mouse button is released, the panel shall stop the pan.
 4. The Reset View button shall set `dmZoom = 1`, `dmPanX = 0`, `dmPanY = 0`, and re-render.
-5. The zoom slider shall have range `10`–`500` and step `1`; changing it shall set `dmZoom = value / 100` and re-apply the inner transform without re-rendering the full panel.
-6. The zoom label shall display the current zoom as `Math.round(dmZoom * 100)%`.
+5. The zoom slider shall have range `67`–`100` and step `1`; `100` = the player's view fills the preview (max zoom), `67` ≈ 1/1.5 = the player's view plus surrounding area (min zoom). Changing it shall set `dmZoom = value / 100` and re-apply the inner transform without re-rendering the full panel.
+6. The zoom controls (`dm-preview-zoom-controls`) shall be positioned as an absolute overlay inside `dm-layer-preview` (top-right, `z-index: 10`), following the same pattern as the map panel's `dm-map-zoom-controls`. Mousedown on the controls shall be stopPropagated so it cannot trigger a layer drag or pan.
 
 ## Non-goals
 

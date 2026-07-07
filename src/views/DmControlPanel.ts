@@ -660,23 +660,25 @@ export class DmControlPanel extends ItemView {
       vpRect.style.backgroundColor = `rgba(0, 255, 0, ${fillOpacity})`;
     }
 
-    // Pan/zoom via scroll wheel on preview
+    // Pan via middle-click drag on preview
     this.setupPreviewPanZoom(previewArea, previewInner);
 
-    // DM view controls (always visible)
-    const viewControls = section.createDiv("dm-preview-view-controls");
-    const zoomLabel = viewControls.createSpan({ text: `${Math.round(this.dmZoom * 100)}%`, cls: "dm-zoom-label" });
-    const zoomSlider = viewControls.createEl("input", { cls: "dm-zoom-slider" });
-    zoomSlider.type = "range";
-    zoomSlider.min = "10";
-    zoomSlider.max = "500";
+    // Zoom controls inside the preview (overlay, top-right — mirrors the map panel)
+    const zoomControls = previewArea.createDiv("dm-preview-zoom-controls");
+    zoomControls.addEventListener("mousedown", (e: MouseEvent) => e.stopPropagation());
+
+    const zoomSlider = zoomControls.createEl("input", { type: "range", cls: "dm-zoom-slider" });
+    zoomSlider.min = "67";
+    zoomSlider.max = "100";
+    zoomSlider.step = "1";
     zoomSlider.value = String(Math.round(this.dmZoom * 100));
+    zoomSlider.title = "Preview zoom — max: player view, min: zoomed out with surroundings";
     zoomSlider.addEventListener("input", () => {
       this.dmZoom = parseInt(zoomSlider.value, 10) / 100;
-      zoomLabel.textContent = `${zoomSlider.value}%`;
       previewInner.style.transform = `translate(${this.dmPanX}%, ${this.dmPanY}%) scale(${this.dmZoom})`;
     });
-    const resetBtn = viewControls.createEl("button", { text: "Reset View", cls: "dm-layer-btn" });
+
+    const resetBtn = zoomControls.createEl("button", { text: "Reset View", cls: "dm-preview-reset-btn" });
     resetBtn.addEventListener("click", () => this.resetDmView());
 
     // ── Layer list ──
