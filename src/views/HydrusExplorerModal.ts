@@ -56,6 +56,9 @@ export class HydrusExplorerModal extends Modal {
   private filterImages = true;
   private filterVideos = true;
   private tagSuggester: TagSuggester | null = null;
+  private previewEl: HTMLElement | null = null;
+  private previewObjectUrl: string | null = null;
+  private previewKeyHandler: ((evt: KeyboardEvent) => void) | null = null;
 
   constructor(app: App, plugin: DmScreenPlugin) {
     super(app);
@@ -69,7 +72,7 @@ export class HydrusExplorerModal extends Modal {
 
   async onOpen() {
     this.modalEl.addClass("dm-hydrus-modal");
-    this.titleEl.setText("Image from Hydrus");
+    this.titleEl.setText("Media from Hydrus");
 
     const { contentEl } = this;
     contentEl.empty();
@@ -136,6 +139,7 @@ export class HydrusExplorerModal extends Modal {
   }
 
   onClose() {
+    this.closePreview();
     this.tagSuggester?.destroy();
     this.tagSuggester = null;
     this.contentEl.empty();
@@ -384,7 +388,7 @@ export class HydrusExplorerModal extends Modal {
     for (const tile of tiles) {
       const card = this.gridEl.createDiv({ cls: "dm-hydrus-tile" });
       card.dataset.hash = tile.hash;
-      card.title = `${tile.knownTags.slice(0, 8).join(", ") || "(no tags)"}\nclick → image layer · shift+click → background`;
+      card.title = `${tile.knownTags.slice(0, 8).join(", ") || "(no tags)"}\nclick → preview · right-click → menu`;
 
       const thumb = card.createEl("img", { cls: "dm-hydrus-thumb" });
       thumb.alt = "";
@@ -403,17 +407,17 @@ export class HydrusExplorerModal extends Modal {
 
       card.addEventListener("click", (evt) => {
         evt.preventDefault();
-        if (evt.shiftKey) {
-          void this.handleSetBackground(tile);
-        } else {
-          void this.handleAddAsLayer(tile);
-        }
+        void this.openPreview(tile);
+      });
+      card.addEventListener("contextmenu", (evt) => {
+        evt.preventDefault();
+        this.openTileMenu(tile, evt);
       });
 
       const more = card.createEl("button", { cls: "dm-hydrus-more", text: "⋮" });
       more.addEventListener("click", (evt) => {
         evt.stopPropagation();
-        void this.openTileMenu(tile, evt);
+        this.openTileMenu(tile, evt);
       });
     }
   }
@@ -557,6 +561,17 @@ export class HydrusExplorerModal extends Modal {
         wrap.createSpan({ cls: "dm-hydrus-tile-tag", text: i < sorted.length - 1 ? `${t},` : t });
       });
     });
+    if (mediaTypeOf(tile.mime) === "image") {
+      menu.addItem((item: any) =>
+        item
+          .setTitle("Add as image layer")
+          .setIcon("layers")
+          .onClick(() => {
+            void this.handleAddAsLayer(tile);
+          })
+      );
+    }
+
     if (sorted.length > 0) {
       menu.addItem((item: any) =>
         item
@@ -652,6 +667,123 @@ export class HydrusExplorerModal extends Modal {
       );
     }
     menu.showAtMouseEvent(evt);
+  }
+
+  private async openPreview(tile: Tile) {
+    this.closePreview();
+    const isVideo = mediaTypeOf(tile.mime) === "video";
+    debug("HydrusExplorer: openPreview", tile.hash.slice(0, 12), isVideo ? "video" : "image");
+
+    const overlay = this.contentEl.createDiv({ cls: "dm-hydrus-preview" });
+    this.previewEl = overlay;
+    overlay.addEventListener("click", (evt) => {
+      if (evt.target === overlay) this.closePreview();
+    });
+
+    // Escape closes only the preview, not the whole modal. Capture phase so we
+    // beat Obsidian's own modal-close handler bound on document.
+    const keyHandler = (evt: KeyboardEvent) => {
+      if (evt.key === "Escape") {
+        evt.preventDefault();
+        evt.stopPropagation();
+        this.closePreview();
+      }
+    };
+    this.previewKeyHandler = keyHandler;
+    document.addEventListener("keydown", keyHandler, true);
+
+    const box = overlay.createDiv({ cls: "dm-hydrus-preview-box" });
+    const closeBtn = box.createEl("button", { cls: "dm-hydrus-preview-close", text: "✕" });
+    closeBtn.setAttr("aria-label", "Close preview");
+    closeBtn.addEventListener("click", () => this.closePreview());
+
+    const mediaWrap = box.createDiv({ cls: "dm-hydrus-preview-media" });
+    void this.loadPreviewMedia(tile, mediaWrap, isVideo);
+
+    const filtered = filterTags(tile.knownTags, this.plugin.settings.hydrusIgnoredTagPatterns);
+    const sorted = [...filtered].sort((a, b) => a.localeCompare(b));
+    const tagsString = sorted.join(", ");
+    box.createDiv({
+      cls: "dm-hydrus-preview-tags",
+      text: sorted.length > 0 ? tagsString : "(no tags)",
+    });
+
+    const actions = box.createDiv({ cls: "dm-hydrus-preview-actions" });
+    if (!isVideo) {
+      const addBtn = actions.createEl("button", { text: "Add as image layer" });
+      addBtn.addEventListener("click", async () => {
+        await this.handleAddAsLayer(tile);
+        this.closePreview();
+      });
+    }
+    actions
+      .createEl("button", { text: "Set as background" })
+      .addEventListener("click", () => void this.handleSetBackground(tile));
+    actions
+      .createEl("button", { text: "Set as map" })
+      .addEventListener("click", () => void this.handleSetMap(tile));
+    if (sorted.length > 0) {
+      actions.createEl("button", { text: "Copy tags" }).addEventListener("click", () => {
+        void navigator.clipboard.writeText(tagsString);
+        new Notice("Tags copied.");
+      });
+    }
+    actions
+      .createEl("button", { text: isVideo ? "Copy video reference" : "Copy image reference" })
+      .addEventListener("click", () => {
+        const label = layerLabelFromTags(tile.knownTags, tile.hash);
+        void navigator.clipboard.writeText(`[${label}](hydrus://${tile.hash})`);
+        new Notice("Reference copied.");
+      });
+  }
+
+  private async loadPreviewMedia(tile: Tile, wrap: HTMLElement, isVideo: boolean) {
+    let src: string;
+    try {
+      if (tile.kind === "local" && tile.vaultPath) {
+        src = this.plugin.app.vault.adapter.getResourcePath(tile.vaultPath);
+      } else if (this.client) {
+        const buf = await this.client.getFileBytes(tile.hash);
+        const blob = new Blob([buf], { type: tile.mime });
+        src = URL.createObjectURL(blob);
+        this.previewObjectUrl = src;
+      } else {
+        wrap.createDiv({ cls: "dm-hydrus-preview-error", text: "Hydrus offline — cannot load this file." });
+        return;
+      }
+    } catch (err) {
+      debugWarn("HydrusExplorer: preview load failed for", tile.hash, err);
+      wrap.createDiv({ cls: "dm-hydrus-preview-error", text: `Failed to load: ${(err as Error).message}` });
+      return;
+    }
+    // A late-arriving remote fetch must not paint into a preview the DM already
+    // dismissed (its object URL would then leak until modal close).
+    if (this.previewEl !== wrap.closest(".dm-hydrus-preview")) return;
+    if (isVideo) {
+      const video = wrap.createEl("video");
+      video.src = src;
+      video.controls = true;
+      video.autoplay = true;
+      video.loop = this.plugin.settings.hydrusDefaultLoop;
+      video.muted = this.plugin.settings.hydrusDefaultMuted;
+    } else {
+      const img = wrap.createEl("img");
+      img.src = src;
+      img.alt = "";
+    }
+  }
+
+  private closePreview() {
+    if (this.previewKeyHandler) {
+      document.removeEventListener("keydown", this.previewKeyHandler, true);
+      this.previewKeyHandler = null;
+    }
+    if (this.previewObjectUrl) {
+      URL.revokeObjectURL(this.previewObjectUrl);
+      this.previewObjectUrl = null;
+    }
+    this.previewEl?.remove();
+    this.previewEl = null;
   }
 }
 

@@ -30,7 +30,7 @@ Built for in-person 5e games where the DM wants a clean visual layer for the pla
 1. Install and enable the plugin (see [Installation](#installation)).
 2. Open the **DM Control Panel** from the ribbon icon or the Command Palette ("Open DM Control Panel").
 3. Click **Start Server**. The panel shows a LAN URL — open it on the device your players will look at.
-4. Use **Add Image** to push images from the active note, **Add BG** to set a background, or **Image from Hydrus** to browse your Hydrus library.
+4. Use **Add Image** to push images from the active note, **Add BG** to set a background, or **Media from Hydrus** to browse your Hydrus library.
 5. In the COMBAT section, pick a source (Manual, Initiative Tracker plugin, or D&D Beyond) and start the encounter.
 
 ## Map screen (TV tables)
@@ -75,9 +75,10 @@ Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](
 
 Browse a self-hosted [Hydrus](https://hydrusnetwork.github.io/hydrus/) media library by tags and push files to the player screen.
 
-- Click **Image from Hydrus** in the DM Control Panel to open the explorer.
-- A default click on a tile pushes the file as an image layer; shift-click sets it as the background.
-- Videos can only be used as backgrounds — the tile's ⋮ menu also offers a "Set as background" option.
+- Click **Media from Hydrus** in the DM Control Panel to open the explorer.
+- Left-click a tile to open a full-resolution preview with action buttons (add as image layer, set as background, set as map, copy tags, copy reference).
+- Right-click a tile — or use its ⋮ button — for the same actions as a context menu, plus cache management (download / delete local copy).
+- Videos can be used as a background or map, not as an image layer.
 - Downloaded media is cached locally; the cache folder, retention, and tag filters are all configurable in settings.
 
 ### D&D Beyond
