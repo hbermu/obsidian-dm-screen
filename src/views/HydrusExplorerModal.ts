@@ -550,9 +550,12 @@ export class HydrusExplorerModal extends Modal {
         return;
       }
       const wrap = titleEl.createDiv({ cls: "dm-hydrus-tile-tags" });
-      for (const t of sorted) {
-        wrap.createSpan({ cls: "dm-hydrus-tile-tag", text: t });
-      }
+      sorted.forEach((t, i) => {
+        // Comma-separate so adjacent tags stay legible even where the chip
+        // background is invisible; the tag text itself stays nowrap so
+        // multi-word tags (e.g. "castle exterior") never break mid-string.
+        wrap.createSpan({ cls: "dm-hydrus-tile-tag", text: i < sorted.length - 1 ? `${t},` : t });
+      });
     });
     if (sorted.length > 0) {
       menu.addItem((item: any) =>
