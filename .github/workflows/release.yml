@@ -55,14 +55,14 @@ jobs:
         env:
           BUMP: ${{ steps.pr_bump.outputs.type }}
         run: |
-          # Find the latest stable tag — supports both legacy v-prefixed and
-          # new bare tags. Strip the v prefix for version arithmetic.
-          latest=$(git tag --list '[0-9]*' --list 'v[0-9]*' --sort=-version:refname \
-              | grep -vE -- '-beta\.[0-9]+$' | head -1)
-          if [ -z "$latest" ]; then
+          # Latest stable version number across legacy v-prefixed and new bare
+          # tags. git's --sort=version:refname does NOT normalize the leading
+          # v (ASCII 'v' > '0', so every v0.x tag ranks above every bare tag),
+          # so we strip the prefix first, then sort -V numerically.
+          current=$(git tag --list '[0-9]*' --list 'v[0-9]*' \
+              | grep -vE -- '-beta\.[0-9]+$' | sed 's/^v//' | sort -V | tail -1)
+          if [ -z "$current" ]; then
             current="0.0.0"
-          else
-            current="${latest#v}"
           fi
           IFS=. read -r MA MI PA <<< "$current"
           case "$BUMP" in
@@ -107,21 +107,29 @@ jobs:
           BUMP: ${{ steps.pr_bump.outputs.type }}
           PR_NUM: ${{ github.event.pull_request.number }}
         run: |
+          # Highest stable tag matching the given glob(s), returned as its
+          # ORIGINAL name (legacy tags keep their v prefix — these values are
+          # used verbatim as git refs in compare URLs). We can't sort by
+          # version:refname because it doesn't normalize the v prefix, so we
+          # sort on a v-stripped key and print the untouched name back.
+          latest_tag() {
+            git tag -l "$@" | grep -vE -- '-beta\.[0-9]+$' \
+              | awk '{k=$0; sub(/^v/,"",k); print k"\t"$0}' \
+              | sort -V | tail -1 | cut -f2
+          }
+
           # Previous stable tag (any tier), used as the compare-link footer
-          # baseline for patch releases. Supports both v-prefixed and bare tags.
-          prev_tag=$(git tag --list '[0-9]*' --list 'v[0-9]*' --sort=-version:refname \
-              | grep -vE -- '-beta\.[0-9]+$' | head -1)
+          # baseline for patch releases.
+          prev_tag=$(latest_tag '[0-9]*' 'v[0-9]*')
 
           # Tier-specific previous tag, used as the aggregation window for
           # minor (prev *.*.0) and major (prev *.0.0) releases.
           case "$BUMP" in
             major)
-              prev_window=$(git tag --list '[0-9]*.0.0' --list 'v[0-9]*.0.0' --sort=-version:refname \
-                  | grep -vE -- '-beta\.[0-9]+$' | head -1)
+              prev_window=$(latest_tag '[0-9]*.0.0' 'v[0-9]*.0.0')
               ;;
             minor)
-              prev_window=$(git tag --list '[0-9]*.*.0' --list 'v[0-9]*.*.0' --sort=-version:refname \
-                  | grep -vE -- '-beta\.[0-9]+$' | head -1)
+              prev_window=$(latest_tag '[0-9]*.*.0' 'v[0-9]*.*.0')
               ;;
             *)
               prev_window="$prev_tag"
@@ -178,9 +186,18 @@ jobs:
               # minor (*.*.0) shipped since the previous major.
               PR_BODY=$(gh pr view "$PR_NUM" --json body --jq .body)
               SUMMARY=$(printf '%s\n' "$PR_BODY" | awk '/^## Test plan/{exit} {print}')
-              minors=$(git tag --list '[0-9]*.*.0' --list 'v[0-9]*.*.0' --sort=-version:refname \
+              # Every minor (*.*.0) strictly above prev_window and below this
+              # release, sorted ascending. Compare numerically per-component —
+              # a string compare would order v0.10.0 below v0.9.0 — and match
+              # the v-stripped key while emitting the original tag name.
+              minors=$(git tag -l '[0-9]*.*.0' 'v[0-9]*.*.0' \
                   | grep -vE -- '-beta\.[0-9]+$' \
-                  | awk -v lo="$prev_window" -v hi="${VERSION}" '$0!=hi && (lo=="" || $0>lo)')
+                  | awk '{k=$0; sub(/^v/,"",k); print k"\t"$0}' | sort -V \
+                  | awk -F'\t' -v lo="${prev_window#v}" -v hi="${VERSION#v}" '
+                      function vcmp(a,b,  x,y,i){split(a,x,".");split(b,y,".");
+                        for(i=1;i<=3;i++){if((x[i]+0)>(y[i]+0))return 1;
+                                          if((x[i]+0)<(y[i]+0))return -1}return 0}
+                      { if ($1!=hi && (lo=="" || vcmp($1,lo)>0)) print $2 }')
               {
                 if [ -n "$SUMMARY" ]; then
                   printf '%s\n\n' "$SUMMARY"
