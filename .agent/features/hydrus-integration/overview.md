@@ -1,6 +1,6 @@
 # Hydrus Integration
 
-> The DM can browse a self-hosted Hydrus Network library by tag and push any image as a player-screen layer (default click) or any image / video as a player-screen background (Shift-click or context menu). Hydrus is contacted through its Client API; downloaded files are cached in the vault so subsequent uses do not re-download. Hydrus is an optional integration — when disabled the Image from Hydrus button is hidden and no network calls are made.
+> The DM can browse a self-hosted Hydrus Network library by tag, preview any file at full resolution (left click), and push any image as a player-screen layer or any image / video as a player-screen background or map — from the preview lightbox or the tile's right-click / ⋮ context menu. Hydrus is contacted through its Client API; downloaded files are cached in the vault so subsequent uses do not re-download. Hydrus is an optional integration — when disabled the Media from Hydrus button is hidden and no network calls are made.
 
 ## Source files
 
@@ -17,7 +17,7 @@
 
 ## Settings used
 
-- `hydrusEnabled` — gates the Image from Hydrus button and the sweep interval
+- `hydrusEnabled` — gates the Media from Hydrus button and the sweep interval
 - `hydrusApiUrl` — base URL of the Hydrus Client API (no trailing slash)
 - `hydrusApiKey` — 64-hex `Hydrus-Client-API-Access-Key`
 - `hydrusAvailableTagServices` — `{ name, key }[]` populated by Fetch services
@@ -31,7 +31,7 @@
 
 ## Requirements
 
-1. The DM Control Panel shall expose an Image from Hydrus button if and only if `hydrusEnabled` is true and `hydrusApiUrl` is non-empty; it renders as a standalone full-width bar between the Player Screen Server and Player Screen sections, always visible and outside every collapsible section.
+1. The DM Control Panel shall expose a Media from Hydrus button if and only if `hydrusEnabled` is true and `hydrusApiUrl` is non-empty; it renders as a standalone full-width bar between the Player Screen Server and Player Screen sections, always visible and outside every collapsible section.
 2. When the button is clicked, the panel shall open `HydrusExplorerModal`.
 3. The plugin shall instantiate `HydrusCache` (and `DdbImageCache`) on load and whenever a cache-related setting changes (`hydrusEnabled`, `cacheBaseFolder`, `hydrusCacheTtlDays`). It shall NOT re-instantiate on every unrelated settings save — bulk paths like `DmControlPanel.saveState` fire on every layer broadcast and rebuilding caches there would be wasteful.
 4. While `hydrusEnabled` is true, the plugin shall sweep the Hydrus cache once on load and then every 24 hours (via `registerInterval`). The `DdbImageCache` sweep schedule is independent of `hydrusEnabled` — it always sweeps on load and on a 24-hour `registerInterval` while the plugin is loaded.

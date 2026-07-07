@@ -450,7 +450,7 @@ export class DmControlPanel extends ItemView {
   private renderHydrusBar(container: HTMLElement) {
     if (!this.plugin.settings.hydrusEnabled || !this.plugin.settings.hydrusApiUrl) return;
     const bar = container.createDiv("dm-hydrus-bar");
-    const hydrusBtn = bar.createEl("button", { text: "Image from Hydrus" });
+    const hydrusBtn = bar.createEl("button", { text: "Media from Hydrus" });
     hydrusBtn.addEventListener("click", async () => {
       try {
         const { HydrusExplorerModal } = await import("./HydrusExplorerModal");
