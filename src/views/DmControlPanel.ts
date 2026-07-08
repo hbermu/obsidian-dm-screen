@@ -390,35 +390,6 @@ export class DmControlPanel extends ItemView {
         text: ` on port ${this.plugin.settings.serverPort}`,
         cls: "dm-status-detail",
       });
-
-      if (this.connectedClients.length > 0) {
-        const clientInfo = section.createDiv("dm-client-info");
-        clientInfo.createSpan({
-          text: `${this.connectedClients.length} screen${this.connectedClients.length > 1 ? "s" : ""} connected`,
-          cls: "dm-status-detail",
-        });
-
-        const resMap = new Map<string, { width: number; height: number; count: number }>();
-        for (const c of this.connectedClients) {
-          const key = `${c.width}×${c.height}`;
-          const existing = resMap.get(key);
-          if (existing) existing.count++;
-          else resMap.set(key, { width: c.width, height: c.height, count: 1 });
-        }
-
-        const eff = this.getEffectiveResolution();
-        for (const [key, info] of resMap) {
-          const label = info.count > 1 ? `${key} ×${info.count}` : key;
-          const badge = clientInfo.createSpan({ text: label, cls: "dm-client-resolution" });
-          if (info.width === eff.width && info.height === eff.height) {
-            badge.addClass("dm-client-resolution-active");
-          }
-          badge.addEventListener("click", () => {
-            this.selectedResolution = { width: info.width, height: info.height };
-            this.render();
-          });
-        }
-      }
     }
 
     const serverBtn = section.createEl("button", {
@@ -485,6 +456,35 @@ export class DmControlPanel extends ItemView {
         copyBtn.textContent = "Copied!";
         setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
       });
+
+      if (this.connectedClients.length > 0) {
+        const clientInfo = section.createDiv("dm-client-info");
+        clientInfo.createSpan({
+          text: `${this.connectedClients.length} screen${this.connectedClients.length > 1 ? "s" : ""} connected`,
+          cls: "dm-status-detail",
+        });
+
+        const resMap = new Map<string, { width: number; height: number; count: number }>();
+        for (const c of this.connectedClients) {
+          const key = `${c.width}×${c.height}`;
+          const existing = resMap.get(key);
+          if (existing) existing.count++;
+          else resMap.set(key, { width: c.width, height: c.height, count: 1 });
+        }
+
+        const eff = this.getEffectiveResolution();
+        for (const [key, info] of resMap) {
+          const label = info.count > 1 ? `${key} ×${info.count}` : key;
+          const badge = clientInfo.createSpan({ text: label, cls: "dm-client-resolution" });
+          if (info.width === eff.width && info.height === eff.height) {
+            badge.addClass("dm-client-resolution-active");
+          }
+          badge.addEventListener("click", () => {
+            this.selectedResolution = { width: info.width, height: info.height };
+            this.render();
+          });
+        }
+      }
     }
 
     // Button row
