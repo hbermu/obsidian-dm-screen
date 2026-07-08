@@ -6,7 +6,7 @@
 
 - `src/server.ts` — `clientInfoMap`, `getConnectedClients`, `onClientInfo` callback
 - `src/main.ts` — `onPlayerClientInfo` forwards new info to the DM Control Panel
-- `src/views/DmControlPanel.ts` — `connectedClients`, `playerConnected`, `selectedResolution`, `getEffectiveResolution`, the resolution badges row in `renderServerSection`, `onPlayerConnected`
+- `src/views/DmControlPanel.ts` — `connectedClients`, `playerConnected`, `selectedResolution`, `getEffectiveResolution`, the resolution badges row in `renderPlayerScreenSection` (below the player URL, mirroring the Map Screen section), `onPlayerConnected`
 - `src/player/player.ts` — `sendClientInfo` emits the player's window dimensions on connect and on resize
 
 ## Settings used
@@ -18,7 +18,7 @@
 1. The player shall emit a `client-info` WebSocket message on connect and on every window resize, carrying `{ width: window.innerWidth, height: window.innerHeight, devicePixelRatio }` (the map page additionally sends `channel: "map"`).
 2. The server shall store the latest `client-info` per WebSocket in `clientInfoMap`, stamped with the connection's channel, and invoke `onClientInfo` whenever it is updated.
 3. The DM panel shall receive the full connected-client list via `onPlayerConnected` and via the `onClientCountChanged` re-render hook, splitting it by channel: `player`-channel clients populate `connectedClients`, `map`-channel clients populate the Map Screen section (see `../map-screen/overview.md`).
-4. The DM panel shall render one badge per distinct `player`-channel resolution, displayed as `<W>×<H>` (or `<W>×<H> ×<count>` if multiple clients share that resolution). Map clients never appear in this row.
+4. The DM panel shall render one badge per distinct `player`-channel resolution, displayed as `<W>×<H>` (or `<W>×<H> ×<count>` if multiple clients share that resolution), in a `dm-client-info` row inside the Player Screen section directly below the player URL (mirroring the Map Screen section's layout). Map clients never appear in this row.
 5. The effective-resolution badge (the one currently driving the preview) shall carry the `dm-client-resolution-active` CSS class.
 6. When the user clicks a resolution badge, the DM panel shall set `selectedResolution` to that `{ width, height }` and re-render.
 7. The `getEffectiveResolution` method shall return:
