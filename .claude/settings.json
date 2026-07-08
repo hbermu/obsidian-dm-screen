@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(tsc:*)",
+      "Bash(vitest:*)",
+      "Bash(esbuild:*)",
+      "Bash(git tag:*)",
+      "Bash(gh release:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/bash-precheck.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
