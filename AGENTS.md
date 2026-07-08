@@ -8,6 +8,8 @@ DM Screen is an Obsidian plugin for running D&D 5e sessions in-person. It pairs 
 
 ## Hard rules
 
+Many of these rules are enforced locally: `.claude/hooks/bash-precheck.sh` (wired in `.claude/settings.json`) blocks host toolchain use, hook/signing bypasses, manual tags and releases, pushes to `main`, force-pushes, bad branch names, non-conforming PR titles, commits that stage `src/` without a spec change (prefix `SPEC_NOT_NEEDED=1` only for genuinely behaviour-free changes, and apply `spec:not-needed` on the PR), stale `-beta.N` first pushes, and external URLs staged into AI docs. The blocks mirror the required CI gates so violations fail before a CI round-trip — a hook block is a rule violation, not an obstacle to work around.
+
 ### Environment
 
 - No Node, npm, npx, or any JS toolchain runs on the host. Everything happens inside Docker via the Makefile.
