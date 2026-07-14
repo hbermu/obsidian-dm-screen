@@ -220,6 +220,9 @@ class MapScreen {
     this.media = payload;
     document.getElementById("waiting-screen")!.style.display = "none";
     this.applyLayout();
+    // Fog may have loaded before the map (replay order is not guaranteed) —
+    // recomposite now that naturalSize() is known so vision holes land.
+    this.recompositeFog();
   }
 
   private showFog(payload: { dataUrl?: string | null; opacity?: number }) {

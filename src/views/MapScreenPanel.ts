@@ -108,7 +108,7 @@ export class MapScreenPanel {
       } catch { /* ignore */ }
     }
     this.clampStateToViewport();
-    debug("MapScreenPanel: restoreFromCache —", this.activeMap.url, this.state.mode, `${this.aoes.length} AoEs`);
+    debug("MapScreenPanel: restoreFromCache —", this.activeMap.url, this.state.mode, `${this.aoes.length} AoEs`, `${this.visions.length} visions`);
   }
 
   republish() {
@@ -1147,6 +1147,7 @@ export class MapScreenPanel {
   }
 
   async bakeVisions(map: ActiveMap) {
+    debug("MapScreenPanel: bakeVisions —", this.visions.length, "visions into", map.url);
     const { width, height } = fogCanvasSize(map.naturalWidth, map.naturalHeight);
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -1160,6 +1161,7 @@ export class MapScreenPanel {
           ctx.drawImage(img, 0, 0, width, height);
           resolve();
         };
+        img.onerror = () => resolve();
         img.src = this.fogDataUrl!;
       });
     }
