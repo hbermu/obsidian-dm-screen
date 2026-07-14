@@ -13,9 +13,9 @@ import {
   DEFAULT_GRID_CONFIG,
   FALLBACK_PPI,
 } from "./transform";
-import type { MapAoe, MapGridConfig, MapMediaPayload, MapView, MapVision, ScreenProfile } from "./types";
+import type { MapAoe, MapGridConfig, MapMediaPayload, MapView, MapVision, MapWall, ScreenProfile } from "./types";
 import { renderAoe } from "./aoe";
-import { eraseVision } from "./vision";
+import { eraseVisionWithWalls } from "./vision";
 
 interface MapMessage {
   type: string;
@@ -36,6 +36,7 @@ class MapScreen {
   private fogImage: HTMLImageElement | null = null;
   private fogOpacity = 1;
   private visions: MapVision[] = [];
+  private walls: MapWall[] = [];
 
   constructor() {
     this.connect();
@@ -172,6 +173,10 @@ class MapScreen {
         this.visions = ((msg.payload as { visions?: unknown }).visions ?? []) as MapVision[];
         this.recompositeFog();
         break;
+      case "map-walls":
+        this.walls = ((msg.payload as { walls?: unknown }).walls ?? []) as MapWall[];
+        this.recompositeFog();
+        break;
       case "map-clear":
         this.clearMap();
         break;
@@ -263,8 +268,9 @@ class MapScreen {
     ctx.drawImage(this.fogImage, 0, 0);
     if (nw > 0) {
       const scale = fw / nw;
+      const { h: nh } = this.naturalSize();
       for (const v of this.visions) {
-        eraseVision(ctx, v, scale, this.config.pxPerSquare);
+        eraseVisionWithWalls(ctx, v, scale, this.config.pxPerSquare, this.walls, nw, nh);
       }
     }
     canvas.style.opacity = String(this.fogOpacity);
@@ -281,6 +287,7 @@ class MapScreen {
     image.style.display = "none";
     this.fogImage = null;
     this.visions = [];
+    this.walls = [];
     this.recompositeFog();
     this.media = null;
     this.aoes = [];

@@ -2051,3 +2051,9 @@
   height: 100%;
   cursor: crosshair;
 }
+
+.dm-fog-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}

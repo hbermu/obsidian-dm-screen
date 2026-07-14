@@ -5,6 +5,7 @@ import { encodeForVaultUrl } from "./HydrusExplorerModal";
 import { ensureLocalCopy, type ResolvedHydrusRef } from "../hydrus/noteRefs";
 import { vaultPathFromUrl, type ClientInfo } from "../server";
 import { fogCanvasSize, loadFogSidecar, saveFogSidecar, type FogAdapter } from "../map/fog";
+import { loadWallsSidecar, saveWallsSidecar } from "../map/walls";
 import { MapFogModal } from "./MapFogModal";
 import {
   clampPan,
@@ -13,9 +14,9 @@ import {
   profileKey,
   rotatePoint,
 } from "../map/transform";
-import type { AoePreset, AoeShape, MapAoe, MapRotation, MapVision, StoredMapState } from "../map/types";
+import type { AoePreset, AoeShape, MapAoe, MapRotation, MapVision, MapWall, StoredMapState } from "../map/types";
 import { renderAoe } from "../map/aoe";
-import { eraseVision } from "../map/vision";
+import { eraseVisionWithWalls } from "../map/vision";
 import { SpellAoeModal } from "./SpellAoeModal";
 import { MapCalibrationModal } from "./MapCalibrationModal";
 import { debug } from "../debug";
@@ -48,6 +49,7 @@ export class MapScreenPanel {
   mapClients: ClientInfo[] = [];
   aoes: MapAoe[] = [];
   visions: MapVision[] = [];
+  walls: MapWall[] = [];
   fogDataUrl: string | null = null;
   private viewBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
   private aoeBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -107,6 +109,12 @@ export class MapScreenPanel {
         this.fogDataUrl = ((JSON.parse(fogCache).payload as { dataUrl?: string | null })?.dataUrl ?? null);
       } catch { /* ignore */ }
     }
+    const wallsCache = cache["map-walls"];
+    if (wallsCache) {
+      try {
+        this.walls = ((JSON.parse(wallsCache).payload as { walls?: MapWall[] })?.walls ?? []);
+      } catch { /* ignore */ }
+    }
     this.clampStateToViewport();
     debug("MapScreenPanel: restoreFromCache —", this.activeMap.url, this.state.mode, `${this.aoes.length} AoEs`, `${this.visions.length} visions`);
   }
@@ -124,6 +132,7 @@ export class MapScreenPanel {
     // Unlike AoEs, null fog is still a signal — late joiners must clear any
     // stale fog img rather than keep whatever they last rendered.
     this.broadcastFog();
+    this.broadcastWalls();
   }
 
   private broadcastShow() {
@@ -245,6 +254,16 @@ export class MapScreenPanel {
     this.broadcastFog();
   }
 
+  broadcastWalls() {
+    this.plugin.server?.broadcast({ type: "map-walls", payload: { walls: this.walls } });
+  }
+
+  async commitWalls(walls: MapWall[]) {
+    this.walls = walls;
+    if (this.activeMap) await saveWallsSidecar(this.fogAdapter(), this.activeMap.url, walls);
+    this.broadcastWalls();
+  }
+
   async setVaultMap(vaultPath: string, mediaType: "image" | "video") {
     const adapter = this.plugin.app.vault.adapter as { getResourcePath?: (p: string) => string };
     const resourceUrl = adapter.getResourcePath?.(vaultPath);
@@ -260,6 +279,7 @@ export class MapScreenPanel {
       : defaultMapState(dims.w, dims.h, this.plugin.settings.mapDefaultPxPerSquare);
     this.activeMap = { url, mediaType, naturalWidth: dims.w, naturalHeight: dims.h };
     this.fogDataUrl = await loadFogSidecar(this.fogAdapter(), url);
+    this.walls = await loadWallsSidecar(this.fogAdapter(), url);
     this.aoes = [];
     this.visions = [];
     this.previewZoom = 1;
@@ -273,6 +293,7 @@ export class MapScreenPanel {
     this.broadcastAoes(true);
     this.broadcastVisions(true);
     this.broadcastFog();
+    this.broadcastWalls();
     this.persistState();
     this.host.render();
   }
@@ -282,6 +303,7 @@ export class MapScreenPanel {
     this.activeMap = null;
     this.aoes = [];
     this.visions = [];
+    this.walls = [];
     this.fogDataUrl = null;
     this.plugin.server?.broadcast({ type: "map-clear", payload: {} });
     this.host.render();
@@ -1168,7 +1190,7 @@ export class MapScreenPanel {
 
     const scale = canvas.width / map.naturalWidth;
     for (const v of this.visions) {
-      eraseVision(ctx, v, scale, this.state.pxPerSquare);
+      eraseVisionWithWalls(ctx, v, scale, this.state.pxPerSquare, this.walls, map.naturalWidth, map.naturalHeight);
     }
 
     await this.commitFog(canvas.toDataURL("image/png"));

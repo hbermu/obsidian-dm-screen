@@ -95,12 +95,12 @@ describe("MapScreenPanel AoE lifecycle", () => {
     const { panel, broadcasts } = makePanel();
     panel.activeMap = { url: "/vault/m.jpg", mediaType: "image", naturalWidth: 4480, naturalHeight: 7000 };
     panel.republish();
-    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view", "map-fog"]);
+    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view", "map-fog", "map-walls"]);
 
     broadcasts.length = 0;
     panel.aoes = [AOE];
     panel.republish();
-    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view", "map-aoe-sync", "map-fog"]);
+    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view", "map-aoe-sync", "map-fog", "map-walls"]);
     expect(broadcasts[3].payload).toEqual({ aoes: [AOE] });
   });
 

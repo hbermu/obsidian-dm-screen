@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { MapScreenPanel } from "../views/MapScreenPanel";
 import { fogSidecarPath } from "../map/fog";
-import type { MapVision } from "../map/types";
+import { wallsSidecarPath } from "../map/walls";
+import type { MapVision, MapWall } from "../map/types";
 
 interface Broadcast {
   type: string;
@@ -133,5 +134,50 @@ describe("map vision lifecycle", () => {
     panel.visions = [{ id: "v1", shape: "circle", x: 1, y: 1, sizeFt: 30, featherFt: 5 }];
     panel.republish();
     expect(broadcasts.some((b) => b.type === "map-vision")).toBe(true);
+  });
+});
+
+describe("map walls lifecycle", () => {
+  const WALL: MapWall = { x1: 0, y1: 0, x2: 10, y2: 0 };
+
+  it("broadcastWalls sends { walls }", () => {
+    const { panel, broadcasts } = makePanel();
+    panel.walls = [WALL];
+    panel.broadcastWalls();
+    const msg = broadcasts.find((b) => b.type === "map-walls");
+    expect(msg?.payload).toEqual({ walls: [WALL] });
+  });
+
+  it("commitWalls writes the sidecar and broadcasts", async () => {
+    const { panel, broadcasts, files } = makePanel();
+    panel.activeMap = { url: "/vault/maps/a.jpg", mediaType: "image", naturalWidth: 100, naturalHeight: 100 };
+    await panel.commitWalls([WALL]);
+    expect(files[wallsSidecarPath("/vault/maps/a.jpg")]).toBeDefined();
+    expect(broadcasts.some((b) => b.type === "map-walls")).toBe(true);
+  });
+
+  it("stopMap clears walls", () => {
+    const { panel } = makePanel();
+    panel.activeMap = { url: "/vault/x.png", mediaType: "image", naturalWidth: 10, naturalHeight: 10 };
+    panel.walls = [WALL];
+    panel.stopMap();
+    expect(panel.walls).toEqual([]);
+  });
+
+  it("restoreFromCache recovers walls from the map-walls slot", () => {
+    const { panel } = makePanel();
+    const cache = {
+      "map-show": JSON.stringify({ type: "map-show", payload: { url: "/vault/m.jpg", mediaType: "image", naturalWidth: 50, naturalHeight: 50 } }),
+      "map-walls": JSON.stringify({ type: "map-walls", payload: { walls: [WALL] } }),
+    };
+    panel.restoreFromCache(cache);
+    expect(panel.walls).toEqual([WALL]);
+  });
+
+  it("republish broadcasts map-walls even when empty", () => {
+    const { panel, broadcasts } = makePanel();
+    panel.activeMap = { url: "/vault/m.jpg", mediaType: "image", naturalWidth: 50, naturalHeight: 50 };
+    panel.republish();
+    expect(broadcasts.some((b) => b.type === "map-walls")).toBe(true);
   });
 });

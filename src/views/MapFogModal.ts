@@ -1,20 +1,34 @@
-import { App, Modal } from "obsidian";
+import { App, Modal, Notice } from "obsidian";
 import type DmScreenPlugin from "../main";
 import type { MapScreenPanel, ActiveMap } from "./MapScreenPanel";
 import { fogCanvasSize, gridCellRectAt } from "../map/fog";
+import { floodRegion } from "../map/walls";
+import { blocksSight } from "../map/los";
 import { vaultPathFromUrl } from "../server";
+import type { MapWall } from "../map/types";
 import { debug } from "../debug";
 
-type FogTool = "brush" | "rect" | "cell" | "gridrect";
+type FogTool = "brush" | "rect" | "cell" | "gridrect" | "room";
 type FogMode = "reveal" | "cover";
+type EditorMode = "fog" | "walls";
+type WallsTool = "wall" | "door" | "erase" | "toggle";
 
 export class MapFogModal extends Modal {
   private tool: FogTool = "brush";
   private mode: FogMode = "reveal";
+  private editorMode: EditorMode = "fog";
+  private wallsTool: WallsTool = "wall";
+  private wallsSnap = false;
   private brushPct = 5;
   private fogCanvas: HTMLCanvasElement;
   private redrawOverlay: (() => void) | null = null;
   private cleanupDrag: (() => void) | null = null;
+  // local working copy; mutations call commitWalls
+  private walls: MapWall[] = [];
+  // chain anchor in natural map coords
+  private chainAnchor: { x: number; y: number } | null = null;
+  // cursor in natural map coords for preview segment
+  private cursorNatural: { x: number; y: number } | null = null;
 
   constructor(
     app: App,
@@ -48,53 +62,22 @@ export class MapFogModal extends Modal {
   }
 
   onOpen() {
+    this.walls = [...this.panel.walls];
     this.modalEl.addClass("dm-fog-modal");
     const { contentEl } = this;
     contentEl.createEl("h3", { text: "Fog of War" });
 
-    const bar = contentEl.createDiv("dm-fog-toolbar");
-    const modeBtns: Record<FogMode, HTMLButtonElement> = {} as never;
-    const toolBtns: Record<FogTool, HTMLButtonElement> = {} as never;
-    const syncActive = () => {
-      for (const [m, b] of Object.entries(modeBtns)) b.classList.toggle("dm-fog-active", this.mode === m);
-      for (const [t, b] of Object.entries(toolBtns)) b.classList.toggle("dm-fog-active", this.tool === t);
+    // Tab row
+    const tabRow = contentEl.createDiv("dm-fog-tabs");
+    const fogTabBtn = tabRow.createEl("button", { text: "Fog" });
+    const wallsTabBtn = tabRow.createEl("button", { text: "Walls" });
+    const syncTabActive = () => {
+      fogTabBtn.classList.toggle("dm-fog-active", this.editorMode === "fog");
+      wallsTabBtn.classList.toggle("dm-fog-active", this.editorMode === "walls");
     };
-    for (const m of ["reveal", "cover"] as FogMode[]) {
-      modeBtns[m] = bar.createEl("button", { text: m === "reveal" ? "Reveal" : "Cover" });
-      modeBtns[m].addEventListener("click", () => { this.mode = m; syncActive(); });
-    }
-    bar.createSpan({ text: "·", cls: "dm-status-detail" });
-    const toolLabels: Record<FogTool, string> = { brush: "Brush", rect: "Rectangle", cell: "Grid cell", gridrect: "Grid rect" };
-    for (const t of ["brush", "rect", "cell", "gridrect"] as FogTool[]) {
-      toolBtns[t] = bar.createEl("button", { text: toolLabels[t] });
-      toolBtns[t].addEventListener("click", () => { this.tool = t; syncActive(); });
-    }
-    syncActive();
+    syncTabActive();
 
-    bar.createSpan({ text: "Brush", cls: "dm-status-detail" });
-    const sizeSlider = bar.createEl("input", { type: "range" });
-    sizeSlider.min = "2";
-    sizeSlider.max = "15";
-    sizeSlider.step = "1";
-    sizeSlider.value = String(this.brushPct);
-    sizeSlider.title = "Brush size (% of map width)";
-    sizeSlider.addEventListener("input", () => { this.brushPct = parseInt(sizeSlider.value, 10); });
-
-    const revealAll = bar.createEl("button", { text: "Reveal All" });
-    revealAll.addEventListener("click", () => {
-      this.ctx().clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
-      this.redrawOverlay?.();
-      this.commit();
-    });
-    const coverAll = bar.createEl("button", { text: "Cover All", cls: "mod-warning" });
-    coverAll.addEventListener("click", () => {
-      const ctx = this.ctx();
-      ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "black";
-      ctx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
-      this.redrawOverlay?.();
-      this.commit();
-    });
+    const bar = contentEl.createDiv("dm-fog-toolbar");
 
     const stage = contentEl.createDiv("dm-fog-stage");
     stage.style.aspectRatio = `${this.map.naturalWidth} / ${this.map.naturalHeight}`;
@@ -124,15 +107,192 @@ export class MapFogModal extends Modal {
     overlay.width = this.fogCanvas.width;
     overlay.height = this.fogCanvas.height;
     const octx = overlay.getContext("2d")!;
+
+    const fogScale = this.fogCanvas.width / this.map.naturalWidth;
+
     const redraw = () => {
       octx.clearRect(0, 0, overlay.width, overlay.height);
-      octx.globalAlpha = 0.55;
+      octx.globalAlpha = this.editorMode === "fog" ? 0.55 : 0.25;
       octx.drawImage(this.fogCanvas, 0, 0);
       octx.globalAlpha = 1;
+
+      // Draw walls
+      for (const w of this.walls) {
+        octx.save();
+        octx.lineWidth = 3;
+        if (w.door) {
+          octx.strokeStyle = "#44aaff";
+          if (w.open) octx.setLineDash([8, 6]);
+        } else {
+          octx.strokeStyle = "#f5d90a";
+        }
+        octx.beginPath();
+        octx.moveTo(w.x1 * fogScale, w.y1 * fogScale);
+        octx.lineTo(w.x2 * fogScale, w.y2 * fogScale);
+        octx.stroke();
+        octx.setLineDash([]);
+        octx.restore();
+      }
+
+      // Draw chain preview segment in walls mode
+      if (this.editorMode === "walls" && this.chainAnchor && this.cursorNatural) {
+        octx.save();
+        octx.strokeStyle = this.wallsTool === "door" ? "#44aaff" : "#f5d90a";
+        octx.lineWidth = 2;
+        octx.setLineDash([6, 4]);
+        octx.beginPath();
+        octx.moveTo(this.chainAnchor.x * fogScale, this.chainAnchor.y * fogScale);
+        octx.lineTo(this.cursorNatural.x * fogScale, this.cursorNatural.y * fogScale);
+        octx.stroke();
+        octx.setLineDash([]);
+        octx.restore();
+      }
     };
     this.redrawOverlay = redraw;
     redraw();
-    this.setupDrawing(overlay, redraw);
+
+    const renderFogToolbar = (barEl: HTMLElement) => {
+      const modeBtns: Record<FogMode, HTMLButtonElement> = {} as never;
+      const toolBtns: Record<FogTool, HTMLButtonElement> = {} as never;
+      const syncActive = () => {
+        for (const [m, b] of Object.entries(modeBtns)) b.classList.toggle("dm-fog-active", this.mode === (m as FogMode));
+        for (const [t, b] of Object.entries(toolBtns)) b.classList.toggle("dm-fog-active", this.tool === (t as FogTool));
+      };
+      for (const m of ["reveal", "cover"] as FogMode[]) {
+        modeBtns[m] = barEl.createEl("button", { text: m === "reveal" ? "Reveal" : "Cover" });
+        modeBtns[m].addEventListener("click", () => { this.mode = m; syncActive(); });
+      }
+      barEl.createSpan({ text: "·", cls: "dm-status-detail" });
+      const toolLabels: Record<FogTool, string> = { brush: "Brush", rect: "Rectangle", cell: "Grid cell", gridrect: "Grid rect", room: "Room" };
+      for (const t of ["brush", "rect", "cell", "gridrect", "room"] as FogTool[]) {
+        toolBtns[t] = barEl.createEl("button", { text: toolLabels[t] });
+        toolBtns[t].addEventListener("click", () => { this.tool = t; syncActive(); });
+      }
+      syncActive();
+
+      barEl.createSpan({ text: "Brush", cls: "dm-status-detail" });
+      const sizeSlider = barEl.createEl("input", { type: "range" });
+      sizeSlider.min = "2";
+      sizeSlider.max = "15";
+      sizeSlider.step = "1";
+      sizeSlider.value = String(this.brushPct);
+      sizeSlider.title = "Brush size (% of map width)";
+      sizeSlider.addEventListener("input", () => { this.brushPct = parseInt(sizeSlider.value, 10); });
+
+      const revealAll = barEl.createEl("button", { text: "Reveal All" });
+      revealAll.addEventListener("click", () => {
+        this.ctx().clearRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
+        redraw();
+        this.commit();
+      });
+      const coverAll = barEl.createEl("button", { text: "Cover All", cls: "mod-warning" });
+      coverAll.addEventListener("click", () => {
+        const ctx = this.ctx();
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
+        redraw();
+        this.commit();
+      });
+
+      this.setupFogDrawing(overlay, redraw, fogScale);
+    };
+
+    const renderWallsToolbar = (barEl: HTMLElement) => {
+      const wallToolBtns: Record<WallsTool, HTMLButtonElement> = {} as never;
+      const syncActive = () => {
+        for (const [t, b] of Object.entries(wallToolBtns)) b.classList.toggle("dm-fog-active", this.wallsTool === (t as WallsTool));
+      };
+      for (const [t, label] of [["wall", "Wall"], ["door", "Door"], ["erase", "Erase"], ["toggle", "Toggle door"]] as [WallsTool, string][]) {
+        wallToolBtns[t] = barEl.createEl("button", { text: label });
+        wallToolBtns[t].addEventListener("click", () => {
+          this.wallsTool = t;
+          // end any chain when switching tool
+          this.chainAnchor = null;
+          syncActive();
+          redraw();
+        });
+      }
+      syncActive();
+
+      const snapLabel = barEl.createEl("label");
+      snapLabel.createSpan({ text: "Snap" });
+      const snapCb = snapLabel.createEl("input", { type: "checkbox" });
+      snapCb.checked = this.wallsSnap;
+      snapCb.addEventListener("change", () => { this.wallsSnap = snapCb.checked; });
+
+      this.setupWallsDrawing(overlay, redraw, fogScale);
+    };
+
+    const switchTab = (mode: EditorMode) => {
+      this.editorMode = mode;
+      // End any chain on mode switch
+      this.chainAnchor = null;
+      this.cursorNatural = null;
+      // Remove existing drawing listeners by cloning the overlay
+      const newOverlay = overlay.cloneNode(false) as HTMLCanvasElement;
+      overlay.replaceWith(newOverlay);
+      // Reassign overlay reference to the new node — we need to re-set octx too
+      // Since we can't reassign const, rebuild bar content
+      bar.empty();
+      if (mode === "fog") {
+        renderFogToolbar(bar);
+      } else {
+        renderWallsToolbar(bar);
+      }
+      syncTabActive();
+      // redraw still works via closure referencing `octx` from the original overlay
+      // but overlay is now replaced; we need to use the new node
+      // Rebuild the redraw for the new overlay
+      const newOctx = (newOverlay as HTMLCanvasElement).getContext("2d")!;
+      const newRedraw = () => {
+        newOctx.clearRect(0, 0, newOverlay.width, newOverlay.height);
+        newOctx.globalAlpha = this.editorMode === "fog" ? 0.55 : 0.25;
+        newOctx.drawImage(this.fogCanvas, 0, 0);
+        newOctx.globalAlpha = 1;
+        for (const w of this.walls) {
+          newOctx.save();
+          newOctx.lineWidth = 3;
+          if (w.door) {
+            newOctx.strokeStyle = "#44aaff";
+            if (w.open) newOctx.setLineDash([8, 6]);
+          } else {
+            newOctx.strokeStyle = "#f5d90a";
+          }
+          newOctx.beginPath();
+          newOctx.moveTo(w.x1 * fogScale, w.y1 * fogScale);
+          newOctx.lineTo(w.x2 * fogScale, w.y2 * fogScale);
+          newOctx.stroke();
+          newOctx.setLineDash([]);
+          newOctx.restore();
+        }
+        if (this.editorMode === "walls" && this.chainAnchor && this.cursorNatural) {
+          newOctx.save();
+          newOctx.strokeStyle = this.wallsTool === "door" ? "#44aaff" : "#f5d90a";
+          newOctx.lineWidth = 2;
+          newOctx.setLineDash([6, 4]);
+          newOctx.beginPath();
+          newOctx.moveTo(this.chainAnchor.x * fogScale, this.chainAnchor.y * fogScale);
+          newOctx.lineTo(this.cursorNatural.x * fogScale, this.cursorNatural.y * fogScale);
+          newOctx.stroke();
+          newOctx.setLineDash([]);
+          newOctx.restore();
+        }
+      };
+      this.redrawOverlay = newRedraw;
+      newRedraw();
+      if (mode === "fog") {
+        this.setupFogDrawing(newOverlay, newRedraw, fogScale);
+      } else {
+        this.setupWallsDrawing(newOverlay, newRedraw, fogScale);
+      }
+    };
+
+    fogTabBtn.addEventListener("click", () => switchTab("fog"));
+    wallsTabBtn.addEventListener("click", () => switchTab("walls"));
+
+    // Start in fog mode
+    renderFogToolbar(bar);
   }
 
   private ctx(): CanvasRenderingContext2D {
@@ -157,9 +317,7 @@ export class MapFogModal extends Modal {
     }
   }
 
-  private setupDrawing(overlay: HTMLCanvasElement, redraw: () => void) {
-    const fogScale = this.fogCanvas.width / this.map.naturalWidth;
-
+  private setupFogDrawing(overlay: HTMLCanvasElement, redraw: () => void, fogScale: number) {
     const stampBrush = (fx: number, fy: number) => {
       const ctx = this.ctx();
       this.applyMode(ctx);
@@ -181,10 +339,72 @@ export class MapFogModal extends Modal {
       ctx.globalCompositeOperation = "source-over";
     };
 
+    const handleRoomClick = (fx: number, fy: number) => {
+      const fw = this.fogCanvas.width;
+      const fh = this.fogCanvas.height;
+
+      // Build blocked mask from sight-blocking walls
+      const blockCanvas = document.createElement("canvas");
+      blockCanvas.width = fw;
+      blockCanvas.height = fh;
+      const bctx = blockCanvas.getContext("2d")!;
+      bctx.fillStyle = "black";
+      const lineW = Math.max(3, this.panel.state.pxPerSquare * fogScale * 0.12);
+      bctx.lineWidth = lineW;
+      bctx.lineCap = "round";
+      bctx.strokeStyle = "black";
+      for (const w of this.walls) {
+        if (!blocksSight(w)) continue;
+        bctx.beginPath();
+        bctx.moveTo(w.x1 * fogScale, w.y1 * fogScale);
+        bctx.lineTo(w.x2 * fogScale, w.y2 * fogScale);
+        bctx.stroke();
+      }
+      const imgData = bctx.getImageData(0, 0, fw, fh);
+      const blocked = new Uint8Array(fw * fh);
+      for (let i = 0; i < fw * fh; i++) {
+        blocked[i] = imgData.data[i * 4 + 3] > 0 ? 1 : 0;
+      }
+
+      const region = floodRegion(blocked, fw, fh, fx, fy);
+      if (!region) {
+        new Notice("That point is inside a wall");
+        return;
+      }
+
+      const regionCanvas = document.createElement("canvas");
+      regionCanvas.width = fw;
+      regionCanvas.height = fh;
+      const rctx = regionCanvas.getContext("2d")!;
+      const rData = rctx.createImageData(fw, fh);
+      for (let i = 0; i < fw * fh; i++) {
+        if (region[i]) {
+          rData.data[i * 4] = 0;
+          rData.data[i * 4 + 1] = 0;
+          rData.data[i * 4 + 2] = 0;
+          rData.data[i * 4 + 3] = 255;
+        }
+      }
+      rctx.putImageData(rData, 0, 0);
+
+      const ctx = this.ctx();
+      this.applyMode(ctx);
+      ctx.drawImage(regionCanvas, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+
+      redraw();
+      this.commit();
+    };
+
     overlay.addEventListener("mousedown", (e: MouseEvent) => {
       if (e.button !== 0) return;
       e.preventDefault();
       const start = this.toFog(overlay, e.clientX, e.clientY);
+
+      if (this.tool === "room") {
+        handleRoomClick(start.x, start.y);
+        return;
+      }
 
       if (this.tool === "rect" || this.tool === "gridrect") {
         const snapToGrid = this.tool === "gridrect";
@@ -262,11 +482,130 @@ export class MapFogModal extends Modal {
     });
   }
 
+  private snapPoint(x: number, y: number): { x: number; y: number } {
+    const pps = this.panel.state.pxPerSquare;
+    const ox = this.panel.state.gridOffsetX;
+    const oy = this.panel.state.gridOffsetY;
+    return {
+      x: ox + Math.round((x - ox) / pps) * pps,
+      y: oy + Math.round((y - oy) / pps) * pps,
+    };
+  }
+
+  private toNatural(overlay: HTMLCanvasElement, clientX: number, clientY: number): { x: number; y: number } {
+    const fog = this.toFog(overlay, clientX, clientY);
+    const fogScale = this.fogCanvas.width / this.map.naturalWidth;
+    return { x: fog.x / fogScale, y: fog.y / fogScale };
+  }
+
+  private setupWallsDrawing(overlay: HTMLCanvasElement, redraw: () => void, fogScale: number) {
+    const distToSegment = (px: number, py: number, w: MapWall): number => {
+      const dx = w.x2 - w.x1;
+      const dy = w.y2 - w.y1;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) return Math.hypot(px - w.x1, py - w.y1);
+      const t = Math.max(0, Math.min(1, ((px - w.x1) * dx + (py - w.y1) * dy) / lenSq));
+      return Math.hypot(px - (w.x1 + t * dx), py - (w.y1 + t * dy));
+    };
+
+    overlay.addEventListener("mousemove", (e: MouseEvent) => {
+      this.cursorNatural = this.toNatural(overlay, e.clientX, e.clientY);
+      if (this.chainAnchor) redraw();
+    });
+
+    overlay.addEventListener("mouseleave", () => {
+      this.cursorNatural = null;
+      if (this.chainAnchor) redraw();
+    });
+
+    overlay.addEventListener("contextmenu", (e: MouseEvent) => {
+      e.preventDefault();
+      // Right-click ends the chain
+      if (this.chainAnchor) {
+        this.chainAnchor = null;
+        redraw();
+      }
+    });
+
+    overlay.addEventListener("mousedown", (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+
+      let nat = this.toNatural(overlay, e.clientX, e.clientY);
+      if (this.wallsSnap) nat = this.snapPoint(nat.x, nat.y);
+
+      if (this.wallsTool === "wall" || this.wallsTool === "door") {
+        if (!this.chainAnchor) {
+          this.chainAnchor = nat;
+          redraw();
+          return;
+        }
+        const anchor = this.chainAnchor;
+        // Ignore zero-length segments
+        if (Math.hypot(nat.x - anchor.x, nat.y - anchor.y) > 0.5) {
+          const wall: MapWall = {
+            x1: anchor.x,
+            y1: anchor.y,
+            x2: nat.x,
+            y2: nat.y,
+            ...(this.wallsTool === "door" ? { door: true, open: false } : {}),
+          };
+          this.walls = [...this.walls, wall];
+          void this.panel.commitWalls([...this.walls]);
+        }
+        this.chainAnchor = nat;
+        redraw();
+        return;
+      }
+
+      const hitRadius = 12 / fogScale;
+
+      if (this.wallsTool === "erase") {
+        let nearest: MapWall | null = null;
+        let nearestDist = Infinity;
+        for (const w of this.walls) {
+          const d = distToSegment(nat.x, nat.y, w);
+          if (d < hitRadius && d < nearestDist) {
+            nearestDist = d;
+            nearest = w;
+          }
+        }
+        if (nearest) {
+          this.walls = this.walls.filter((w) => w !== nearest);
+          void this.panel.commitWalls([...this.walls]);
+          redraw();
+        }
+        return;
+      }
+
+      if (this.wallsTool === "toggle") {
+        let nearest: MapWall | null = null;
+        let nearestDist = Infinity;
+        for (const w of this.walls) {
+          if (!w.door) continue;
+          const d = distToSegment(nat.x, nat.y, w);
+          if (d < hitRadius && d < nearestDist) {
+            nearestDist = d;
+            nearest = w;
+          }
+        }
+        if (nearest) {
+          nearest.open = !nearest.open;
+          void this.panel.commitWalls([...this.walls]);
+          redraw();
+        }
+        return;
+      }
+    });
+  }
+
   onClose() {
     // A drag can outlive the modal (Escape mid-stroke) — its listeners live on
     // document, not on the modal DOM.
     this.cleanupDrag?.();
     this.cleanupDrag = null;
+    this.chainAnchor = null;
+    this.cursorNatural = null;
     this.redrawOverlay = null;
     this.contentEl.empty();
   }
