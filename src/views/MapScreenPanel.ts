@@ -4,6 +4,8 @@ import type { DmControlPanel } from "./DmControlPanel";
 import { encodeForVaultUrl } from "./HydrusExplorerModal";
 import { ensureLocalCopy, type ResolvedHydrusRef } from "../hydrus/noteRefs";
 import { vaultPathFromUrl, type ClientInfo } from "../server";
+import { loadFogSidecar, saveFogSidecar, type FogAdapter } from "../map/fog";
+import { MapFogModal } from "./MapFogModal";
 import {
   clampPan,
   cssPixelsPerInch,
@@ -43,6 +45,7 @@ export class MapScreenPanel {
   state: StoredMapState = defaultMapState(0, 0);
   mapClients: ClientInfo[] = [];
   aoes: MapAoe[] = [];
+  fogDataUrl: string | null = null;
   private viewBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
   private aoeBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
   private redrawPreviewAoes: (() => void) | null = null;
@@ -88,6 +91,12 @@ export class MapScreenPanel {
         this.aoes = ((JSON.parse(aoeCache).payload as { aoes?: MapAoe[] })?.aoes ?? []);
       } catch { /* ignore */ }
     }
+    const fogCache = cache["map-fog"];
+    if (fogCache) {
+      try {
+        this.fogDataUrl = ((JSON.parse(fogCache).payload as { dataUrl?: string | null })?.dataUrl ?? null);
+      } catch { /* ignore */ }
+    }
     this.clampStateToViewport();
     debug("MapScreenPanel: restoreFromCache —", this.activeMap.url, this.state.mode, `${this.aoes.length} AoEs`);
   }
@@ -101,6 +110,9 @@ export class MapScreenPanel {
     this.broadcastConfig();
     this.broadcastView(true);
     if (this.aoes.length > 0) this.broadcastAoes(true);
+    // Unlike AoEs, null fog is still a signal — late joiners must clear any
+    // stale fog img rather than keep whatever they last rendered.
+    this.broadcastFog();
   }
 
   private broadcastShow() {
@@ -186,6 +198,23 @@ export class MapScreenPanel {
     void this.plugin.saveSettings();
   }
 
+  private fogAdapter(): FogAdapter {
+    return this.plugin.app.vault.adapter as unknown as FogAdapter;
+  }
+
+  broadcastFog() {
+    this.plugin.server?.broadcast({
+      type: "map-fog",
+      payload: { dataUrl: this.fogDataUrl, opacity: this.plugin.settings.mapFogTvOpacity },
+    });
+  }
+
+  async commitFog(dataUrl: string) {
+    this.fogDataUrl = dataUrl;
+    if (this.activeMap) await saveFogSidecar(this.fogAdapter(), this.activeMap.url, dataUrl);
+    this.broadcastFog();
+  }
+
   async setVaultMap(vaultPath: string, mediaType: "image" | "video") {
     const adapter = this.plugin.app.vault.adapter as { getResourcePath?: (p: string) => string };
     const resourceUrl = adapter.getResourcePath?.(vaultPath);
@@ -200,6 +229,7 @@ export class MapScreenPanel {
       ? { ...stored }
       : defaultMapState(dims.w, dims.h, this.plugin.settings.mapDefaultPxPerSquare);
     this.activeMap = { url, mediaType, naturalWidth: dims.w, naturalHeight: dims.h };
+    this.fogDataUrl = await loadFogSidecar(this.fogAdapter(), url);
     this.aoes = [];
     this.previewZoom = 1;
     this.previewPanX = 0;
@@ -210,6 +240,7 @@ export class MapScreenPanel {
     this.broadcastConfig();
     this.broadcastView(true);
     this.broadcastAoes(true);
+    this.broadcastFog();
     this.persistState();
     this.host.render();
   }
@@ -218,6 +249,7 @@ export class MapScreenPanel {
     debug("MapScreenPanel: stopMap");
     this.activeMap = null;
     this.aoes = [];
+    this.fogDataUrl = null;
     this.plugin.server?.broadcast({ type: "map-clear", payload: {} });
     this.host.render();
   }
@@ -392,6 +424,12 @@ export class MapScreenPanel {
       this.broadcastView(true);
       this.persistState();
       this.host.render();
+    });
+
+    const fogBtn = btnRow.createEl("button", { text: this.fogDataUrl ? "Fog ●" : "Fog" });
+    fogBtn.title = "Edit fog of war";
+    fogBtn.addEventListener("click", () => {
+      new MapFogModal(this.plugin.app, this.plugin, this, map).open();
     });
 
     this.renderGridControls(section);

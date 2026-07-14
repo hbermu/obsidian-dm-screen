@@ -2002,3 +2002,41 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ─── Map fog modal ─────────────────────────────────────────────── */
+.dm-fog-modal {
+  width: 90vw;
+  max-width: 1400px;
+}
+.dm-fog-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.dm-fog-toolbar button.dm-fog-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.dm-fog-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--background-secondary);
+}
+.dm-fog-stage img,
+.dm-fog-stage video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.dm-fog-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}

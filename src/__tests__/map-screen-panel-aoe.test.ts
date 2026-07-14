@@ -18,11 +18,12 @@ function makePanel() {
       tvHeight: 1080,
       hydrusDefaultLoop: true,
       hydrusDefaultMuted: true,
+      mapFogTvOpacity: 1,
     },
     server: { broadcast: (msg: Broadcast) => broadcasts.push(msg) },
     saveSettings: () => Promise.resolve(),
     broadcastMapCalibration: () => {},
-    app: {},
+    app: { vault: { adapter: { exists: () => Promise.resolve(false) } } },
   };
   const host = { render: vi.fn() };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,12 +95,12 @@ describe("MapScreenPanel AoE lifecycle", () => {
     const { panel, broadcasts } = makePanel();
     panel.activeMap = { url: "/vault/m.jpg", mediaType: "image", naturalWidth: 4480, naturalHeight: 7000 };
     panel.republish();
-    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view"]);
+    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view", "map-fog"]);
 
     broadcasts.length = 0;
     panel.aoes = [AOE];
     panel.republish();
-    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view", "map-aoe-sync"]);
+    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view", "map-aoe-sync", "map-fog"]);
     expect(broadcasts[3].payload).toEqual({ aoes: [AOE] });
   });
 
