@@ -161,6 +161,9 @@ class MapScreen {
         this.aoes = ((msg.payload as { aoes?: unknown }).aoes ?? []) as MapAoe[];
         this.applyLayout();
         break;
+      case "map-fog":
+        this.showFog(msg.payload as { dataUrl?: string | null; opacity?: number });
+        break;
       case "map-clear":
         this.clearMap();
         break;
@@ -211,6 +214,23 @@ class MapScreen {
     this.applyLayout();
   }
 
+  private showFog(payload: { dataUrl?: string | null; opacity?: number }) {
+    const fog = document.getElementById("map-fog") as HTMLImageElement;
+    if (!payload.dataUrl) {
+      fog.src = "";
+      fog.style.display = "none";
+      return;
+    }
+    const safeSrc = safePlayerUrl(payload.dataUrl, "image");
+    if (!safeSrc) {
+      console.warn("[Map Screen] Rejected fog data URL");
+      return;
+    }
+    fog.src = safeSrc;
+    fog.style.opacity = String(payload.opacity ?? 1);
+    fog.style.display = "block";
+  }
+
   private clearMap() {
     const video = document.getElementById("map-video") as HTMLVideoElement;
     const image = document.getElementById("map-image") as HTMLImageElement;
@@ -219,6 +239,9 @@ class MapScreen {
     video.style.display = "none";
     image.src = "";
     image.style.display = "none";
+    const fog = document.getElementById("map-fog") as HTMLImageElement;
+    fog.src = "";
+    fog.style.display = "none";
     this.media = null;
     this.aoes = [];
     document.getElementById("waiting-screen")!.style.display = "flex";

@@ -45,6 +45,7 @@
 15. The fog editing modal (`MapFogModal`) shall display the map as a background and an overlay canvas for drawing. It shall expose reveal/cover mode buttons and brush/rectangle/grid-cell tool buttons. Drawing completes on mouseup: it calls `commitFog(dataUrl)` which saves the PNG to `.dm-screen/fog/<sidecar>.png` in the vault and immediately broadcasts `map-fog` with the data URL and the current `mapFogTvOpacity`.
 16. `broadcastFog()` shall send `{ type: "map-fog", payload: { dataUrl, opacity } }` where `opacity` is `plugin.settings.mapFogTvOpacity`. When `fogDataUrl` is `null`, it still broadcasts (signalling "no fog").
 17. The Settings tab shall expose a "Fog opacity on the map screen" slider (0.3–1, step 0.05) that updates `mapFogTvOpacity`, saves settings, and immediately re-broadcasts fog via `broadcastFog()`.
+18. When the map client receives `map-fog`, it shall validate `payload.dataUrl` with `safePlayerUrl(..., "image")`. If the URL is valid, it shall set `#map-fog`'s `src` and `opacity` from the payload (defaulting opacity to `1`) and show the element; if `payload.dataUrl` is null/absent, it shall clear `src` and hide the element; if validation fails, it shall log a warning and leave the current fog state unchanged. On `map-clear`, the client shall also clear and hide `#map-fog`.
 
 ## Broadcast / IPC
 
@@ -55,7 +56,7 @@ All map traffic uses the `map` channel (types prefixed `map-`); the full table l
 - `src/__tests__/map-transform.test.ts` — scale, translation, viewport-aware pan clamping, grid phase, calibration math
 - `src/__tests__/map-screen-panel-aoe.test.ts` — pan re-clamp on restore (requirement 13); AoE lifecycle per `aoe-overlays.md`; `republish` broadcast sequence
 - `src/__tests__/map-fog-panel.test.ts` — fog lifecycle: `broadcastFog`, `commitFog`, `stopMap` clear, `restoreFromCache` recovery, `republish` re-broadcast
-- `src/__tests__/server-map-channel.test.ts` — channel-filtered broadcast and replay, channel-scoped cache purge, allowlist map slot
+- `src/__tests__/server-map-channel.test.ts` — channel-filtered broadcast and replay, channel-scoped cache purge (including `map-fog`), allowlist map slot
 - `src/__tests__/bundle-smoke.integration.test.ts` — production build inlines the map bundle
 
 ## Non-goals
