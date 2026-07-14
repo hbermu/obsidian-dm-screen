@@ -65,3 +65,12 @@ export interface MapVision {
   sizeFt: number;
   featherFt: number;
 }
+
+export interface MapWall {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  door?: boolean;
+  open?: boolean;
+}
