@@ -1119,3 +1119,23 @@ git -c url."ssh://git@ssh.github.com:443/".insteadOf="git@github.com:" push -u o
 - Task 6 (visual) depends on Task 5 (client rendering). Task 7 needs the final identifiers from 1–5.
 - Implementer subagents MUST NOT create native tasks (the commit hook blocks commits while tasks are open — the coordinator owns task state).
 - If the local `bash-precheck.sh` hook rejects a `SPEC_NOT_NEEDED=1` intermediate commit for another reason, read the hook message and fix the underlying violation — never bypass.
+
+---
+
+# Extension: Dynamic Character Vision (same PR)
+
+**Goal:** Feet-sized vision shapes with feathered edges, live-movable above the base mask, bakeable into it; plus a grid-rect quick-reveal tool in the fog modal.
+
+**Data model:** `MapVision { id, shape: "circle" | "square", x, y, sizeFt, featherFt }` in `src/map/types.ts`. Coordinates in map-natural px (like `MapAoe`). Vision range `sizeFt` fully revealed; alpha fades to 0 from `sizeFt` to `sizeFt + featherFt`. `ftToPx = pxPerSquare / 5`.
+
+**Rendering:** `src/map/vision.ts` — `eraseVision(ctx, vision, scale, pxPerSquare)` composites `destination-out`: circle = radial gradient (alpha 1 → 0 across the feather band); square = solid rect of half-side `sizeFt` blurred via `ctx.filter = blur(featherPx/2)`. Used by the map client composite AND the DM bake.
+
+**Client:** `#map-fog` becomes a `<canvas>` (same id/geometry). The client keeps the last fog Image (from `map-fog`, still `safePlayerUrl`-validated) and the vision list (new `map-vision { visions }` message, cached/purged like other `map-*`), and recomposites: draw fog image, erase each vision. Opacity via canvas style.
+
+**DM panel:** `visions: MapVision[]` (session state like AoEs; reset on map apply, cached via `map-vision` replay, republished). Vision section: Add Vision (circle/square), rows (shape, sizeFt, featherFt, remove), Clear All, **Bake into fog** (loads `fogDataUrl` into a canvas, erases every vision at fog scale, `commitFog`, clears the vision list). Preview: draggable dots on the pan-preview stage (AoE-dot pattern, throttled `map-vision` broadcasts).
+
+**Fog modal:** 4th tool "Grid rect" — drag a marquee, on mouseup paint/erase ALL grid cells intersecting the rect (cells via `gridCellRectAt` corners).
+
+**Tests:** channel replay/purge for `map-vision`; panel lifecycle (broadcast shape, reset on apply, restore, republish, bake commits + clears); visual: vision hole with feathered edge over full fog (+ regen fog baselines if the img→canvas swap diffs).
+
+**Specs:** extend `map-screen/fog-of-war.md` (vision requirements + bake), `websocket-protocol.md` row `map-vision`. Beta: bump to `0.28.0-beta.2` after implementation.
