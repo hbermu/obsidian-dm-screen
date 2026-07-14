@@ -365,6 +365,17 @@ export class MapFogModal extends Modal {
       for (let i = 0; i < fw * fh; i++) {
         blocked[i] = imgData.data[i * 4 + 3] > 0 ? 1 : 0;
       }
+      // Seal the map border so rooms bounded by walls that stop at the edge
+      // don't leak the fill around the outside — mirrors how visibilityPolygon
+      // closes with the bounds rect.
+      for (let x = 0; x < fw; x++) {
+        blocked[x] = 1;
+        blocked[(fh - 1) * fw + x] = 1;
+      }
+      for (let y = 0; y < fh; y++) {
+        blocked[y * fw] = 1;
+        blocked[y * fw + fw - 1] = 1;
+      }
 
       const region = floodRegion(blocked, fw, fh, fx, fy);
       if (!region) {
@@ -590,7 +601,8 @@ export class MapFogModal extends Modal {
           }
         }
         if (nearest) {
-          nearest.open = !nearest.open;
+          const toggled = nearest;
+          this.walls = this.walls.map((w) => (w === toggled ? { ...w, open: !w.open } : w));
           void this.panel.commitWalls([...this.walls]);
           redraw();
         }
