@@ -5,7 +5,7 @@ import { fogCanvasSize, gridCellRectAt } from "../map/fog";
 import { vaultPathFromUrl } from "../server";
 import { debug } from "../debug";
 
-type FogTool = "brush" | "rect" | "cell";
+type FogTool = "brush" | "rect" | "cell" | "gridrect";
 type FogMode = "reveal" | "cover";
 
 export class MapFogModal extends Modal {
@@ -64,8 +64,8 @@ export class MapFogModal extends Modal {
       modeBtns[m].addEventListener("click", () => { this.mode = m; syncActive(); });
     }
     bar.createSpan({ text: "·", cls: "dm-status-detail" });
-    const toolLabels: Record<FogTool, string> = { brush: "Brush", rect: "Rectangle", cell: "Grid cell" };
-    for (const t of ["brush", "rect", "cell"] as FogTool[]) {
+    const toolLabels: Record<FogTool, string> = { brush: "Brush", rect: "Rectangle", cell: "Grid cell", gridrect: "Grid rect" };
+    for (const t of ["brush", "rect", "cell", "gridrect"] as FogTool[]) {
       toolBtns[t] = bar.createEl("button", { text: toolLabels[t] });
       toolBtns[t].addEventListener("click", () => { this.tool = t; syncActive(); });
     }
@@ -186,7 +186,13 @@ export class MapFogModal extends Modal {
       e.preventDefault();
       const start = this.toFog(overlay, e.clientX, e.clientY);
 
-      if (this.tool === "rect") {
+      if (this.tool === "rect" || this.tool === "gridrect") {
+        const snapToGrid = this.tool === "gridrect";
+        const cfg = {
+          pxPerSquare: this.panel.state.pxPerSquare,
+          gridOffsetX: this.panel.state.gridOffsetX,
+          gridOffsetY: this.panel.state.gridOffsetY,
+        };
         const onMove = (me: MouseEvent) => {
           const cur = this.toFog(overlay, me.clientX, me.clientY);
           redraw();
@@ -204,12 +210,22 @@ export class MapFogModal extends Modal {
           const end = this.toFog(overlay, me.clientX, me.clientY);
           const ctx = this.ctx();
           this.applyMode(ctx);
-          ctx.fillRect(
-            Math.min(start.x, end.x),
-            Math.min(start.y, end.y),
-            Math.abs(end.x - start.x),
-            Math.abs(end.y - start.y)
-          );
+          if (snapToGrid) {
+            const minX = Math.min(start.x, end.x);
+            const minY = Math.min(start.y, end.y);
+            const maxX = Math.max(start.x, end.x);
+            const maxY = Math.max(start.y, end.y);
+            const a = gridCellRectAt(minX / fogScale, minY / fogScale, cfg);
+            const b = gridCellRectAt(maxX / fogScale, maxY / fogScale, cfg);
+            ctx.fillRect(a.x * fogScale, a.y * fogScale, (b.x + b.w - a.x) * fogScale, (b.y + b.h - a.y) * fogScale);
+          } else {
+            ctx.fillRect(
+              Math.min(start.x, end.x),
+              Math.min(start.y, end.y),
+              Math.abs(end.x - start.x),
+              Math.abs(end.y - start.y)
+            );
+          }
           ctx.globalCompositeOperation = "source-over";
           redraw();
           this.commit();

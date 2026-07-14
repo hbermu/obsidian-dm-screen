@@ -4,7 +4,7 @@ import type { DmControlPanel } from "./DmControlPanel";
 import { encodeForVaultUrl } from "./HydrusExplorerModal";
 import { ensureLocalCopy, type ResolvedHydrusRef } from "../hydrus/noteRefs";
 import { vaultPathFromUrl, type ClientInfo } from "../server";
-import { loadFogSidecar, saveFogSidecar, type FogAdapter } from "../map/fog";
+import { fogCanvasSize, loadFogSidecar, saveFogSidecar, type FogAdapter } from "../map/fog";
 import { MapFogModal } from "./MapFogModal";
 import {
   clampPan,
@@ -13,8 +13,9 @@ import {
   profileKey,
   rotatePoint,
 } from "../map/transform";
-import type { AoePreset, AoeShape, MapAoe, MapRotation, StoredMapState } from "../map/types";
+import type { AoePreset, AoeShape, MapAoe, MapRotation, MapVision, StoredMapState } from "../map/types";
 import { renderAoe } from "../map/aoe";
+import { eraseVision } from "../map/vision";
 import { SpellAoeModal } from "./SpellAoeModal";
 import { MapCalibrationModal } from "./MapCalibrationModal";
 import { debug } from "../debug";
@@ -39,15 +40,18 @@ const SHAPE_PRESETS: AoePreset[] = [
 ];
 
 let nextAoeId = 1;
+let nextVisionId = 1;
 
 export class MapScreenPanel {
   activeMap: ActiveMap | null = null;
   state: StoredMapState = defaultMapState(0, 0);
   mapClients: ClientInfo[] = [];
   aoes: MapAoe[] = [];
+  visions: MapVision[] = [];
   fogDataUrl: string | null = null;
   private viewBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
   private aoeBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+  private visionBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
   private redrawPreviewAoes: (() => void) | null = null;
   private previewZoom = 1;
   private previewPanX = 0;
@@ -91,6 +95,12 @@ export class MapScreenPanel {
         this.aoes = ((JSON.parse(aoeCache).payload as { aoes?: MapAoe[] })?.aoes ?? []);
       } catch { /* ignore */ }
     }
+    const visionCache = cache["map-vision"];
+    if (visionCache) {
+      try {
+        this.visions = ((JSON.parse(visionCache).payload as { visions?: MapVision[] })?.visions ?? []);
+      } catch { /* ignore */ }
+    }
     const fogCache = cache["map-fog"];
     if (fogCache) {
       try {
@@ -110,6 +120,7 @@ export class MapScreenPanel {
     this.broadcastConfig();
     this.broadcastView(true);
     if (this.aoes.length > 0) this.broadcastAoes(true);
+    if (this.visions.length > 0) this.broadcastVisions(true);
     // Unlike AoEs, null fog is still a signal — late joiners must clear any
     // stale fog img rather than keep whatever they last rendered.
     this.broadcastFog();
@@ -174,6 +185,25 @@ export class MapScreenPanel {
     }, VIEW_BROADCAST_THROTTLE_MS);
   }
 
+  broadcastVisions(immediate = false) {
+    const send = () => {
+      this.plugin.server?.broadcast({ type: "map-vision", payload: { visions: this.visions } });
+    };
+    if (immediate) {
+      if (this.visionBroadcastTimer) {
+        clearTimeout(this.visionBroadcastTimer);
+        this.visionBroadcastTimer = null;
+      }
+      send();
+      return;
+    }
+    if (this.visionBroadcastTimer) return;
+    this.visionBroadcastTimer = setTimeout(() => {
+      this.visionBroadcastTimer = null;
+      send();
+    }, VIEW_BROADCAST_THROTTLE_MS);
+  }
+
   private clampStateToViewport() {
     if (!this.activeMap || this.state.mode !== "physical") return;
     const client = this.effectiveMapClient();
@@ -231,6 +261,7 @@ export class MapScreenPanel {
     this.activeMap = { url, mediaType, naturalWidth: dims.w, naturalHeight: dims.h };
     this.fogDataUrl = await loadFogSidecar(this.fogAdapter(), url);
     this.aoes = [];
+    this.visions = [];
     this.previewZoom = 1;
     this.previewPanX = 0;
     this.previewPanY = 0;
@@ -240,6 +271,7 @@ export class MapScreenPanel {
     this.broadcastConfig();
     this.broadcastView(true);
     this.broadcastAoes(true);
+    this.broadcastVisions(true);
     this.broadcastFog();
     this.persistState();
     this.host.render();
@@ -249,6 +281,7 @@ export class MapScreenPanel {
     debug("MapScreenPanel: stopMap");
     this.activeMap = null;
     this.aoes = [];
+    this.visions = [];
     this.fogDataUrl = null;
     this.plugin.server?.broadcast({ type: "map-clear", payload: {} });
     this.host.render();
@@ -435,6 +468,7 @@ export class MapScreenPanel {
     this.renderGridControls(section);
     this.renderPanPreview(section, map);
     this.renderAoeControls(section, map);
+    this.renderVisionControls(section, map);
   }
 
   private renderGridControls(section: HTMLElement) {
@@ -534,6 +568,22 @@ export class MapScreenPanel {
       for (const aoe of this.aoes) {
         renderAoe(ctx, aoe, s, 0, 0, this.state.pxPerSquare, 0);
       }
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = "#ffd23f";
+      ctx.lineWidth = 2;
+      const ftToPxScaled = (this.state.pxPerSquare / 5) * s;
+      for (const v of this.visions) {
+        const radius = v.sizeFt * ftToPxScaled;
+        ctx.beginPath();
+        if (v.shape === "circle") {
+          ctx.arc(v.x * s, v.y * s, radius, 0, Math.PI * 2);
+        } else {
+          const half = radius;
+          ctx.rect(v.x * s - half, v.y * s - half, half * 2, half * 2);
+        }
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
     };
 
     const sideways = rotation % 180 !== 0;
@@ -757,6 +807,41 @@ export class MapScreenPanel {
       });
     }
 
+    for (const vision of this.visions) {
+      const dot = stage.createDiv("dm-map-vision-dot");
+      dot.title = `${vision.shape} ${vision.sizeFt}ft vision — drag to move`;
+      const positionVisionDot = () => {
+        dot.style.left = `${(vision.x / nw) * 100}%`;
+        dot.style.top = `${(vision.y / nh) * 100}%`;
+      };
+      positionVisionDot();
+      dot.addEventListener("mousedown", (ev: MouseEvent) => {
+        if (ev.button !== 0) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (!stage.offsetWidth) return;
+        const startX = ev.clientX;
+        const startY = ev.clientY;
+        const startVX = vision.x;
+        const startVY = vision.y;
+        const onMove = (me: MouseEvent) => {
+          const d = deltaToMap(me.clientX - startX, me.clientY - startY);
+          vision.x = Math.max(0, Math.min(nw, startVX + d.x));
+          vision.y = Math.max(0, Math.min(nh, startVY + d.y));
+          positionVisionDot();
+          redrawAoes();
+          this.broadcastVisions();
+        };
+        const onUp = () => {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          this.broadcastVisions(true);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    }
+
     if (this.state.mode !== "physical") return;
 
     if (!calibrated) {
@@ -968,6 +1053,125 @@ export class MapScreenPanel {
       ...(label ? { label } : {}),
     });
     this.broadcastAoes(true);
+    this.host.render();
+  }
+
+  private renderVisionControls(section: HTMLElement, map: ActiveMap) {
+    const wrap = section.createDiv("dm-map-aoe-section");
+    const header = wrap.createDiv("dm-layer-btn-row");
+    header.createSpan({ text: "Vision", cls: "dm-status-detail" });
+
+    const addBtn = header.createEl("button", { text: "Add Vision" });
+    addBtn.addEventListener("click", (evt: MouseEvent) => {
+      const menu = new Menu();
+      for (const shape of ["circle", "square"] as Array<"circle" | "square">) {
+        menu.addItem((item) =>
+          item.setTitle(`${shape === "circle" ? "Circle" : "Square"} 30 ft`).onClick(() => {
+            this.visions.push({
+              id: `vision-${nextVisionId++}`,
+              shape,
+              x: map.naturalWidth / 2,
+              y: map.naturalHeight / 2,
+              sizeFt: 30,
+              featherFt: 5,
+            });
+            this.broadcastVisions(true);
+            this.host.render();
+          })
+        );
+      }
+      menu.showAtMouseEvent(evt);
+    });
+
+    if (this.visions.length === 0) return;
+
+    const bakeBtn = header.createEl("button", { text: "Bake into fog" });
+    bakeBtn.title = "Burns current vision into the persistent mask and clears the live layer";
+    bakeBtn.addEventListener("click", () => { void this.bakeVisions(map); });
+
+    const clearBtn = header.createEl("button", { text: "Clear All" });
+    clearBtn.addEventListener("click", () => {
+      this.visions = [];
+      this.broadcastVisions(true);
+      this.host.render();
+    });
+
+    for (const vision of this.visions) {
+      const row = wrap.createDiv("dm-map-aoe-row");
+
+      const shapeSelect = row.createEl("select");
+      for (const shape of ["circle", "square"] as Array<"circle" | "square">) {
+        shapeSelect.createEl("option", { text: shape, value: shape });
+      }
+      shapeSelect.value = vision.shape;
+      shapeSelect.addEventListener("change", () => {
+        vision.shape = shapeSelect.value as "circle" | "square";
+        this.broadcastVisions(true);
+        this.host.render();
+      });
+
+      const sizeInput = row.createEl("input", { type: "number" });
+      sizeInput.value = String(vision.sizeFt);
+      sizeInput.min = "5";
+      sizeInput.step = "5";
+      sizeInput.title = "Vision range (ft)";
+      sizeInput.addEventListener("change", () => {
+        const v = parseFloat(sizeInput.value);
+        if (!Number.isFinite(v) || v <= 0) return;
+        vision.sizeFt = v;
+        this.broadcastVisions(true);
+        this.redrawPreviewAoes?.();
+      });
+      row.createSpan({ text: "ft", cls: "dm-status-detail" });
+
+      const featherInput = row.createEl("input", { type: "number" });
+      featherInput.value = String(vision.featherFt);
+      featherInput.min = "0";
+      featherInput.step = "5";
+      featherInput.title = "Feather (ft)";
+      featherInput.addEventListener("change", () => {
+        const v = parseFloat(featherInput.value);
+        if (!Number.isFinite(v) || v < 0) return;
+        vision.featherFt = v;
+        this.broadcastVisions(true);
+      });
+      row.createSpan({ text: "feather", cls: "dm-status-detail" });
+
+      const removeBtn = row.createEl("button", { text: "✕" });
+      removeBtn.addEventListener("click", () => {
+        this.visions = this.visions.filter((v) => v.id !== vision.id);
+        this.broadcastVisions(true);
+        this.host.render();
+      });
+    }
+  }
+
+  async bakeVisions(map: ActiveMap) {
+    const { width, height } = fogCanvasSize(map.naturalWidth, map.naturalHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d")!;
+
+    if (this.fogDataUrl) {
+      await new Promise<void>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve();
+        };
+        img.src = this.fogDataUrl!;
+      });
+    }
+
+    const scale = canvas.width / map.naturalWidth;
+    for (const v of this.visions) {
+      eraseVision(ctx, v, scale, this.state.pxPerSquare);
+    }
+
+    await this.commitFog(canvas.toDataURL("image/png"));
+    this.visions = [];
+    this.broadcastVisions(true);
     this.host.render();
   }
 }

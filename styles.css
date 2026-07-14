@@ -1958,6 +1958,17 @@
   z-index: 5;
 }
 
+.dm-map-vision-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #ffd23f;
+  border: 2px dashed rgba(0, 0, 0, 0.7);
+  transform: translate(-50%, -50%) rotate(45deg) scale(calc(1 / var(--dm-map-zoom, 1)));
+  cursor: move;
+  z-index: 5;
+}
+
 .dm-map-aoe-rot-handle {
   position: absolute;
   width: 8px;

@@ -6,7 +6,7 @@
 
 - `src/map/fog.ts` — `FOG_RESOLUTION`, `fogCanvasSize`, `fogSidecarPath`, `gridCellRectAt`, `loadFogSidecar`, `saveFogSidecar`, `FogAdapter`, `CellRect`
 - `src/views/MapFogModal.ts` — the editing modal (toolbar, stage, drawing handlers, drag cleanup)
-- `src/views/MapScreenPanel.ts` — `fogDataUrl`, `broadcastFog`, `commitFog`, sidecar load in `setVaultMap`, restore in `restoreFromCache`, re-emit in `republish`, reset in `stopMap`, the Fog button
+- `src/views/MapScreenPanel.ts` — `fogDataUrl`, `broadcastFog`, `commitFog`, sidecar load in `setVaultMap`, restore in `restoreFromCache`, re-emit in `republish`, reset in `stopMap`, the Fog button; `visions`, `broadcastVisions`, `bakeVisions`, `renderVisionControls`, vision dots in `renderPanPreview`
 - `src/map/map.ts` — `showFog`, `recompositeFog`, fog/vision clearing in `clearMap`
 - `src/map/vision.ts` — `eraseVision`: canvas compositor that punches feathered holes through the fog for each `MapVision`
 - `src/map/types.ts` — `MapVision` interface
@@ -21,7 +21,7 @@
 
 1. While a map is active, the Map Screen section shall render a Fog button that opens `MapFogModal`; the label reads `Fog ●` when the map has fog and `Fog` otherwise.
 2. The fog mask shall be an offscreen canvas of width `1024` (`FOG_RESOLUTION`) and height `max(1, round(1024 × naturalHeight/naturalWidth))`; black = hidden, transparent = revealed. A map with no stored fog starts fully transparent.
-3. The modal shall offer Reveal/Cover modes × Brush (stamped circles sized by a 2–15% slider), Rectangle (dashed marquee — `#7bd88f` reveal / `#f97583` cover — committed on mouseup), and Grid cell (whole cells snapped via `gridCellRectAt` from the map's `pxPerSquare`/`gridOffsetX`/`gridOffsetY`) tools, plus Reveal All and Cover All. Reveal composites with `destination-out`; Cover paints opaque black with `source-over`. The mask renders at 0.55 alpha inside the modal so the DM sees the map beneath.
+3. The modal shall offer Reveal/Cover modes × Brush (stamped circles sized by a 2–15% slider), Rectangle (dashed marquee — `#7bd88f` reveal / `#f97583` cover — committed on mouseup), Grid cell (whole cells snapped via `gridCellRectAt`), and Grid rect (same dashed marquee as Rectangle but the committed rect is snapped to whole grid cells: the corners are each snapped with `gridCellRectAt` and the fill covers from the top-left cell's origin to the bottom-right cell's far edge) tools, plus Reveal All and Cover All. Reveal composites with `destination-out`; Cover paints opaque black with `source-over`. The mask renders at 0.55 alpha inside the modal so the DM sees the map beneath.
 4. When a stroke completes (mouseup) or Reveal All / Cover All is clicked, the modal shall call `commitFog`, which re-encodes the mask as a PNG data URL, writes the sidecar, and broadcasts `map-fog { dataUrl, opacity: mapFogTvOpacity }`.
 5. The sidecar shall live at `.dm-screen/fog/<tail>-<fnv1a(mapUrl)>.png`, where `<tail>` is the sanitized last 60 characters of the decoded vault path (fallback `x` when sanitization strips everything) — deterministic per map URL, identical for note-image and Hydrus-cached maps.
 6. When a map is applied, `setVaultMap` shall load the sidecar (dotfolder-safe `adapter.exists` + `readBinary`) into `fogDataUrl` (or null) and broadcast `map-fog` alongside the other map messages.
@@ -48,9 +48,19 @@ Full channel routing in `../player-server/websocket-protocol.md`.
 - `src/__tests__/server-map-channel.test.ts` — `map-fog` and `map-vision` replay to late joiners and purge on `map-clear`
 - `test/visual/map-fog.spec.ts` — Playwright rendering: full fog, revealed hole, cleared fog, physical mode
 
+## DM vision controls
+
+The Map Screen section exposes a Vision subsystem below AoE Overlays while a map is active.
+
+13. The DM panel shall render a Vision section with an Add Vision menu (Circle 30 ft / Square 30 ft); new visions spawn at the map center with `sizeFt: 30` and `featherFt: 5`.
+14. When visions exist the section shall also render a Bake into fog button and a Clear All button; Bake composites all active visions onto the persistent fog mask (building a canvas, drawing the existing fog if present, erasing each vision with `eraseVision`, then calling `commitFog`) and clears the live vision list; Clear All empties the list and broadcasts immediately.
+15. Each vision row shall expose: shape select (circle / square), sizeFt number input (min 5 step 5, title "Vision range (ft)"), featherFt number input (min 0 step 5, title "Feather (ft)"), and a remove ✕ button; each change broadcasts `map-vision` immediately.
+16. Each vision shall carry a draggable dot (`.dm-map-vision-dot`) in the pan preview positioned at `(x/nw, y/nh)` percent; left-drag moves the vision (same `deltaToMap` + clamp pattern as AoE dots), throttled broadcast during drag, immediate on mouseup.
+17. The `redrawAoes` canvas shall also draw a dashed `#ffd23f` 2px outline for each vision: arc for circle, rect for square, at `sizeFt * (pxPerSquare/5) * s` radius/half-side.
+18. `broadcastVisions(immediate?)` shall follow the same throttle pattern as `broadcastAoes`; `setVaultMap` resets `this.visions = []` and calls `broadcastVisions(true)`; `stopMap` resets `this.visions`; `restoreFromCache` recovers from the `map-vision` slot; `republish()` re-broadcasts visions when non-empty.
+
 ## Non-goals
 
-- DM UI for managing vision shapes — `map-vision` is sent by external tooling; the plugin does not yet ship a vision editor.
 - Fog on the player screen at `/` (it has its own per-layer fog, `../fog-of-war/overview.md`).
 - Deleting sidecars from the UI. Stale fog files are cleaned up manually in `.dm-screen/fog/`.
 - Undo history inside the modal. Strokes are destructive; Reveal All / Cover All are the recovery tools.
