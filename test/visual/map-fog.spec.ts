@@ -39,8 +39,8 @@ async function waitForMapImageLoaded(page: import("@playwright/test").Page) {
 
 async function waitForFogLoaded(page: import("@playwright/test").Page) {
   await page.waitForFunction(() => {
-    const fog = document.getElementById("map-fog") as HTMLImageElement | null;
-    return fog !== null && fog.style.display !== "none" && fog.complete && fog.naturalWidth > 0;
+    const fog = document.getElementById("map-fog") as HTMLCanvasElement | null;
+    return fog !== null && fog.style.display !== "none" && fog.width > 0;
   });
 }
 

@@ -56,3 +56,12 @@ export interface AoePreset {
   color: string;
   opacity: number;
 }
+
+export interface MapVision {
+  id: string;
+  shape: "circle" | "square";
+  x: number;
+  y: number;
+  sizeFt: number;
+  featherFt: number;
+}
