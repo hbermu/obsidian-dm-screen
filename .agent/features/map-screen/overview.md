@@ -42,10 +42,7 @@
 12. The map screen shall render a fullscreen toggle button and the same disconnect-overlay/reconnect behaviour as the player screen (`../player-server/websocket-protocol.md` requirement 8).
 13. In physical mode, `clampPan` shall prevent the viewport from extending past the map edges: the pan is constrained so that no black (empty) region is visible; when the map is smaller than the visible window on an axis (including a degenerate scale), the pan is forced to the centre of that axis. The pan is re-clamped whenever it could go stale: on map apply, on cache restore, on scale-mode switch, and on rotation change.
 14. While a map is active, the DM section shall expose an AoE Overlays section; the full contract (data model, spell catalog, controls, rendering, preview interactions, broadcast cadence, lifecycle) is specified in `aoe-overlays.md`.
-15. The fog editing modal (`MapFogModal`) shall display the map as a background and an overlay canvas for drawing. It shall expose reveal/cover mode buttons and brush/rectangle/grid-cell tool buttons. Drawing completes on mouseup: it calls `commitFog(dataUrl)` which saves the PNG to `.dm-screen/fog/<sidecar>.png` in the vault and immediately broadcasts `map-fog` with the data URL and the current `mapFogTvOpacity`.
-16. `broadcastFog()` shall send `{ type: "map-fog", payload: { dataUrl, opacity } }` where `opacity` is `plugin.settings.mapFogTvOpacity`. When `fogDataUrl` is `null`, it still broadcasts (signalling "no fog").
-17. The Settings tab shall expose a "Fog opacity on the map screen" slider (0.3–1, step 0.05) that updates `mapFogTvOpacity`, saves settings, and immediately re-broadcasts fog via `broadcastFog()`.
-18. When the map client receives `map-fog`, it shall validate `payload.dataUrl` with `safePlayerUrl(..., "image")`. If the URL is valid, it shall set `#map-fog`'s `src` and `opacity` from the payload (defaulting opacity to `1`) and show the element; if `payload.dataUrl` is null/absent, it shall clear `src` and hide the element; if validation fails, it shall log a warning and leave the current fog state unchanged. On `map-clear`, the client shall also clear and hide `#map-fog`.
+15. While a map is active, the DM section shall expose fog of war editing and the map client shall render the fog mask; the full contract lives in `fog-of-war.md`.
 
 ## Broadcast / IPC
 

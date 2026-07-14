@@ -26,7 +26,7 @@
 6. When the player side receives a message whose `type` is not in its known set, it shall log `[Player Screen] Unknown message type:` and ignore the payload (no throw, no disconnect).
 7. When the player side fails to parse a message as JSON, it shall log the failure and ignore the message.
 8. When the WebSocket closes on the player side after the player has connected at least once, the player shall display a full-screen `Disconnected` overlay and attempt to reconnect after 3 seconds. On a successful reconnect that follows a previous disconnect, the player shall reload the page so the server's late-joiner cache replay reconstructs the screen from scratch. On the very first successful connect (no prior disconnect), the player shall hide the overlay if present and send `client-info`.
-9. Player-side and map-side code shall not assign a payload URL field (`show-background-media.payload.url`, `map-show.payload.url`, `image-layers-sync.payload.layers[].dataUrl`, `image-layers-sync.payload.layers[].fogDataUrl`) to a DOM URL sink without first validating it with `safePlayerUrl(url, kind)` from `src/player/safeUrl.ts`. The helper accepts only `/vault/...` paths and `data:image/...` / `data:video/...` URLs of an allowlisted MIME family (no `image/svg+xml`, no `text/*`, no absolute HTTP URLs, no `javascript:`). Rejected URLs shall be logged via `console.warn` and the affected element (layer image, fog overlay, background) shall be skipped — no throw, no disconnect.
+9. Player-side and map-side code shall not assign a payload URL field (`show-background-media.payload.url`, `map-show.payload.url`, `image-layers-sync.payload.layers[].dataUrl`, `image-layers-sync.payload.layers[].fogDataUrl`, `map-fog.payload.dataUrl`) to a DOM URL sink without first validating it with `safePlayerUrl(url, kind)` from `src/player/safeUrl.ts`. The helper accepts only `/vault/...` paths and `data:image/...` / `data:video/...` URLs of an allowlisted MIME family (no `image/svg+xml`, no `text/*`, no absolute HTTP URLs, no `javascript:`). Rejected URLs shall be logged via `console.warn` and the affected element (layer image, fog overlay, background) shall be skipped — no throw, no disconnect.
 
 ## Broadcast / IPC
 
@@ -48,6 +48,7 @@
 | `map-calibration` | DM → map | `{ profiles: Record<string, { diagonalInches, fineTune }> }` | Server start; calibration modal change | yes |
 | `map-calibration-overlay` | DM → map | `{ show: boolean }` | Calibration test-pattern toggle | yes |
 | `map-aoe-sync` | DM → map | `{ aoes: Array<{ id, shape, sizeFt, widthFt, color, opacity, rotation, x, y, label? }> }` | DM adds/edits/moves/removes an AoE overlay (drags throttled, immediate on release); map apply resets to `[]`; `republishToServer()` when non-empty | yes |
+| `map-fog` | DM → map | `{ dataUrl: string \| null, opacity: number }` | Map apply; fog edit committed; opacity setting change; `republishToServer()` | yes |
 | `map-clear` | DM → map | `{}` | DM clicks Stop Map | no (purges map-channel cache) |
 | `client-info` | player/map → DM | `{ width: number, height: number, devicePixelRatio: number, channel?: "map" }` | Client connects; window resizes. The server stores it with the connection's channel regardless of the payload field | n/a (received only) |
 
