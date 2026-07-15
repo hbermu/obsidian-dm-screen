@@ -60,7 +60,7 @@ Full channel routing in `../player-server/websocket-protocol.md`.
 - `src/__tests__/server-map-channel.test.ts` — `map-fog`, `map-vision`, and `map-walls` replay to late joiners and purge on `map-clear`
 - `src/__tests__/map-fog-endtoend.integration.test.ts` — full DM→server→late-joiner scene reconstruction: all map-* messages replayed to map channel, player channel isolation, map-clear purge, cross-session cache restore, sidecar persistence round-trip
 - `src/__tests__/map-fog-spec.test.ts` — EARS conformance: mask geometry (req 2), sidecar path determinism (req 7), blocksSight truth table (req 10), LoS wall/door geometry (req 10), republish signals (reqs 14/21/27), mapFogTvOpacity default + broadcastFog embedding (req 15), map-* channel routing (websocket-protocol req 1b)
-- `src/__tests__/map-fog-czepeku.test.ts` — real-world fixture (Czepeku "Candle Workshop" wall geometry, 101 walls / 15 doors / 140 px per square, in `fixtures/czepeku-candle-workshop-walls.json`): pipeline dimensions, LoS occlusion and door opening against production wall data, performance budget, room flood bounded by real walls
+- `src/__tests__/map-fog-uvtt.test.ts` — real-world fixture (FelderHouse.dd2vtt from the CC0 `mbround18/vtt-maps` collection, converted UVTT `line_of_sight`/`portals`: 173 walls / 46 doors / 128 px per square, in `fixtures/dd2vtt-felderhouse-walls.json`): pipeline dimensions, LoS occlusion and door opening against production wall data, performance budget, room flood bounded by real walls
 - `test/visual/map-fog.spec.ts` — Playwright rendering: full fog, revealed hole, cleared fog, physical mode
 - `test/visual/map-vision.spec.ts` — Playwright rendering: feathered circle vision hole, wall-clipped asymmetric hole, open-door symmetric hole
 

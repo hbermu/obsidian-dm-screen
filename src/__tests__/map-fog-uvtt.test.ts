@@ -6,10 +6,11 @@ import { blocksSight, visibilityPolygon, type Point } from "../map/los";
 import { floodRegion, wallsSidecarPath } from "../map/walls";
 import type { MapWall } from "../map/types";
 
-// Real wall geometry extracted from the Czepeku "Candle Workshop" FoundryVTT
-// module (scene 01, geometry only — no artwork). Exercises the fog pipeline
-// against production-shaped data: 101 walls, 15 doors, 140 px/square.
-interface CzepekuFixture {
+// Real wall geometry from FelderHouse.dd2vtt (github.com/mbround18/vtt-maps,
+// CC0-1.0): UVTT line_of_sight polylines split into segments, portals mapped
+// to doors, square units × pixels_per_grid. Exercises the fog pipeline against
+// production-shaped data: 173 walls (46 doors), 128 px/square.
+interface UvttFixture {
   sceneWidth: number;
   sceneHeight: number;
   gridSize: number;
@@ -17,8 +18,8 @@ interface CzepekuFixture {
 }
 
 const fixture = JSON.parse(
-  readFileSync(join(__dirname, "fixtures", "czepeku-candle-workshop-walls.json"), "utf-8")
-) as CzepekuFixture;
+  readFileSync(join(__dirname, "fixtures", "dd2vtt-felderhouse-walls.json"), "utf-8")
+) as UvttFixture;
 
 const { sceneWidth, sceneHeight, gridSize, walls } = fixture;
 const bounds = { x: 0, y: 0, w: sceneWidth, h: sceneHeight };
@@ -69,15 +70,15 @@ function rasterizeWalls(scale: number, thickness: number): { blocked: Uint8Array
   return { blocked, w, h };
 }
 
-describe("czepeku fixture sanity", () => {
-  it("carries the real scene shape: 101 walls, 15 closed doors, 140 px/square", () => {
-    expect(walls).toHaveLength(101);
+describe("uvtt fixture sanity", () => {
+  it("carries the real scene shape: 173 walls, 46 closed doors, 128 px/square", () => {
+    expect(walls).toHaveLength(173);
     const doors = walls.filter((w) => w.door);
-    expect(doors).toHaveLength(15);
+    expect(doors).toHaveLength(46);
     expect(doors.every((d) => !d.open)).toBe(true);
-    expect(gridSize).toBe(140);
-    expect(sceneWidth).toBe(4200);
-    expect(sceneHeight).toBe(5040);
+    expect(gridSize).toBe(128);
+    expect(sceneWidth).toBe(8320);
+    expect(sceneHeight).toBe(5760);
   });
 
   it("every wall lies within the scene bounds", () => {
@@ -95,19 +96,19 @@ describe("czepeku fixture sanity", () => {
   });
 });
 
-describe("fog pipeline at real Czepeku dimensions", () => {
-  it("fogCanvasSize keeps the 4200×5040 aspect at 1024 wide", () => {
-    expect(fogCanvasSize(sceneWidth, sceneHeight)).toEqual({ width: 1024, height: 1229 });
+describe("fog pipeline at real UVTT dimensions", () => {
+  it("fogCanvasSize keeps the 8320×5760 aspect at 1024 wide", () => {
+    expect(fogCanvasSize(sceneWidth, sceneHeight)).toEqual({ width: 1024, height: 709 });
   });
 
-  it("gridCellRectAt snaps to the module's 140px grid", () => {
+  it("gridCellRectAt snaps to the map's 128px grid", () => {
     const cfg = { pxPerSquare: gridSize, gridOffsetX: 0, gridOffsetY: 0 };
-    expect(gridCellRectAt(4199, 5039, cfg)).toEqual({ x: 4060, y: 4900, w: 140, h: 140 });
-    expect(gridCellRectAt(0, 0, cfg)).toEqual({ x: 0, y: 0, w: 140, h: 140 });
+    expect(gridCellRectAt(8319, 5759, cfg)).toEqual({ x: 8192, y: 5632, w: 128, h: 128 });
+    expect(gridCellRectAt(0, 0, cfg)).toEqual({ x: 0, y: 0, w: 128, h: 128 });
   });
 
   it("sidecar paths stay deterministic for an NFS-style vault path with spaces", () => {
-    const url = "/vault/TTRPG_Media/czepeku/fantasy/battlemaps/Candle%20Workshop/Gridded/Candle%20Workshop%20Original%20Night.webp";
+    const url = "/vault/TTRPG_Media/maps/base_building/Felder%20House/FelderHouse.png";
     expect(fogSidecarPath(url)).toBe(fogSidecarPath(url));
     expect(fogSidecarPath(url)).toMatch(/^\.dm-screen\/fog\/[A-Za-z0-9._-]+\.png$/);
     expect(wallsSidecarPath(url)).toMatch(/^\.dm-screen\/walls\/[A-Za-z0-9._-]+\.json$/);
@@ -115,7 +116,7 @@ describe("fog pipeline at real Czepeku dimensions", () => {
 });
 
 describe("line of sight against the real wall set", () => {
-  // Workshop interior: the centre of the scene sits inside the building.
+  // House interior: the centre of the scene sits inside the building.
   const vision = { x: sceneWidth / 2, y: sceneHeight / 2 };
 
   it("produces a valid polygon fully inside the scene bounds", () => {
@@ -183,7 +184,7 @@ describe("line of sight against the real wall set", () => {
     expect(open).toBeGreaterThan(closed);
   });
 
-  it("stays within budget: 5 visions × 101 walls under 250ms", () => {
+  it("stays within budget: 5 visions × 173 walls under 250ms", () => {
     const start = performance.now();
     for (let i = 0; i < 5; i++) {
       visibilityPolygon(sceneWidth * (0.2 + i * 0.15), sceneHeight * 0.5, walls, bounds);
@@ -193,11 +194,11 @@ describe("line of sight against the real wall set", () => {
 });
 
 describe("room flood fill against the real wall set", () => {
-  // Rasterized at 1/10 scale (420×504) with a 2px stamp — proportionally the
+  // Rasterized at 1/10 scale (832×576) with a 2px stamp — proportionally the
   // same thickness the Room tool uses at fog resolution.
   const { blocked, w, h } = rasterizeWalls(0.1, 2);
 
-  it("filling from inside the workshop stays bounded (a room, not the whole map)", () => {
+  it("filling from inside the house stays bounded (a room, not the whole map)", () => {
     const free = blocked.reduce((acc, v) => acc + (v ? 0 : 1), 0);
     const region = floodRegion(blocked, w, h, Math.round((sceneWidth / 2) * 0.1), Math.round((sceneHeight / 2) * 0.1));
     expect(region).not.toBeNull();
