@@ -19,6 +19,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@napi-rs/canvas": "^1.0.2",
     "@playwright/test": "1.60.0",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.12",

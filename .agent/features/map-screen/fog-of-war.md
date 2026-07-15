@@ -61,8 +61,12 @@ Full channel routing in `../player-server/websocket-protocol.md`.
 - `src/__tests__/map-fog-endtoend.integration.test.ts` — full DM→server→late-joiner scene reconstruction: all map-* messages replayed to map channel, player channel isolation, map-clear purge, cross-session cache restore, sidecar persistence round-trip
 - `src/__tests__/map-fog-spec.test.ts` — EARS conformance: mask geometry (req 2), sidecar path determinism (req 7), blocksSight truth table (req 10), LoS wall/door geometry (req 10), republish signals (reqs 14/21/27), mapFogTvOpacity default + broadcastFog embedding (req 15), map-* channel routing (websocket-protocol req 1b)
 - `src/__tests__/map-fog-uvtt.test.ts` — real-world fixture (FelderHouse.dd2vtt from the CC0 `mbround18/vtt-maps` collection, converted UVTT `line_of_sight`/`portals`: 173 walls / 46 doors / 128 px per square, in `fixtures/dd2vtt-felderhouse-walls.json`): pipeline dimensions, LoS occlusion and door opening against production wall data, performance budget, room flood bounded by real walls
+- `src/__tests__/map-fog-modal.test.ts` — MapFogModal tools with real canvas pixel assertions: brush reveal, cover/reveal all, rect (forward + reversed), grid cell, grid rect, room (two-room split + wall-click Notice), cleanupDrag, walls chain, door, toggle door (immutability), erase, snap
+- `src/__tests__/map-vision-bake.test.ts` — bakeVisions with real canvas pixel assertions via @napi-rs/canvas shim: huge vision erases entire canvas, small vision (center transparent, corner opaque), feather ring intermediate alpha, wall-clipped bake (behind-wall opaque, visible-side transparent)
 - `test/visual/map-fog.spec.ts` — Playwright rendering: full fog, revealed hole, cleared fog, physical mode
 - `test/visual/map-vision.spec.ts` — Playwright rendering: feathered circle vision hole, wall-clipped asymmetric hole, open-door symmetric hole
+- `test/visual/map-fog-video.spec.ts` — Playwright rendering: full fog over video shows black; cleared fog shows green video
+- `test/visual/map-fog-rotation.spec.ts` — Playwright rendering: 90° rotation with off-center fog hole; hole appears rotated with the stage (asymmetric layout verification)
 
 ## DM vision controls
 
