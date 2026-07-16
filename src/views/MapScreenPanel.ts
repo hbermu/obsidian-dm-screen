@@ -264,6 +264,15 @@ export class MapScreenPanel {
     this.broadcastWalls();
   }
 
+  applyGridConfig(pxPerSquare: number, offsetX: number, offsetY: number) {
+    this.state.pxPerSquare = pxPerSquare;
+    this.state.gridOffsetX = offsetX;
+    this.state.gridOffsetY = offsetY;
+    this.broadcastConfig();
+    this.persistState();
+    this.host.render();
+  }
+
   async setVaultMap(vaultPath: string, mediaType: "image" | "video") {
     const adapter = this.plugin.app.vault.adapter as { getResourcePath?: (p: string) => string };
     const resourceUrl = adapter.getResourcePath?.(vaultPath);

@@ -6,6 +6,7 @@ import { floodRegion } from "../map/walls";
 import { blocksSight } from "../map/los";
 import { vaultPathFromUrl } from "../server";
 import type { MapWall } from "../map/types";
+import { parseUvttWalls } from "../map/uvtt";
 import { debug } from "../debug";
 
 type FogTool = "brush" | "rect" | "cell" | "gridrect" | "room";
@@ -220,6 +221,28 @@ export class MapFogModal extends Modal {
       const snapCb = snapLabel.createEl("input", { type: "checkbox" });
       snapCb.checked = this.wallsSnap;
       snapCb.addEventListener("change", () => { this.wallsSnap = snapCb.checked; });
+
+      const importBtn = barEl.createEl("button", { text: "Import UVTT" });
+      importBtn.addEventListener("click", () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".dd2vtt,.uvtt,.df2vtt,.json";
+        input.addEventListener("change", () => {
+          const file = input.files?.[0];
+          if (!file) return;
+          void file.text().then((text) => {
+            let doc: unknown;
+            try {
+              doc = JSON.parse(text);
+            } catch (err) {
+              new Notice(`UVTT import failed: ${(err as Error).message}`, 6000);
+              return;
+            }
+            this.importUvttDoc(doc);
+          });
+        });
+        input.click();
+      });
 
       this.setupWallsDrawing(overlay, redraw, fogScale);
     };
@@ -609,6 +632,38 @@ export class MapFogModal extends Modal {
         return;
       }
     });
+  }
+
+  importUvttDoc(doc: unknown) {
+    let parsed;
+    try {
+      parsed = parseUvttWalls(doc);
+    } catch (err) {
+      new Notice(`UVTT import failed: ${(err as Error).message}`, 6000);
+      return;
+    }
+
+    const scale = this.map.naturalWidth / (parsed.gridSquares.x * parsed.pixelsPerGrid);
+    const scaledWalls: MapWall[] = parsed.walls.map((w) => ({
+      x1: w.x1 * scale,
+      y1: w.y1 * scale,
+      x2: w.x2 * scale,
+      y2: w.y2 * scale,
+      ...(w.door ? { door: true } : {}),
+      ...(w.open ? { open: true } : {}),
+    }));
+
+    this.walls = scaledWalls;
+    void this.panel.commitWalls([...this.walls]);
+    this.redrawOverlay?.();
+
+    const rawPxPerSquare = this.map.naturalWidth / parsed.gridSquares.x;
+    const pxPerSquare = Number.isInteger(rawPxPerSquare) ? rawPxPerSquare : parseFloat(rawPxPerSquare.toFixed(2));
+    this.panel.applyGridConfig(pxPerSquare, 0, 0);
+
+    const doors = scaledWalls.filter((w) => w.door).length;
+    debug("MapFogModal: importUvttDoc —", scaledWalls.length, "walls,", doors, "doors, pxPerSquare", pxPerSquare);
+    new Notice(`Imported ${scaledWalls.length} walls (${doors} doors) — grid set to ${pxPerSquare} px/square`);
   }
 
   onClose() {

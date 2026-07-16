@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { installNapiCanvas, pixelAt } from "../../test/canvas/napi-canvas-shim";
 import { MapFogModal } from "../views/MapFogModal";
 import { fogCanvasSize } from "../map/fog";
@@ -57,9 +59,11 @@ const appStub = { vault: { adapter: { getResourcePath: () => null as null } } };
 function makePanelStub(walls: MapWall[] = []) {
   const commitFogSpy = vi.fn().mockResolvedValue(undefined);
   const commitWallsSpy = vi.fn().mockResolvedValue(undefined);
+  const applyGridConfigSpy = vi.fn();
   return {
     commitFog: commitFogSpy,
     commitWalls: commitWallsSpy,
+    applyGridConfig: applyGridConfigSpy,
     fogDataUrl: null as string | null,
     walls,
     state: {
@@ -579,6 +583,78 @@ describe("MapFogModal Walls tab — pixel assertions", () => {
     expect(walls[0].x2).toBeCloseTo(200, 0);
     expect(walls[0].y2).toBeCloseTo(100, 0);
 
+    modal.onClose();
+  });
+});
+
+describe("MapFogModal — uvtt import", () => {
+  interface WallsFixture {
+    walls: MapWall[];
+  }
+
+  const rawFixtureDoc = JSON.parse(
+    readFileSync(join(__dirname, "fixtures", "dd2vtt-felderhouse-raw.json"), "utf-8")
+  ) as unknown;
+
+  const wallsFixture = JSON.parse(
+    readFileSync(join(__dirname, "fixtures", "dd2vtt-felderhouse-walls.json"), "utf-8")
+  ) as WallsFixture;
+
+  // The UVTT map is 8320 wide; the test map is 4160 (half) — scale factor 0.5
+  const UVTT_HALF_W = 4160;
+
+  function openModalWithWidth(naturalWidth: number): { modal: MapFogModal; panel: ReturnType<typeof makePanelStub> } {
+    const panel = makePanelStub();
+    const halfMap: ActiveMap = {
+      url: "/vault/test.png",
+      mediaType: "image",
+      naturalWidth,
+      naturalHeight: Math.round(naturalWidth * (750 / 1000)),
+    };
+    const modal = new MapFogModal(
+      appStub as never,
+      { app: appStub, settings: { mapFogTvOpacity: 0.9 } } as never,
+      panel as never,
+      halfMap
+    );
+    modal.onOpen();
+    return { modal, panel };
+  }
+
+  it("importUvttDoc on half-width map scales all 173 walls by 0.5 and calls applyGridConfig with pxPerSquare 64", () => {
+    const { modal, panel } = openModalWithWidth(UVTT_HALF_W);
+
+    modal.importUvttDoc(rawFixtureDoc);
+
+    expect(panel.commitWalls).toHaveBeenCalledTimes(1);
+    const walls = panel.commitWalls.mock.calls[0][0] as MapWall[];
+    expect(walls).toHaveLength(173);
+
+    // Every coordinate should be exactly half of the converted fixture
+    for (let i = 0; i < walls.length; i++) {
+      expect(walls[i].x1).toBeCloseTo(wallsFixture.walls[i].x1 * 0.5, 5);
+      expect(walls[i].y1).toBeCloseTo(wallsFixture.walls[i].y1 * 0.5, 5);
+      expect(walls[i].x2).toBeCloseTo(wallsFixture.walls[i].x2 * 0.5, 5);
+      expect(walls[i].y2).toBeCloseTo(wallsFixture.walls[i].y2 * 0.5, 5);
+    }
+
+    // pxPerSquare = naturalWidth / gridSquares.x = 4160 / 65 = 64
+    expect(panel.applyGridConfig).toHaveBeenCalledWith(64, 0, 0);
+
+    modal.onClose();
+  });
+
+  it("importUvttDoc with malformed doc shows Notice and does not call commitWalls", async () => {
+    const obsidian = await import("obsidian");
+    const noticeSpy = vi.spyOn(obsidian, "Notice");
+
+    const { modal, panel } = openModalWithWidth(UVTT_HALF_W);
+    modal.importUvttDoc({});
+
+    expect(panel.commitWalls).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenCalledWith(expect.stringContaining("UVTT import failed"), 6000);
+
+    noticeSpy.mockRestore();
     modal.onClose();
   });
 });

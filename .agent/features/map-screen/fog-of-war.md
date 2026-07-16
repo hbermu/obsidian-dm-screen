@@ -1,14 +1,15 @@
 # Map Screen Fog of War
 
-> A single PNG mask painted by the DM over the active battlemap: black hides, transparent reveals. Edited in a dedicated modal (brush / rectangle / grid-cell / room-reveal, reveal or cover), rendered on the map screen inside the stage transform, and persisted per map as a vault sidecar PNG keyed by the map's `/vault/` URL — note images and Hydrus-cached files alike. A companion Walls editor in the same modal defines line segments that block line-of-sight; walls are persisted as a JSON sidecar and broadcast as `map-walls` so vision holes are clipped to LoS on the client.
+> A single PNG mask painted by the DM over the active battlemap: black hides, transparent reveals. Edited in a dedicated modal (brush / rectangle / grid-cell / room-reveal, reveal or cover), rendered on the map screen inside the stage transform, and persisted per map as a vault sidecar PNG keyed by the map's `/vault/` URL — note images and Hydrus-cached files alike. A companion Walls editor in the same modal defines line segments that block line-of-sight; walls are persisted as a JSON sidecar and broadcast as `map-walls` so vision holes are clipped to LoS on the client. The Walls tab also supports importing walls from a UVTT file (`.dd2vtt`, `.uvtt`, `.df2vtt`, `.json`).
 
 ## Source files
 
 - `src/map/fog.ts` — `FOG_RESOLUTION`, `fogCanvasSize`, `fogSidecarPath`, `gridCellRectAt`, `loadFogSidecar`, `saveFogSidecar`, `FogAdapter`, `CellRect`
 - `src/map/walls.ts` — `wallsSidecarPath`, `loadWallsSidecar`, `saveWallsSidecar`, `floodRegion`
 - `src/map/los.ts` — `blocksSight`, `visibilityPolygon`
-- `src/views/MapFogModal.ts` — the editing modal (fog tab + walls tab, drawing handlers, drag cleanup)
-- `src/views/MapScreenPanel.ts` — `fogDataUrl`, `broadcastFog`, `commitFog`; `walls`, `broadcastWalls`, `commitWalls`; sidecar loads in `setVaultMap`; restore in `restoreFromCache`; re-emit in `republish`; resets in `stopMap`; the Fog button; `visions`, `broadcastVisions`, `bakeVisions`, `renderVisionControls`, vision dots in `renderPanPreview`
+- `src/map/uvtt.ts` — `parseUvttWalls`, `UvttParseResult`
+- `src/views/MapFogModal.ts` — the editing modal (fog tab + walls tab, drawing handlers, drag cleanup, `importUvttDoc`)
+- `src/views/MapScreenPanel.ts` — `fogDataUrl`, `broadcastFog`, `commitFog`; `walls`, `broadcastWalls`, `commitWalls`; `applyGridConfig`; sidecar loads in `setVaultMap`; restore in `restoreFromCache`; re-emit in `republish`; resets in `stopMap`; the Fog button; `visions`, `broadcastVisions`, `bakeVisions`, `renderVisionControls`, vision dots in `renderPanPreview`
 - `src/map/map.ts` — `showFog`, `recompositeFog`, fog/vision/walls clearing in `clearMap`
 - `src/map/vision.ts` — `eraseVision`, `eraseVisionWithWalls`
 - `src/map/types.ts` — `MapVision`, `MapWall` interfaces
@@ -43,6 +44,16 @@
 20. The Erase tool shall remove the nearest wall whose point-to-segment distance (in natural coords) is less than `12 / fogScale`; Toggle door shall flip `open` on the nearest door wall within the same hit radius. Both commit immediately via `panel.commitWalls`.
 21. `broadcastWalls()` shall broadcast `{ type: "map-walls", payload: { walls } }`; `commitWalls(walls)` shall update `this.walls`, write the walls sidecar (at `wallsSidecarPath`), and call `broadcastWalls()`; `republish()` shall call `broadcastWalls()` alongside `broadcastFog()` — an empty walls list is a valid signal for late joiners.
 
+## UVTT import
+
+28. The Walls tab toolbar shall include an **Import UVTT** button. Accepted file types: `.dd2vtt`, `.uvtt`, `.df2vtt`, `.json`. On click the button opens a native file picker; on file selection the file is read as text and JSON-parsed.
+29. `parseUvttWalls(doc: unknown): UvttParseResult` (in `src/map/uvtt.ts`) shall validate the document at the boundary: `resolution.map_size.x/y` must be finite positive numbers; `resolution.pixels_per_grid` must be a finite positive number; missing fields throw `new Error("Not a UVTT file (missing resolution/pixels_per_grid)")`. `line_of_sight`, `objects_line_of_sight`, and `portals` default to `[]` when absent.
+30. `parseUvttWalls` shall convert polylines: every consecutive pair of points in `line_of_sight` and then `objects_line_of_sight` → `{ x1, y1, x2, y2 }` where each coordinate is `(point.coord − map_origin.coord) × pixels_per_grid`. Zero-length segments and polylines with fewer than 2 points are skipped. Portals with ≥ 2 bounds points → `{ x1: first.x, y1: first.y, x2: last.x, y2: last.y, door: true }` (same coordinate transform); `open: true` is added when `portal.closed === false`. Result order: `line_of_sight` segments, then `objects_line_of_sight` segments, then portal walls.
+31. On any parse error, `importUvttDoc` shall show `new Notice(\`UVTT import failed: ${message}\`, 6000)` and return without modifying walls.
+32. On success, the parsed walls shall be scaled to the displayed map: `scale = this.map.naturalWidth / (parsed.gridSquares.x × parsed.pixelsPerGrid)`. Every wall coordinate is multiplied by `scale`. `this.walls` is replaced with the scaled list, `panel.commitWalls([...this.walls])` is called, and the overlay is redrawn.
+33. On success, the map grid shall be configured via `panel.applyGridConfig(pxPerSquare, 0, 0)` where `pxPerSquare = this.map.naturalWidth / parsed.gridSquares.x` (integer when the division is exact, otherwise rounded to 2 decimal places). `applyGridConfig` sets `state.pxPerSquare / gridOffsetX / gridOffsetY`, calls `broadcastConfig()`, `persistState()`, and `host.render()`.
+34. On success, the modal shall show `new Notice(\`Imported ${walls.length} walls (${doors} doors) — grid set to ${pxPerSquare} px/square\`)` where `doors` is the count of walls with `door: true`.
+
 ## Broadcast / IPC
 
 | Message type | Direction | Payload | When |
@@ -61,7 +72,8 @@ Full channel routing in `../player-server/websocket-protocol.md`.
 - `src/__tests__/map-fog-endtoend.integration.test.ts` — full DM→server→late-joiner scene reconstruction: all map-* messages replayed to map channel, player channel isolation, map-clear purge, cross-session cache restore, sidecar persistence round-trip
 - `src/__tests__/map-fog-spec.test.ts` — EARS conformance: mask geometry (req 2), sidecar path determinism (req 7), blocksSight truth table (req 10), LoS wall/door geometry (req 10), republish signals (reqs 14/21/27), mapFogTvOpacity default + broadcastFog embedding (req 15), map-* channel routing (websocket-protocol req 1b)
 - `src/__tests__/map-fog-uvtt.test.ts` — real-world fixture (FelderHouse.dd2vtt from the CC0 `mbround18/vtt-maps` collection, converted UVTT `line_of_sight`/`portals`: 173 walls / 46 doors / 128 px per square, in `fixtures/dd2vtt-felderhouse-walls.json`): pipeline dimensions, LoS occlusion and door opening against production wall data, performance budget, room flood bounded by real walls
-- `src/__tests__/map-fog-modal.test.ts` — MapFogModal tools with real canvas pixel assertions: brush reveal, cover/reveal all, rect (forward + reversed), grid cell, grid rect, room (two-room split + wall-click Notice), cleanupDrag, walls chain, door, toggle door (immutability), erase, snap
+- `src/__tests__/map-uvtt.test.ts` — pure parser: cross-validation against `dd2vtt-felderhouse-raw.json` / `dd2vtt-felderhouse-walls.json` (173 walls, gridSquares {x:65,y:45}, pixelsPerGrid 128), open portal → `open:true`, closed portal no `open`, `objects_line_of_sight` as plain walls, non-zero `map_origin` subtraction, 3-point polyline → 2 segments, single-point polyline ignored, zero-length segment skipped, malformed docs throw
+- `src/__tests__/map-fog-modal.test.ts` — MapFogModal tools with real canvas pixel assertions: brush reveal, cover/reveal all, rect (forward + reversed), grid cell, grid rect, room (two-room split + wall-click Notice), cleanupDrag, walls chain, door, toggle door (immutability), erase, snap; uvtt import: half-width map scales 173 walls by 0.5 and calls applyGridConfig with pxPerSquare 64; malformed doc shows Notice and does not call commitWalls
 - `src/__tests__/map-vision-bake.test.ts` — bakeVisions with real canvas pixel assertions via @napi-rs/canvas shim: huge vision erases entire canvas, small vision (center transparent, corner opaque), feather ring intermediate alpha, wall-clipped bake (behind-wall opaque, visible-side transparent)
 - `test/visual/map-fog.spec.ts` — Playwright rendering: full fog, revealed hole, cleared fog, physical mode
 - `test/visual/map-vision.spec.ts` — Playwright rendering: feathered circle vision hole, wall-clipped asymmetric hole, open-door symmetric hole
