@@ -60,11 +60,25 @@ function tryDecodeFirstJson(str: string): unknown | null {
   return null;
 }
 
+export interface LeveldbEntry {
+  key: string;
+  doc: unknown;
+}
+
+// The document's LevelDB key precedes its JSON value in the record. Newer
+// Foundry stores embedded collections as separate keys — a Scene lives at
+// `!scenes!<id>` while each of its walls lives at `!scenes.walls!<id>.<wallId>`
+// — so the parent scene id can only be recovered from the key.
+function extractKey(prefix: string): string {
+  const m = prefix.match(/!scenes(?:\.\w+)?![A-Za-z0-9_.-]+/g);
+  return m ? m[m.length - 1] : "";
+}
+
 // LevelDB write-ahead-log parser.
 // Block size is 32768; record header is 7 bytes: crc(4 LE) + length(2 LE) + type(1).
 // Types: 1=FULL, 2=FIRST, 3=MIDDLE, 4=LAST. CRC is not verified.
-export function parseLeveldbLog(bytes: Uint8Array): unknown[] {
-  const results: unknown[] = [];
+export function parseLeveldbEntries(bytes: Uint8Array): LeveldbEntry[] {
+  const results: LeveldbEntry[] = [];
   const BLOCK = 32768;
   const HEADER = 7;
   let offset = 0;
@@ -78,8 +92,9 @@ export function parseLeveldbLog(bytes: Uint8Array): unknown[] {
     for (const chunk of pending) { buf.set(chunk, pos); pos += chunk.length; }
     pending = [];
     const str = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+    const brace = str.indexOf("{");
     const doc = tryDecodeFirstJson(str);
-    if (doc !== null) results.push(doc);
+    if (doc !== null) results.push({ key: extractKey(brace === -1 ? str : str.slice(0, brace)), doc });
   };
 
   while (offset < bytes.length) {
@@ -103,30 +118,60 @@ export function parseLeveldbLog(bytes: Uint8Array): unknown[] {
       pos = dataEnd;
 
       if (type === 1) {
-        // FULL
         flushPending();
         pending = [data];
         flushPending();
       } else if (type === 2) {
-        // FIRST
         flushPending();
         pending = [data];
       } else if (type === 3) {
-        // MIDDLE
         pending.push(data);
       } else if (type === 4) {
-        // LAST
         pending.push(data);
         flushPending();
       }
     }
 
-    // Advance to next block boundary
     offset = blockEnd;
   }
 
   flushPending();
   return results;
+}
+
+export function parseLeveldbLog(bytes: Uint8Array): unknown[] {
+  return parseLeveldbEntries(bytes).map((e) => e.doc);
+}
+
+// Newer Foundry (LevelDB) stores a scene's walls as separate `!scenes.walls!`
+// documents rather than inline. Re-attach each wall doc to its parent scene by
+// the id embedded in its key, yielding scene docs with an inline `walls` array
+// (matching the older NeDB shape that `foundrySceneToWalls` consumes).
+function assembleLeveldbScenes(entries: LeveldbEntry[]): Record<string, unknown>[] {
+  const sceneDocs: Record<string, unknown>[] = [];
+  const wallsByScene = new Map<string, unknown[]>();
+
+  for (const { key, doc } of entries) {
+    if (doc === null || typeof doc !== "object") continue;
+    const wallMatch = key.match(/^!scenes\.walls!([A-Za-z0-9_.-]+?)\./);
+    if (wallMatch) {
+      const list = wallsByScene.get(wallMatch[1]) ?? [];
+      list.push(doc);
+      wallsByScene.set(wallMatch[1], list);
+      continue;
+    }
+    const d = doc as Record<string, unknown>;
+    if ("name" in d && "width" in d && "height" in d && "grid" in d) sceneDocs.push(d);
+  }
+
+  return sceneDocs.map((scene) => {
+    const inline = scene["walls"];
+    const hasInlineGeometry =
+      Array.isArray(inline) && inline.some((w) => w !== null && typeof w === "object" && "c" in (w as object));
+    if (hasInlineGeometry) return scene;
+    const id = typeof scene["_id"] === "string" ? (scene["_id"] as string) : "";
+    return { ...scene, walls: wallsByScene.get(id) ?? [] };
+  });
 }
 
 export function foundrySceneToWalls(scene: Record<string, unknown>): FoundryScene | null {
@@ -159,8 +204,9 @@ export function foundrySceneToWalls(scene: Record<string, unknown>): FoundryScen
     if (w === null || typeof w !== "object") continue;
     const wr = w as Record<string, unknown>;
 
-    // Filter walls that don't block sight
-    if (wr["sense"] === 0) continue;
+    // Filter walls that don't block sight. Older Foundry uses `sense`, newer
+    // uses `sight`; 0 = CONST.WALL_SENSE_TYPES.NONE.
+    if (wr["sense"] === 0 || wr["sight"] === 0) continue;
 
     const c = wr["c"];
     if (!Array.isArray(c) || c.length < 4) continue;
@@ -214,7 +260,7 @@ export function parseFoundryModule(entries: Record<string, Uint8Array>): Foundry
       const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
       docs.push(...parseNedb(text));
     } else if (/packs[/\\].*\.(log|ldb)$/i.test(name)) {
-      docs.push(...parseLeveldbLog(bytes));
+      docs.push(...assembleLeveldbScenes(parseLeveldbEntries(bytes)));
     }
   }
 
