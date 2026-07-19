@@ -28,6 +28,67 @@ export async function saveWallsSidecar(adapter: FogAdapter, mapUrl: string, wall
   await adapter.writeBinary(wallsSidecarPath(mapUrl), buf);
 }
 
+// Rasterize the walls the `blocks` predicate admits onto a fresh fogW×fogH
+// canvas at fog resolution, read their alpha into a 0/1 blocked mask, and seal
+// the 1px outer border (the map edge acts as a wall — mirrors how
+// visibilityPolygon closes with the bounds rect). Shared by the Fog Room tool
+// (predicate = blocksSight) and Exploration (predicate = () => true).
+export function buildBlockedMask(
+  walls: MapWall[],
+  fogW: number,
+  fogH: number,
+  fogScale: number,
+  pxPerSquare: number,
+  blocks: (w: MapWall) => boolean
+): Uint8Array {
+  const canvas = document.createElement("canvas");
+  canvas.width = fogW;
+  canvas.height = fogH;
+  const ctx = canvas.getContext("2d")!;
+  ctx.lineWidth = Math.max(3, pxPerSquare * fogScale * 0.12);
+  ctx.lineCap = "round";
+  ctx.strokeStyle = "black";
+  for (const w of walls) {
+    if (!blocks(w)) continue;
+    ctx.beginPath();
+    ctx.moveTo(w.x1 * fogScale, w.y1 * fogScale);
+    ctx.lineTo(w.x2 * fogScale, w.y2 * fogScale);
+    ctx.stroke();
+  }
+  const imgData = ctx.getImageData(0, 0, fogW, fogH);
+  const blocked = new Uint8Array(fogW * fogH);
+  for (let i = 0; i < fogW * fogH; i++) {
+    blocked[i] = imgData.data[i * 4 + 3] > 0 ? 1 : 0;
+  }
+  for (let x = 0; x < fogW; x++) {
+    blocked[x] = 1;
+    blocked[(fogH - 1) * fogW + x] = 1;
+  }
+  for (let y = 0; y < fogH; y++) {
+    blocked[y * fogW] = 1;
+    blocked[y * fogW + fogW - 1] = 1;
+  }
+  return blocked;
+}
+
+// Paint a floodRegion mask onto a fresh fogW×fogH canvas: opaque black where
+// region===1, transparent elsewhere — ready for source-over / destination-out
+// compositing onto the fog canvas.
+export function regionToCanvas(region: Uint8Array, fogW: number, fogH: number): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = fogW;
+  canvas.height = fogH;
+  const ctx = canvas.getContext("2d")!;
+  const data = ctx.createImageData(fogW, fogH);
+  for (let i = 0; i < fogW * fogH; i++) {
+    if (region[i]) {
+      data.data[i * 4 + 3] = 255;
+    }
+  }
+  ctx.putImageData(data, 0, 0);
+  return canvas;
+}
+
 // BFS flood over unblocked pixels; returns the connected region containing
 // (sx, sy) as a 0/1 mask, or null when the start pixel is blocked.
 export function floodRegion(blocked: Uint8Array, w: number, h: number, sx: number, sy: number): Uint8Array | null {

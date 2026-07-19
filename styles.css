@@ -2057,3 +2057,36 @@
   gap: 4px;
   margin-bottom: 6px;
 }
+
+.dm-explore-modal {
+  width: 96vw;
+  height: 96vh;
+  max-width: none;
+}
+.dm-explore-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.dm-explore-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--background-secondary);
+}
+.dm-explore-stage img,
+.dm-explore-stage video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.dm-explore-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}

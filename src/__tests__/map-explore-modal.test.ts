@@ -1,0 +1,279 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { installNapiCanvas } from "../../test/canvas/napi-canvas-shim";
+import { MapExploreModal } from "../views/MapExploreModal";
+import { fogCanvasSize } from "../map/fog";
+import type { ActiveMap } from "../views/MapScreenPanel";
+import type { MapWall } from "../map/types";
+
+// Map dimensions: 1000×750 natural pixels; fog canvas: 1024×768
+const MAP_W = 1000;
+const MAP_H = 750;
+const { width: FOG_W, height: FOG_H } = fogCanvasSize(MAP_W, MAP_H);
+
+let uninstall: () => void;
+
+// ---- Obsidian HTMLElement polyfills ----
+function polyfillHTMLElement() {
+  if (!HTMLElement.prototype.addClass) {
+    HTMLElement.prototype.addClass = function (cls: string) { this.classList.add(cls); };
+  }
+  if (!HTMLElement.prototype.createDiv) {
+    (HTMLElement.prototype as unknown as Record<string, unknown>).createDiv = function (arg?: string | { cls?: string; text?: string }) {
+      const div = document.createElement("div");
+      if (typeof arg === "string") div.className = arg;
+      else if (arg) { if (arg.cls) div.className = arg.cls; if (arg.text) div.textContent = arg.text; }
+      this.appendChild(div);
+      return div;
+    };
+  }
+  if (!HTMLElement.prototype.createEl) {
+    (HTMLElement.prototype as unknown as Record<string, unknown>).createEl = function (tag: string, opts?: { text?: string; cls?: string; type?: string }) {
+      const el = document.createElement(tag);
+      if (opts?.cls) el.className = opts.cls;
+      if (opts?.text) el.textContent = opts.text;
+      if (opts && "type" in opts && opts.type) (el as HTMLInputElement).type = opts.type;
+      this.appendChild(el);
+      return el;
+    };
+  }
+  if (!HTMLElement.prototype.createSpan) {
+    (HTMLElement.prototype as unknown as Record<string, unknown>).createSpan = function (opts?: { text?: string; cls?: string }) {
+      const el = document.createElement("span");
+      if (opts?.cls) el.className = opts.cls;
+      if (opts?.text) el.textContent = opts.text;
+      this.appendChild(el);
+      return el;
+    };
+  }
+  if (!HTMLElement.prototype.empty) {
+    (HTMLElement.prototype as unknown as Record<string, unknown>).empty = function () { this.innerHTML = ""; };
+  }
+}
+
+// ---- Stubs ----
+const appStub = { vault: { adapter: { getResourcePath: () => null as null } } };
+
+function makePanelStub(walls: MapWall[] = []) {
+  const commitFogSpy = vi.fn().mockResolvedValue(undefined);
+  const commitWallsSpy = vi.fn().mockResolvedValue(undefined);
+  return {
+    commitFog: commitFogSpy,
+    commitWalls: commitWallsSpy,
+    fogDataUrl: null as string | null,
+    walls,
+    state: {
+      pxPerSquare: 100,
+      gridOffsetX: 0,
+      gridOffsetY: 0,
+    },
+  };
+}
+
+const mapStub: ActiveMap = {
+  url: "/vault/test.png",
+  mediaType: "image",
+  naturalWidth: MAP_W,
+  naturalHeight: MAP_H,
+};
+
+// ---- Helpers ----
+function openModal(panelStub: ReturnType<typeof makePanelStub>): {
+  modal: MapExploreModal;
+  overlay: HTMLCanvasElement;
+  contentEl: HTMLElement;
+} {
+  const modal = new MapExploreModal(
+    appStub as never,
+    { app: appStub, settings: { mapFogTvOpacity: 0.9 } } as never,
+    panelStub as never,
+    mapStub
+  );
+  modal.onOpen();
+
+  const stage = modal.contentEl.querySelector(".dm-explore-stage") as HTMLElement;
+  const overlay = stage.querySelector(".dm-explore-overlay") as HTMLCanvasElement;
+
+  // Stub getBoundingClientRect so toFog maps 1:1 (clientX/Y === fog canvas coords)
+  overlay.getBoundingClientRect = () => ({
+    left: 0, top: 0,
+    width: FOG_W, height: FOG_H,
+    right: FOG_W, bottom: FOG_H,
+    x: 0, y: 0,
+    toJSON: () => ({}),
+  });
+
+  return { modal, overlay, contentEl: modal.contentEl };
+}
+
+function findBtn(contentEl: HTMLElement, text: string): HTMLButtonElement {
+  const btn = Array.from(contentEl.querySelectorAll("button")).find(
+    (b) => b.textContent?.trim() === text
+  ) as HTMLButtonElement | undefined;
+  if (!btn) throw new Error(`Button "${text}" not found`);
+  return btn;
+}
+
+function coverAll(contentEl: HTMLElement) {
+  findBtn(contentEl, "Cover All").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+}
+
+function fireMousedown(overlay: HTMLElement, x: number, y: number, button = 0) {
+  overlay.dispatchEvent(new MouseEvent("mousedown", { clientX: x, clientY: y, button, bubbles: true }));
+}
+
+function fireMousemove(overlay: HTMLElement, x: number, y: number) {
+  overlay.dispatchEvent(new MouseEvent("mousemove", { clientX: x, clientY: y, bubbles: true }));
+}
+
+async function decodeLastFog(commitFog: ReturnType<typeof vi.fn>) {
+  const dataUrl = commitFog.mock.calls[commitFog.mock.calls.length - 1][0] as string;
+  const { loadImage, createCanvas } = await import("@napi-rs/canvas");
+  const img = await loadImage(Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64"));
+  const nc = createCanvas(FOG_W, FOG_H);
+  const ctx = nc.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+  return ctx;
+}
+
+beforeEach(() => {
+  polyfillHTMLElement();
+  uninstall = installNapiCanvas();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  uninstall();
+});
+
+// ---- Tests ----
+
+describe("MapExploreModal — room fog auto-toggle", () => {
+  // Two rooms split by a vertical wall at natural x=500 (fog x≈512).
+  const twoRoomWalls = (): MapWall[] => [
+    { x1: 500, y1: 0, x2: 500, y2: MAP_H },
+  ];
+
+  it("click a covered room reveals only that room; the room across the wall stays opaque", async () => {
+    const panel = makePanelStub(twoRoomWalls());
+    const { modal, overlay, contentEl } = openModal(panel);
+    coverAll(contentEl);
+    panel.commitFog.mockClear();
+
+    // Click Room A center (fog x=256)
+    fireMousedown(overlay, 256, 384);
+
+    await vi.waitFor(() => expect(panel.commitFog).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/png;base64,/)));
+    const ctx = await decodeLastFog(panel.commitFog);
+
+    // Room A becomes transparent
+    expect(ctx.getImageData(200, 384, 1, 1).data[3]).toBeLessThan(50);
+    // Room B (across the wall) stays opaque
+    expect(ctx.getImageData(800, 384, 1, 1).data[3]).toBeGreaterThan(200);
+
+    modal.onClose();
+  });
+
+  it("clicking the same room twice covers it again (auto-toggle round-trip)", async () => {
+    const panel = makePanelStub(twoRoomWalls());
+    const { modal, overlay, contentEl } = openModal(panel);
+    coverAll(contentEl);
+    panel.commitFog.mockClear();
+
+    // First click reveals Room A
+    fireMousedown(overlay, 256, 384);
+    await vi.waitFor(() => expect(panel.commitFog).toHaveBeenCalledTimes(1));
+    let ctx = await decodeLastFog(panel.commitFog);
+    expect(ctx.getImageData(200, 384, 1, 1).data[3]).toBeLessThan(50);
+
+    // Second click on the now-revealed room covers it again
+    fireMousedown(overlay, 256, 384);
+    await vi.waitFor(() => expect(panel.commitFog).toHaveBeenCalledTimes(2));
+    ctx = await decodeLastFog(panel.commitFog);
+    expect(ctx.getImageData(200, 384, 1, 1).data[3]).toBeGreaterThan(200);
+
+    modal.onClose();
+  });
+
+  it("clicking on a wall pixel does not commit fog", async () => {
+    const panel = makePanelStub(twoRoomWalls());
+    const { modal, overlay, contentEl } = openModal(panel);
+    coverAll(contentEl);
+    panel.commitFog.mockClear();
+
+    // fog (512, 384) → natural (500, 375): on the wall
+    fireMousedown(overlay, 512, 384);
+
+    await new Promise((r) => setTimeout(r, 20));
+    expect(panel.commitFog).not.toHaveBeenCalled();
+
+    modal.onClose();
+  });
+});
+
+describe("MapExploreModal — doors are always room boundaries", () => {
+  it("two rooms joined only by an OPEN door: revealing one leaves the other covered", async () => {
+    // Vertical divider with a door gap; the door is OPEN. In the Room edit tool an
+    // open door would merge the rooms, but exploration always treats a door as a
+    // boundary, so the flood stays inside Room A.
+    const walls: MapWall[] = [
+      { x1: 500, y1: 0, x2: 500, y2: 300 },
+      { x1: 500, y1: 300, x2: 500, y2: 450, door: true, open: true },
+      { x1: 500, y1: 450, x2: 500, y2: MAP_H },
+    ];
+    const panel = makePanelStub(walls);
+    const { modal, overlay, contentEl } = openModal(panel);
+    coverAll(contentEl);
+    panel.commitFog.mockClear();
+
+    fireMousedown(overlay, 256, 384);
+
+    await vi.waitFor(() => expect(panel.commitFog).toHaveBeenCalled());
+    const ctx = await decodeLastFog(panel.commitFog);
+
+    // Room A revealed
+    expect(ctx.getImageData(200, 384, 1, 1).data[3]).toBeLessThan(50);
+    // Room B still covered despite the open door
+    expect(ctx.getImageData(800, 384, 1, 1).data[3]).toBeGreaterThan(200);
+
+    modal.onClose();
+  });
+});
+
+describe("MapExploreModal — door marker toggle", () => {
+  it("clicking a door marker flips its open flag without mutating the original wall", () => {
+    const door: MapWall = { x1: 400, y1: 300, x2: 600, y2: 300, door: true, open: false };
+    const panel = makePanelStub([door]);
+    const { modal, overlay } = openModal(panel);
+
+    // Door midpoint natural (500, 300) → fog (512, 307)
+    fireMousedown(overlay, 512, 307);
+
+    expect(panel.commitWalls).toHaveBeenCalledTimes(1);
+    const walls = panel.commitWalls.mock.calls[0][0] as MapWall[];
+    expect(walls[0].open).toBe(true);
+    // Original object must not be mutated
+    expect(door.open).toBe(false);
+    // No fog commit for a door toggle
+    expect(panel.commitFog).not.toHaveBeenCalled();
+
+    modal.onClose();
+  });
+});
+
+describe("MapExploreModal — listener cleanup", () => {
+  it("Exit closes the modal and no commit fires after a post-close mousemove", async () => {
+    const panel = makePanelStub([{ x1: 500, y1: 0, x2: 500, y2: MAP_H }]);
+    const { modal, overlay, contentEl } = openModal(panel);
+    coverAll(contentEl);
+    panel.commitFog.mockClear();
+
+    modal.onClose();
+
+    // A synthetic mousemove on the overlay after close must be inert.
+    fireMousemove(overlay, 256, 384);
+
+    await new Promise((r) => setTimeout(r, 20));
+    expect(panel.commitFog).not.toHaveBeenCalled();
+    expect(panel.commitWalls).not.toHaveBeenCalled();
+  });
+});

@@ -1,9 +1,10 @@
 // src/__tests__/map-walls.test.ts
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { blocksSight, visibilityPolygon } from "../map/los";
-import { wallsSidecarPath, loadWallsSidecar, saveWallsSidecar, floodRegion } from "../map/walls";
+import { wallsSidecarPath, loadWallsSidecar, saveWallsSidecar, floodRegion, buildBlockedMask, regionToCanvas } from "../map/walls";
 import { fogSidecarPath, type FogAdapter } from "../map/fog";
 import type { MapWall } from "../map/types";
+import { installNapiCanvas, pixelAt } from "../../test/canvas/napi-canvas-shim";
 
 function makeAdapter(files: Record<string, Uint8Array> = {}) {
   const dirs = new Set<string>();
@@ -166,5 +167,71 @@ describe("floodRegion", () => {
     for (let i = 0; i < w * h; i++) {
       expect(region![i]).toBe(1);
     }
+  });
+});
+
+describe("buildBlockedMask", () => {
+  let uninstall: () => void;
+  beforeEach(() => { uninstall = installNapiCanvas(); });
+  afterEach(() => { uninstall(); });
+
+  // Fog-resolution canvas dimensions and a wall filter that admits everything.
+  const FW = 200;
+  const FH = 200;
+  const all = () => true;
+
+  it("a wall splits the canvas so a flood from one side cannot reach the other", () => {
+    // Vertical wall at natural x=100 (fogScale 1) spanning the full height.
+    const walls: MapWall[] = [{ x1: 100, y1: 0, x2: 100, y2: 200 }];
+    const mask = buildBlockedMask(walls, FW, FH, 1, 100, all);
+    const region = floodRegion(mask, FW, FH, 40, 100);
+    expect(region).not.toBeNull();
+    // Left of the wall reached, right of the wall not.
+    expect(region![100 * FW + 40]).toBe(1);
+    expect(region![100 * FW + 160]).toBe(0);
+  });
+
+  it("seals the 1px outer border", () => {
+    const mask = buildBlockedMask([], FW, FH, 1, 100, all);
+    for (let x = 0; x < FW; x++) {
+      expect(mask[x]).toBe(1);
+      expect(mask[(FH - 1) * FW + x]).toBe(1);
+    }
+    for (let y = 0; y < FH; y++) {
+      expect(mask[y * FW]).toBe(1);
+      expect(mask[y * FW + FW - 1]).toBe(1);
+    }
+    // Interior stays open.
+    expect(mask[100 * FW + 100]).toBe(0);
+  });
+
+  it("honors the blocks predicate: an open door blocks when admitted, passes when filtered", () => {
+    const openDoor: MapWall = { x1: 100, y1: 0, x2: 100, y2: 200, door: true, open: true };
+
+    // Predicate admits the open door → it splits the canvas.
+    const blocking = buildBlockedMask([openDoor], FW, FH, 1, 100, all);
+    const split = floodRegion(blocking, FW, FH, 40, 100);
+    expect(split![100 * FW + 160]).toBe(0);
+
+    // blocksSight drops the open door → flood crosses the (now-absent) wall.
+    const passable = buildBlockedMask([openDoor], FW, FH, 1, 100, blocksSight);
+    const merged = floodRegion(passable, FW, FH, 40, 100);
+    expect(merged![100 * FW + 160]).toBe(1);
+  });
+});
+
+describe("regionToCanvas", () => {
+  let uninstall: () => void;
+  beforeEach(() => { uninstall = installNapiCanvas(); });
+  afterEach(() => { uninstall(); });
+
+  it("is opaque black where region is set, transparent elsewhere", () => {
+    const w = 20;
+    const h = 20;
+    const region = new Uint8Array(w * h);
+    region[5 * w + 5] = 1;
+    const canvas = regionToCanvas(region, w, h);
+    expect(pixelAt(canvas, 5, 5)).toEqual([0, 0, 0, 255]);
+    expect(pixelAt(canvas, 15, 15)).toEqual([0, 0, 0, 0]);
   });
 });

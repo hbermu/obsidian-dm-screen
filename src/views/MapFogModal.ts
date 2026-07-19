@@ -3,7 +3,7 @@ import { unzipSync } from "fflate";
 import type DmScreenPlugin from "../main";
 import type { MapScreenPanel, ActiveMap } from "./MapScreenPanel";
 import { fogCanvasSize, gridCellRectAt } from "../map/fog";
-import { floodRegion } from "../map/walls";
+import { buildBlockedMask, floodRegion, regionToCanvas } from "../map/walls";
 import { blocksSight } from "../map/los";
 import { vaultPathFromUrl } from "../server";
 import type { MapWall } from "../map/types";
@@ -415,64 +415,18 @@ export class MapFogModal extends Modal {
       const fw = this.fogCanvas.width;
       const fh = this.fogCanvas.height;
 
-      // Build blocked mask from sight-blocking walls
-      const blockCanvas = document.createElement("canvas");
-      blockCanvas.width = fw;
-      blockCanvas.height = fh;
-      const bctx = blockCanvas.getContext("2d")!;
-      bctx.fillStyle = "black";
-      const lineW = Math.max(3, this.panel.state.pxPerSquare * fogScale * 0.12);
-      bctx.lineWidth = lineW;
-      bctx.lineCap = "round";
-      bctx.strokeStyle = "black";
-      for (const w of this.walls) {
-        if (!blocksSight(w)) continue;
-        bctx.beginPath();
-        bctx.moveTo(w.x1 * fogScale, w.y1 * fogScale);
-        bctx.lineTo(w.x2 * fogScale, w.y2 * fogScale);
-        bctx.stroke();
-      }
-      const imgData = bctx.getImageData(0, 0, fw, fh);
-      const blocked = new Uint8Array(fw * fh);
-      for (let i = 0; i < fw * fh; i++) {
-        blocked[i] = imgData.data[i * 4 + 3] > 0 ? 1 : 0;
-      }
-      // Seal the map border so rooms bounded by walls that stop at the edge
-      // don't leak the fill around the outside — mirrors how visibilityPolygon
-      // closes with the bounds rect.
-      for (let x = 0; x < fw; x++) {
-        blocked[x] = 1;
-        blocked[(fh - 1) * fw + x] = 1;
-      }
-      for (let y = 0; y < fh; y++) {
-        blocked[y * fw] = 1;
-        blocked[y * fw + fw - 1] = 1;
-      }
-
+      // Room boundaries are the sight-blocking walls only (open doors merge rooms
+      // here, unlike Exploration where every door is a boundary).
+      const blocked = buildBlockedMask(this.walls, fw, fh, fogScale, this.panel.state.pxPerSquare, blocksSight);
       const region = floodRegion(blocked, fw, fh, fx, fy);
       if (!region) {
         new Notice("That point is inside a wall");
         return;
       }
 
-      const regionCanvas = document.createElement("canvas");
-      regionCanvas.width = fw;
-      regionCanvas.height = fh;
-      const rctx = regionCanvas.getContext("2d")!;
-      const rData = rctx.createImageData(fw, fh);
-      for (let i = 0; i < fw * fh; i++) {
-        if (region[i]) {
-          rData.data[i * 4] = 0;
-          rData.data[i * 4 + 1] = 0;
-          rData.data[i * 4 + 2] = 0;
-          rData.data[i * 4 + 3] = 255;
-        }
-      }
-      rctx.putImageData(rData, 0, 0);
-
       const ctx = this.ctx();
       this.applyMode(ctx);
-      ctx.drawImage(regionCanvas, 0, 0);
+      ctx.drawImage(regionToCanvas(region, fw, fh), 0, 0);
       ctx.globalCompositeOperation = "source-over";
 
       redraw();

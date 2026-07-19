@@ -7,6 +7,7 @@ import { vaultPathFromUrl, type ClientInfo } from "../server";
 import { fogCanvasSize, loadFogSidecar, saveFogSidecar, type FogAdapter } from "../map/fog";
 import { loadWallsSidecar, saveWallsSidecar } from "../map/walls";
 import { MapFogModal } from "./MapFogModal";
+import { MapExploreModal } from "./MapExploreModal";
 import {
   clampPan,
   cssPixelsPerInch,
@@ -494,6 +495,12 @@ export class MapScreenPanel {
     fogBtn.title = "Edit fog of war";
     fogBtn.addEventListener("click", () => {
       new MapFogModal(this.plugin.app, this.plugin, this, map).open();
+    });
+
+    const exploreBtn = btnRow.createEl("button", { text: "Explore" });
+    exploreBtn.title = "Table-play exploration: toggle doors and reveal rooms";
+    exploreBtn.addEventListener("click", () => {
+      new MapExploreModal(this.plugin.app, this.plugin, this, map).open();
     });
 
     this.renderGridControls(section);
