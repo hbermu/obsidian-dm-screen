@@ -199,6 +199,15 @@ export function foundrySceneToWalls(scene: Record<string, unknown>): FoundryScen
   }
   if (!Number.isFinite(gridSize) || gridSize <= 0) return null;
 
+  // Foundry wall coordinates live in the padded scene space: the background
+  // image is inset by `padding` (real scenes store it explicitly, default 0.25,
+  // snapped up to a grid multiple) on each side. Subtract that inset so walls
+  // land relative to the image's top-left, matching how the map is displayed.
+  // Absent field → assume no padding (0) so non-Foundry callers aren't shifted.
+  const padding = typeof scene["padding"] === "number" ? (scene["padding"] as number) : 0;
+  const padX = Math.ceil((width * padding) / gridSize) * gridSize;
+  const padY = Math.ceil((height * padding) / gridSize) * gridSize;
+
   const walls: MapWall[] = [];
   for (const w of rawWalls) {
     if (w === null || typeof w !== "object") continue;
@@ -210,8 +219,11 @@ export function foundrySceneToWalls(scene: Record<string, unknown>): FoundryScen
 
     const c = wr["c"];
     if (!Array.isArray(c) || c.length < 4) continue;
-    const [x1, y1, x2, y2] = c as number[];
-    if (![x1, y1, x2, y2].every((v) => typeof v === "number" && Number.isFinite(v))) continue;
+    if (!c.every((v) => typeof v === "number" && Number.isFinite(v))) continue;
+    const x1 = (c[0] as number) - padX;
+    const y1 = (c[1] as number) - padY;
+    const x2 = (c[2] as number) - padX;
+    const y2 = (c[3] as number) - padY;
     // Skip zero-length walls
     if (x1 === x2 && y1 === y2) continue;
 
