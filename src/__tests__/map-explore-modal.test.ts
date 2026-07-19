@@ -3,7 +3,7 @@ import { installNapiCanvas } from "../../test/canvas/napi-canvas-shim";
 import { MapExploreModal } from "../views/MapExploreModal";
 import { fogCanvasSize } from "../map/fog";
 import type { ActiveMap } from "../views/MapScreenPanel";
-import type { MapWall } from "../map/types";
+import type { MapAoe, MapVision, MapWall } from "../map/types";
 
 // Map dimensions: 1000×750 natural pixels; fog canvas: 1024×768
 const MAP_W = 1000;
@@ -53,20 +53,39 @@ function polyfillHTMLElement() {
 // ---- Stubs ----
 const appStub = { vault: { adapter: { getResourcePath: () => null as null } } };
 
-function makePanelStub(walls: MapWall[] = []) {
-  const commitFogSpy = vi.fn().mockResolvedValue(undefined);
-  const commitWallsSpy = vi.fn().mockResolvedValue(undefined);
-  return {
-    commitFog: commitFogSpy,
-    commitWalls: commitWallsSpy,
+function makePanelStub(
+  walls: MapWall[] = [],
+  opts: { aoes?: MapAoe[]; visions?: MapVision[]; mode?: "physical" | "fit"; rotation?: 0 | 90 | 180 | 270 } = {}
+) {
+  const aoes = opts.aoes ?? [];
+  const visions = opts.visions ?? [];
+  const stub = {
+    commitFog: vi.fn().mockResolvedValue(undefined),
+    commitWalls: vi.fn().mockResolvedValue(undefined),
+    broadcastAoes: vi.fn(),
+    broadcastVisions: vi.fn(),
+    openAddAoeMenu: vi.fn(),
+    removeAoe: vi.fn((id: string) => {
+      stub.aoes = stub.aoes.filter((a) => a.id !== id);
+    }),
+    refreshPanel: vi.fn(),
+    playerViewportMapSize: vi.fn(() => (opts.mode === "physical" ? { w: 400, h: 300 } : null)),
+    applyExplorePan: vi.fn(),
     fogDataUrl: null as string | null,
     walls,
+    aoes,
+    visions,
     state: {
       pxPerSquare: 100,
       gridOffsetX: 0,
       gridOffsetY: 0,
+      mode: opts.mode ?? "fit",
+      panX: MAP_W / 2,
+      panY: MAP_H / 2,
+      rotation: opts.rotation ?? 0,
     },
   };
+  return stub;
 }
 
 const mapStub: ActiveMap = {
@@ -77,9 +96,15 @@ const mapStub: ActiveMap = {
 };
 
 // ---- Helpers ----
-function openModal(panelStub: ReturnType<typeof makePanelStub>): {
+function openModal(
+  panelStub: ReturnType<typeof makePanelStub>,
+  // Overlay AABB (client rect). Default is 1:1 with the fog canvas so an
+  // unrotated view maps clientX/Y === fog coords.
+  rect: { width: number; height: number } = { width: FOG_W, height: FOG_H }
+): {
   modal: MapExploreModal;
   overlay: HTMLCanvasElement;
+  markers: HTMLElement;
   contentEl: HTMLElement;
 } {
   const modal = new MapExploreModal(
@@ -93,16 +118,20 @@ function openModal(panelStub: ReturnType<typeof makePanelStub>): {
   const stage = modal.contentEl.querySelector(".dm-explore-stage") as HTMLElement;
   const overlay = stage.querySelector(".dm-explore-overlay") as HTMLCanvasElement;
 
-  // Stub getBoundingClientRect so toFog maps 1:1 (clientX/Y === fog canvas coords)
   overlay.getBoundingClientRect = () => ({
     left: 0, top: 0,
-    width: FOG_W, height: FOG_H,
-    right: FOG_W, bottom: FOG_H,
+    width: rect.width, height: rect.height,
+    right: rect.width, bottom: rect.height,
     x: 0, y: 0,
     toJSON: () => ({}),
   });
 
-  return { modal, overlay, contentEl: modal.contentEl };
+  const markers = stage.querySelector(".dm-explore-markers") as HTMLElement;
+  return { modal, overlay, markers, contentEl: modal.contentEl };
+}
+
+function fireDocMouse(type: "mousemove" | "mouseup", x: number, y: number) {
+  document.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true }));
 }
 
 function findBtn(contentEl: HTMLElement, text: string): HTMLButtonElement {
@@ -275,5 +304,123 @@ describe("MapExploreModal — listener cleanup", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(panel.commitFog).not.toHaveBeenCalled();
     expect(panel.commitWalls).not.toHaveBeenCalled();
+  });
+});
+
+describe("MapExploreModal — rotated view", () => {
+  it("a click under a 90° view maps to the correct room via toFog", async () => {
+    // Two rooms split by a vertical wall at natural x=500 (fog x≈512).
+    const panel = makePanelStub([{ x1: 500, y1: 0, x2: 500, y2: MAP_H }], { rotation: 90 });
+    // Rotated 90°, the unrotated 1024×768 overlay's AABB is 768×1024.
+    const { modal, overlay, contentEl } = openModal(panel, { width: FOG_H, height: FOG_W });
+    coverAll(contentEl);
+    panel.commitFog.mockClear();
+
+    // Client (384, 256) un-rotates (invRotation 270) to fog Room A centre (256, 384).
+    fireMousedown(overlay, 384, 256);
+
+    await vi.waitFor(() => expect(panel.commitFog).toHaveBeenCalled());
+    const ctx = await decodeLastFog(panel.commitFog);
+    // Room A revealed, Room B across the wall stays covered.
+    expect(ctx.getImageData(200, 384, 1, 1).data[3]).toBeLessThan(50);
+    expect(ctx.getImageData(800, 384, 1, 1).data[3]).toBeGreaterThan(200);
+
+    modal.onClose();
+  });
+});
+
+describe("MapExploreModal — players' viewport rectangle", () => {
+  it("renders a draggable viewport rect only in physical mode", () => {
+    const fit = openModal(makePanelStub([], { mode: "fit" }));
+    expect(fit.markers.querySelector(".dm-map-viewport-rect")).toBeNull();
+    fit.modal.onClose();
+
+    const phys = openModal(makePanelStub([], { mode: "physical" }));
+    expect(phys.markers.querySelector(".dm-map-viewport-rect")).not.toBeNull();
+    phys.modal.onClose();
+  });
+
+  it("dragging the rect moves the players' view via applyExplorePan (throttled, then immediate on release)", () => {
+    const panel = makePanelStub([], { mode: "physical" });
+    const { modal, markers } = openModal(panel);
+    const rect = markers.querySelector(".dm-map-viewport-rect") as HTMLElement;
+
+    // Overlay rect is 1:1 with fog px (1024×768); deltaToMap divides by that and
+    // scales to natural (1000×750). Drag +102.4 fog px → +100 natural px.
+    rect.dispatchEvent(new MouseEvent("mousedown", { clientX: 500, clientY: 400, button: 0, bubbles: true }));
+    fireDocMouse("mousemove", 500 + 102.4, 400);
+    expect(panel.applyExplorePan).toHaveBeenLastCalledWith(MAP_W / 2 + 100, MAP_H / 2);
+
+    fireDocMouse("mouseup", 500 + 102.4, 400);
+    expect(panel.applyExplorePan).toHaveBeenLastCalledWith(MAP_W / 2 + 100, MAP_H / 2, true);
+
+    modal.onClose();
+  });
+});
+
+describe("MapExploreModal — AoE and vision markers", () => {
+  const anAoe = (): MapAoe => ({
+    id: "aoe-1", shape: "circle", sizeFt: 20, widthFt: 5, color: "#ff4400", opacity: 0.3, rotation: 0,
+    x: MAP_W / 2, y: MAP_H / 2,
+  });
+
+  it("dragging an AoE dot moves it and broadcasts (throttled + immediate on release)", () => {
+    const aoe = anAoe();
+    const panel = makePanelStub([], { aoes: [aoe] });
+    const { modal, markers } = openModal(panel);
+    const dot = markers.querySelector(".dm-map-aoe-dot") as HTMLElement;
+
+    dot.dispatchEvent(new MouseEvent("mousedown", { clientX: 0, clientY: 0, button: 0, bubbles: true }));
+    fireDocMouse("mousemove", 102.4, 0); // +100 natural px in x
+    expect(aoe.x).toBeCloseTo(MAP_W / 2 + 100, 1);
+    expect(panel.broadcastAoes).toHaveBeenCalledWith();
+
+    fireDocMouse("mouseup", 102.4, 0);
+    expect(panel.broadcastAoes).toHaveBeenLastCalledWith(true);
+
+    modal.onClose();
+  });
+
+  it("right-clicking an AoE dot removes it via panel.removeAoe", () => {
+    const panel = makePanelStub([], { aoes: [anAoe()] });
+    const { modal, markers } = openModal(panel);
+    const dot = markers.querySelector(".dm-map-aoe-dot") as HTMLElement;
+
+    dot.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    expect(panel.removeAoe).toHaveBeenCalledWith("aoe-1");
+
+    modal.onClose();
+  });
+
+  it("dragging a vision dot moves it and broadcasts", () => {
+    const vision: MapVision = { id: "v-1", shape: "circle", x: MAP_W / 2, y: MAP_H / 2, sizeFt: 30, featherFt: 5 };
+    const panel = makePanelStub([], { visions: [vision] });
+    const { modal, markers } = openModal(panel);
+    const dot = markers.querySelector(".dm-map-vision-dot") as HTMLElement;
+
+    dot.dispatchEvent(new MouseEvent("mousedown", { clientX: 0, clientY: 0, button: 0, bubbles: true }));
+    fireDocMouse("mousemove", 0, 102.4); // +100 natural px in y (768 fog h → 750 natural)
+    expect(vision.y).toBeCloseTo(MAP_H / 2 + 100, 0);
+    expect(panel.broadcastVisions).toHaveBeenCalledWith();
+
+    fireDocMouse("mouseup", 0, 102.4);
+    expect(panel.broadcastVisions).toHaveBeenLastCalledWith(true);
+
+    modal.onClose();
+  });
+
+  it("Add AoE button delegates to panel.openAddAoeMenu", () => {
+    const panel = makePanelStub();
+    const { modal, contentEl } = openModal(panel);
+    findBtn(contentEl, "Add AoE").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(panel.openAddAoeMenu).toHaveBeenCalled();
+    modal.onClose();
+  });
+
+  it("closing the modal refreshes the DM panel", () => {
+    const panel = makePanelStub();
+    const { modal } = openModal(panel);
+    modal.onClose();
+    expect(panel.refreshPanel).toHaveBeenCalled();
   });
 });

@@ -176,7 +176,7 @@ export class MapScreenPanel {
     }, VIEW_BROADCAST_THROTTLE_MS);
   }
 
-  private broadcastAoes(immediate = false) {
+  broadcastAoes(immediate = false) {
     const send = () => {
       this.plugin.server?.broadcast({ type: "map-aoe-sync", payload: { aoes: this.aoes } });
     };
@@ -946,25 +946,7 @@ export class MapScreenPanel {
     header.createSpan({ text: "AoE Overlays", cls: "dm-status-detail" });
 
     const addBtn = header.createEl("button", { text: "Add AoE" });
-    addBtn.addEventListener("click", (evt: MouseEvent) => {
-      const menu = new Menu();
-      for (const preset of SHAPE_PRESETS) {
-        menu.addItem((item) => item.setTitle(preset.name).onClick(() => this.addAoe(preset, map)));
-      }
-      menu.addSeparator();
-      menu.addItem((item) =>
-        item.setTitle("Spells…").onClick(() => {
-          new SpellAoeModal(this.plugin.app, (spell) =>
-            this.addAoe(
-              { name: spell.name, shape: spell.shape, sizeFt: spell.sizeFt, widthFt: spell.widthFt, color: spell.color, opacity: 0.3 },
-              map,
-              spell.name
-            )
-          ).open();
-        })
-      );
-      menu.showAtMouseEvent(evt);
-    });
+    addBtn.addEventListener("click", (evt: MouseEvent) => this.openAddAoeMenu(evt, map));
 
     if (this.aoes.length === 0) return;
 
@@ -1077,7 +1059,30 @@ export class MapScreenPanel {
     });
   }
 
-  private addAoe(preset: AoePreset, map: ActiveMap, label?: string) {
+  openAddAoeMenu(evt: MouseEvent, map: ActiveMap, onChange?: () => void) {
+    const add = (preset: AoePreset, label?: string) => {
+      this.addAoe(preset, map, label);
+      onChange?.();
+    };
+    const menu = new Menu();
+    for (const preset of SHAPE_PRESETS) {
+      menu.addItem((item) => item.setTitle(preset.name).onClick(() => add(preset)));
+    }
+    menu.addSeparator();
+    menu.addItem((item) =>
+      item.setTitle("Spells…").onClick(() => {
+        new SpellAoeModal(this.plugin.app, (spell) =>
+          add(
+            { name: spell.name, shape: spell.shape, sizeFt: spell.sizeFt, widthFt: spell.widthFt, color: spell.color, opacity: 0.3 },
+            spell.name
+          )
+        ).open();
+      })
+    );
+    menu.showAtMouseEvent(evt);
+  }
+
+  addAoe(preset: AoePreset, map: ActiveMap, label?: string) {
     this.aoes.push({
       id: `aoe-${nextAoeId++}`,
       shape: preset.shape,
@@ -1092,6 +1097,50 @@ export class MapScreenPanel {
     });
     this.broadcastAoes(true);
     this.host.render();
+  }
+
+  removeAoe(id: string) {
+    this.aoes = this.aoes.filter((a) => a.id !== id);
+    this.broadcastAoes(true);
+    this.host.render();
+  }
+
+  refreshPanel() {
+    this.host.render();
+  }
+
+  // Player-viewport window in map pixels for the current physical scale, or null
+  // when not in physical mode (fit mode shows the whole map — no window to move).
+  // Mirrors renderPanPreview's visW/visH, honoring the rotated screen dimensions.
+  playerViewportMapSize(): { w: number; h: number } | null {
+    if (!this.activeMap || this.state.mode !== "physical") return null;
+    const client = this.effectiveMapClient();
+    const { ppi } = this.clientPpi(client);
+    const scale = ppi / this.state.pxPerSquare;
+    const sideways = (this.state.rotation ?? 0) % 180 !== 0;
+    return {
+      w: (sideways ? client.height : client.width) / scale,
+      h: (sideways ? client.width : client.height) / scale,
+    };
+  }
+
+  // Move the players' viewport centre to (panX, panY) in map pixels, clamped so
+  // no empty region shows; throttled unless `immediate`. Used by the Explore
+  // modal's draggable viewport rectangle.
+  applyExplorePan(panX: number, panY: number, immediate = false) {
+    if (!this.activeMap || this.state.mode !== "physical") return;
+    const client = this.effectiveMapClient();
+    const { ppi } = this.clientPpi(client);
+    const scale = ppi / this.state.pxPerSquare;
+    const clamped = clampPan(
+      panX, panY,
+      this.activeMap.naturalWidth, this.activeMap.naturalHeight,
+      client.width, client.height, scale, this.state.rotation ?? 0
+    );
+    this.state.panX = clamped.panX;
+    this.state.panY = clamped.panY;
+    this.broadcastView(immediate);
+    if (immediate) this.persistState();
   }
 
   private renderVisionControls(section: HTMLElement, map: ActiveMap) {

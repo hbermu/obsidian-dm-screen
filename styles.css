@@ -682,6 +682,7 @@
 
 .dm-layer-btn-row {
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-wrap: wrap;
 }
@@ -2069,19 +2070,37 @@
   gap: 6px;
   margin-bottom: 8px;
 }
+/* The content column fills the modal so the stage can claim the leftover
+   height below the bar (the map box is centred and rotated within it). */
+.dm-explore-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
 .dm-explore-stage {
   position: relative;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   overflow: hidden;
   background: var(--background-secondary);
 }
-.dm-explore-stage img,
-.dm-explore-stage video {
+/* The rotated map box: sized to the map's aspect, centred, spun to the TV
+   orientation. Its children (media, overlay, markers) rotate solidly with it. */
+.dm-explore-inner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.dm-explore-inner > img,
+.dm-explore-inner > video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: fill;
+  pointer-events: none;
 }
 .dm-explore-overlay {
   position: absolute;
@@ -2089,4 +2108,17 @@
   width: 100%;
   height: 100%;
   cursor: pointer;
+}
+/* Marker layer passes clicks to the overlay; only dots and the viewport rect
+   opt back in to pointer events. */
+.dm-explore-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.dm-explore-markers .dm-map-aoe-dot,
+.dm-explore-markers .dm-map-aoe-rot-handle,
+.dm-explore-markers .dm-map-vision-dot,
+.dm-explore-markers .dm-map-viewport-rect {
+  pointer-events: auto;
 }
