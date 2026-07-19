@@ -48,6 +48,11 @@ function polyfillHTMLElement() {
   if (!HTMLElement.prototype.empty) {
     (HTMLElement.prototype as unknown as Record<string, unknown>).empty = function () { this.innerHTML = ""; };
   }
+  if (!HTMLElement.prototype.toggleClass) {
+    (HTMLElement.prototype as unknown as Record<string, unknown>).toggleClass = function (cls: string, value: boolean) {
+      this.classList.toggle(cls, value);
+    };
+  }
 }
 
 // ---- Stubs ----
@@ -70,7 +75,18 @@ function makePanelStub(
     }),
     refreshPanel: vi.fn(),
     playerViewportMapSize: vi.fn(() => (opts.mode === "physical" ? { w: 400, h: 300 } : null)),
-    applyExplorePan: vi.fn(),
+    applyExplorePan: vi.fn((x: number, y: number) => {
+      stub.state.panX = x;
+      stub.state.panY = y;
+      let changed = false;
+      for (const v of stub.visions) {
+        if (v.followsView) { v.x = x; v.y = y; changed = true; }
+      }
+      return changed;
+    }),
+    renderAoeSection: vi.fn(),
+    renderVisionSection: vi.fn(),
+    viewLocked: false,
     fogDataUrl: null as string | null,
     walls,
     aoes,
@@ -349,7 +365,7 @@ describe("MapExploreModal — players' viewport rectangle", () => {
     // scales to natural (1000×750). Drag +102.4 fog px → +100 natural px.
     rect.dispatchEvent(new MouseEvent("mousedown", { clientX: 500, clientY: 400, button: 0, bubbles: true }));
     fireDocMouse("mousemove", 500 + 102.4, 400);
-    expect(panel.applyExplorePan).toHaveBeenLastCalledWith(MAP_W / 2 + 100, MAP_H / 2);
+    expect(panel.applyExplorePan).toHaveBeenLastCalledWith(MAP_W / 2 + 100, MAP_H / 2, false);
 
     fireDocMouse("mouseup", 500 + 102.4, 400);
     expect(panel.applyExplorePan).toHaveBeenLastCalledWith(MAP_W / 2 + 100, MAP_H / 2, true);
@@ -409,11 +425,13 @@ describe("MapExploreModal — AoE and vision markers", () => {
     modal.onClose();
   });
 
-  it("Add AoE button delegates to panel.openAddAoeMenu", () => {
+  it("renders the AoE + Vision control sidebar by reusing the panel sections", () => {
     const panel = makePanelStub();
     const { modal, contentEl } = openModal(panel);
-    findBtn(contentEl, "Add AoE").dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(panel.openAddAoeMenu).toHaveBeenCalled();
+    const sidebar = contentEl.querySelector(".dm-explore-sidebar") as HTMLElement;
+    expect(sidebar).not.toBeNull();
+    expect(panel.renderAoeSection).toHaveBeenCalledWith(sidebar, mapStub, expect.any(Function));
+    expect(panel.renderVisionSection).toHaveBeenCalledWith(sidebar, mapStub, expect.any(Function));
     modal.onClose();
   });
 
@@ -422,5 +440,56 @@ describe("MapExploreModal — AoE and vision markers", () => {
     const { modal } = openModal(panel);
     modal.onClose();
     expect(panel.refreshPanel).toHaveBeenCalled();
+  });
+});
+
+describe("MapExploreModal — view lock", () => {
+  it("the lock button toggles panel.viewLocked and disables the viewport rect", () => {
+    const panel = makePanelStub([], { mode: "physical" });
+    const { modal, markers, contentEl } = openModal(panel);
+    const lockBtn = contentEl.querySelector(".dm-explore-lock-btn") as HTMLButtonElement;
+
+    // Initially unlocked: rect is draggable (not the locked variant).
+    expect(markers.querySelector(".dm-map-viewport-rect.dm-explore-rect-locked")).toBeNull();
+
+    lockBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(panel.viewLocked).toBe(true);
+    // Markers re-rendered: the rect is now the passive locked variant.
+    expect(markers.querySelector(".dm-map-viewport-rect.dm-explore-rect-locked")).not.toBeNull();
+
+    modal.onClose();
+  });
+
+  it("a locked view ignores viewport-rect drags", () => {
+    const panel = makePanelStub([], { mode: "physical" });
+    panel.viewLocked = true;
+    const { modal, markers } = openModal(panel);
+    const rect = markers.querySelector(".dm-map-viewport-rect") as HTMLElement;
+
+    rect.dispatchEvent(new MouseEvent("mousedown", { clientX: 500, clientY: 400, button: 0, bubbles: true }));
+    fireDocMouse("mousemove", 700, 400);
+    expect(panel.applyExplorePan).not.toHaveBeenCalled();
+
+    modal.onClose();
+  });
+});
+
+describe("MapExploreModal — view-bound vision", () => {
+  it("dragging the viewport rect drags a view-bound vision along with it", () => {
+    const vision: MapVision = {
+      id: "v-1", shape: "circle", x: MAP_W / 2, y: MAP_H / 2, sizeFt: 30, featherFt: 5, followsView: true,
+    };
+    const panel = makePanelStub([], { mode: "physical", visions: [vision] });
+    const { modal, markers } = openModal(panel);
+    const rect = markers.querySelector(".dm-map-viewport-rect") as HTMLElement;
+
+    rect.dispatchEvent(new MouseEvent("mousedown", { clientX: 500, clientY: 400, button: 0, bubbles: true }));
+    fireDocMouse("mousemove", 500 + 102.4, 400); // +100 natural px in x
+    // applyExplorePan (stub) moved the bound vision onto the new view centre.
+    expect(vision.x).toBeCloseTo(MAP_W / 2 + 100, 1);
+    expect(vision.y).toBeCloseTo(MAP_H / 2, 1);
+
+    fireDocMouse("mouseup", 500 + 102.4, 400);
+    modal.onClose();
   });
 });

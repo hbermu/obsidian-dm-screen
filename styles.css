@@ -2070,20 +2070,50 @@
   gap: 6px;
   margin-bottom: 8px;
 }
-/* The content column fills the modal so the stage can claim the leftover
-   height below the bar (the map box is centred and rotated within it). */
+/* The content column fills the modal so the body can claim the leftover
+   height below the bar. */
 .dm-explore-content {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
+/* Body is a row: the map stage grows to fill, the control sidebar sits at a
+   fixed width on the right. */
+.dm-explore-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+}
 .dm-explore-stage {
   position: relative;
   flex: 1;
   min-height: 0;
-  width: 100%;
+  min-width: 0;
   overflow: hidden;
   background: var(--background-secondary);
+}
+/* The AoE/Vision control panel, reusing the DM panel's row layout. */
+.dm-explore-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.dm-explore-lock-btn.dm-fog-active,
+.dm-map-vision-bind.dm-fog-active {
+  color: var(--text-normal);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+.dm-map-vision-bind {
+  min-width: 28px;
+  padding: 2px 6px;
+}
+/* A locked viewport rect is a passive dashed outline — not draggable. */
+.dm-explore-markers .dm-map-viewport-rect.dm-explore-rect-locked {
+  pointer-events: none;
+  border-style: dashed;
+  cursor: default;
 }
 /* The rotated map box: sized to the map's aspect, centred, spun to the TV
    orientation. Its children (media, overlay, markers) rotate solidly with it. */

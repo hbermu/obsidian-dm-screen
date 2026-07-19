@@ -1,4 +1,4 @@
-import { App, Modal, Notice } from "obsidian";
+import { App, Modal, Notice, setIcon } from "obsidian";
 import type DmScreenPlugin from "../main";
 import type { MapScreenPanel, ActiveMap } from "./MapScreenPanel";
 import { fogCanvasSize } from "../map/fog";
@@ -80,10 +80,24 @@ export class MapExploreModal extends Modal {
     const bar = contentEl.createDiv("dm-explore-bar");
     const revealAll = bar.createEl("button", { text: "Reveal All" });
     const coverAll = bar.createEl("button", { text: "Cover All", cls: "mod-warning" });
-    const addAoeBtn = bar.createEl("button", { text: "Add AoE" });
+    const lockBtn = bar.createEl("button", { cls: "dm-explore-lock-btn" });
+    const syncLockIcon = () => {
+      setIcon(lockBtn, this.panel.viewLocked ? "lock" : "unlock");
+      lockBtn.title = this.panel.viewLocked
+        ? "View locked — the players' viewport can't be moved. Click to unlock."
+        : "Lock the players' view so it can't be dragged by accident";
+      lockBtn.toggleClass("dm-fog-active", this.panel.viewLocked);
+    };
+    syncLockIcon();
+    lockBtn.addEventListener("click", () => {
+      this.panel.viewLocked = !this.panel.viewLocked;
+      syncLockIcon();
+      this.renderMarkers?.();
+    });
     const exitBtn = bar.createEl("button", { text: "Exit" });
 
-    const stage = contentEl.createDiv("dm-explore-stage");
+    const body = contentEl.createDiv("dm-explore-body");
+    const stage = body.createDiv("dm-explore-stage");
     // The inner box carries the map's exact aspect and rotates to the TV
     // orientation; the overlay and markers are its children so they rotate
     // solidly with the map. Client↔fog/map conversions un-rotate through
@@ -235,13 +249,29 @@ export class MapExploreModal extends Modal {
       return { x: (r.x / uw) * nw, y: (r.y / uh) * nh };
     };
 
+    const sidebar = body.createDiv("dm-explore-sidebar");
+
     const renderMarkers = () => {
       markers.empty();
       this.buildAoeMarkers(markers, nw, nh, rotation, overlayGeom, deltaToMap, redraw);
       this.buildVisionMarkers(markers, nw, nh, deltaToMap, redraw);
-      this.buildViewportRect(markers, nw, nh, deltaToMap);
+      this.buildViewportRect(markers, nw, nh, deltaToMap, redraw);
     };
     this.renderMarkers = renderMarkers;
+
+    // Full refresh after any structural edit made in the side panel: rebuild the
+    // AoE/vision rows, the on-map markers, and repaint the overlay footprints.
+    const refresh = () => {
+      renderSidebar();
+      renderMarkers();
+      redraw();
+    };
+    const renderSidebar = () => {
+      sidebar.empty();
+      this.panel.renderAoeSection(sidebar, this.map, refresh);
+      this.panel.renderVisionSection(sidebar, this.map, refresh);
+    };
+    renderSidebar();
     renderMarkers();
 
     revealAll.addEventListener("click", () => {
@@ -256,12 +286,6 @@ export class MapExploreModal extends Modal {
       ctx.fillRect(0, 0, this.fogCanvas.width, this.fogCanvas.height);
       redraw();
       this.commitFog();
-    });
-    addAoeBtn.addEventListener("click", (evt: MouseEvent) => {
-      this.panel.openAddAoeMenu(evt, this.map, () => {
-        renderMarkers();
-        redraw();
-      });
     });
     exitBtn.addEventListener("click", () => this.close());
 
@@ -468,18 +492,23 @@ export class MapExploreModal extends Modal {
   }
 
   // Draggable players'-viewport rectangle (physical mode only) — repositions
-  // the visible window on the table TV without touching the DM's own rotated view.
+  // the visible window on the table TV without touching the DM's own rotated
+  // view. While the view is locked the rect is inert (dashed, no pointer). A
+  // vision bound to the view (followsView) is dragged along by applyExplorePan,
+  // so redraw + re-place the vision dots on every step.
   private buildViewportRect(
     layer: HTMLElement,
     nw: number,
     nh: number,
-    deltaToMap: (dx: number, dy: number) => { x: number; y: number }
+    deltaToMap: (dx: number, dy: number) => { x: number; y: number },
+    redraw: () => void
   ) {
     if (this.panel.state.mode !== "physical") return;
     const vis = this.panel.playerViewportMapSize();
     if (!vis) return;
 
     const rect = layer.createDiv("dm-map-viewport-rect");
+    rect.toggleClass("dm-explore-rect-locked", this.panel.viewLocked);
     const position = () => {
       rect.style.width = `${Math.min((vis.w / nw) * 100, 100)}%`;
       rect.style.height = `${Math.min((vis.h / nh) * 100, 100)}%`;
@@ -487,7 +516,9 @@ export class MapExploreModal extends Modal {
       rect.style.top = `${((this.panel.state.panY - vis.h / 2) / nh) * 100}%`;
     };
     position();
+    if (this.panel.viewLocked) return;
 
+    const hasBoundVision = this.panel.visions.some((v) => v.followsView);
     rect.addEventListener("mousedown", (ev: MouseEvent) => {
       if (ev.button !== 0) return;
       ev.preventDefault();
@@ -496,17 +527,20 @@ export class MapExploreModal extends Modal {
       const startY = ev.clientY;
       const startPanX = this.panel.state.panX;
       const startPanY = this.panel.state.panY;
-      this.beginDrag(
-        (me) => {
-          const d = deltaToMap(me.clientX - startX, me.clientY - startY);
-          this.panel.applyExplorePan(startPanX + d.x, startPanY + d.y);
-          position();
-        },
-        (me) => {
-          const d = deltaToMap(me.clientX - startX, me.clientY - startY);
-          this.panel.applyExplorePan(startPanX + d.x, startPanY + d.y, true);
-          position();
+      const step = (me: MouseEvent, immediate: boolean) => {
+        const d = deltaToMap(me.clientX - startX, me.clientY - startY);
+        this.panel.applyExplorePan(startPanX + d.x, startPanY + d.y, immediate);
+        position();
+        // A bound vision moved with the view — repaint its footprint (overlay)
+        // and its dot (markers layer).
+        if (hasBoundVision) {
+          redraw();
+          this.renderMarkers?.();
         }
+      };
+      this.beginDrag(
+        (me) => step(me, false),
+        (me) => step(me, true)
       );
     });
   }
