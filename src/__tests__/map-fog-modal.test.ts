@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { zipSync } from "fflate";
 import { installNapiCanvas, pixelAt } from "../../test/canvas/napi-canvas-shim";
 import { MapFogModal } from "../views/MapFogModal";
 import { fogCanvasSize } from "../map/fog";
@@ -653,6 +654,184 @@ describe("MapFogModal — uvtt import", () => {
 
     expect(panel.commitWalls).not.toHaveBeenCalled();
     expect(noticeSpy).toHaveBeenCalledWith(expect.stringContaining("UVTT import failed"), 6000);
+
+    noticeSpy.mockRestore();
+    modal.onClose();
+  });
+});
+
+describe("MapFogModal Walls tab — Rect wall tool", () => {
+  function switchToWalls(contentEl: HTMLElement) {
+    findBtn(contentEl, "Walls").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  }
+
+  function getOverlayAfterSwitch(modal: MapFogModal): HTMLCanvasElement {
+    const stage = modal.contentEl.querySelector(".dm-fog-stage") as HTMLElement;
+    const overlay = stage.querySelector(".dm-fog-overlay") as HTMLCanvasElement;
+    overlay.getBoundingClientRect = () => ({
+      left: 0, top: 0, width: FOG_W, height: FOG_H,
+      right: FOG_W, bottom: FOG_H, x: 0, y: 0, toJSON: () => ({}),
+    });
+    return overlay;
+  }
+
+  it("mousedown+mouseup creates 4 plain wall segments forming the bbox", () => {
+    const panel = makePanelStub();
+    const { modal, contentEl } = openModal(panel);
+    switchToWalls(contentEl);
+    const overlay = getOverlayAfterSwitch(modal);
+
+    findBtn(contentEl, "Rect").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // fog coords (100,100) → natural (≈97.6, 97.6); (300,250) → natural (≈292.9, 244.1)
+    // We use identity-mapped coords for simplicity: getBoundingClientRect returns FOG_W×FOG_H
+    // so toFog gives fog coords directly; toNatural divides by fogScale ≈ 1.024
+    fireMousedown(overlay, 102, 102); // anchor ~= nat (99.6, 99.6) ≈ 100,100
+    fireMousemove(200, 150);
+    fireMouseup(307, 256); // end ~= nat (300, 250) after / fogScale
+
+    expect(panel.commitWalls).toHaveBeenCalledTimes(1);
+    const walls = panel.commitWalls.mock.calls[0][0] as MapWall[];
+    expect(walls).toHaveLength(4);
+
+    // All walls must be plain (no door property set to true)
+    for (const w of walls) {
+      expect(w.door).toBeFalsy();
+    }
+
+    // Find bounding box from the 4 walls
+    const xs = walls.flatMap((w) => [w.x1, w.x2]);
+    const ys = walls.flatMap((w) => [w.y1, w.y2]);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    // bbox should be non-degenerate
+    expect(maxX - minX).toBeGreaterThan(0);
+    expect(maxY - minY).toBeGreaterThan(0);
+
+    // The 4 edges: top, right, bottom, left
+    const top = walls.find((w) => w.y1 === minY && w.y2 === minY);
+    const right = walls.find((w) => w.x1 === maxX && w.x2 === maxX);
+    const bottom = walls.find((w) => w.y1 === maxY && w.y2 === maxY);
+    const left = walls.find((w) => w.x1 === minX && w.x2 === minX);
+    expect(top).toBeDefined();
+    expect(right).toBeDefined();
+    expect(bottom).toBeDefined();
+    expect(left).toBeDefined();
+
+    modal.onClose();
+  });
+
+  it("erase removes one of the four rect walls, leaving three", () => {
+    const panel = makePanelStub();
+    const { modal, contentEl } = openModal(panel);
+    switchToWalls(contentEl);
+    const overlay = getOverlayAfterSwitch(modal);
+
+    findBtn(contentEl, "Rect").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Drag a ~100×100 rect starting at natural ≈ (100,100)
+    fireMousedown(overlay, 102, 102);
+    fireMouseup(204, 204);
+
+    expect(panel.commitWalls).toHaveBeenCalledTimes(1);
+    let walls = panel.commitWalls.mock.calls[0][0] as MapWall[];
+    expect(walls).toHaveLength(4);
+    panel.commitWalls.mockClear();
+
+    // Switch to Erase and click near the midpoint of the top edge
+    // top edge is at y≈100 (natural), midpoint x≈150 → fog (154, 102)
+    findBtn(contentEl, "Erase").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    fireMousedown(overlay, 154, 102); // should hit top edge
+
+    expect(panel.commitWalls).toHaveBeenCalledTimes(1);
+    walls = panel.commitWalls.mock.calls[0][0] as MapWall[];
+    expect(walls).toHaveLength(3);
+
+    modal.onClose();
+  });
+
+  it("degenerate rect (zero width) does not call commitWalls", () => {
+    const panel = makePanelStub();
+    const { modal, contentEl } = openModal(panel);
+    switchToWalls(contentEl);
+    const overlay = getOverlayAfterSwitch(modal);
+
+    findBtn(contentEl, "Rect").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Same X for both start and end
+    fireMousedown(overlay, 100, 100);
+    fireMouseup(100, 200);
+
+    expect(panel.commitWalls).not.toHaveBeenCalled();
+    modal.onClose();
+  });
+});
+
+describe("MapFogModal — Foundry import", () => {
+  function openModalWithNaturalWidth(naturalWidth: number): { modal: MapFogModal; panel: ReturnType<typeof makePanelStub> } {
+    const panel = makePanelStub();
+    const map: ActiveMap = {
+      url: "/vault/test.png",
+      mediaType: "image",
+      naturalWidth,
+      naturalHeight: Math.round(naturalWidth * 0.6),
+    };
+    const modal = new MapFogModal(
+      appStub as never,
+      { app: appStub, settings: { mapFogTvOpacity: 0.9 } } as never,
+      panel as never,
+      map
+    );
+    modal.onOpen();
+    return { modal, panel };
+  }
+
+  it("importFoundryZip scales walls to the displayed map width and sets grid", () => {
+    // Scene: 1000×800, gridSize=100 → gridSquares={x:10,y:8}, pixelsPerGrid=100
+    // naturalWidth = 2000 (2× scene width) → scale = 2
+    const scene = {
+      _id: "z1",
+      name: "TestScene",
+      width: 1000,
+      height: 800,
+      grid: 100,
+      walls: [
+        { c: [0, 0, 1000, 0], sense: 20 },
+        { c: [0, 0, 0, 800], sense: 20 },
+      ],
+    };
+    const nedbStr = JSON.stringify(scene) + "\n";
+    const zipBytes = zipSync({ "packs/maps.db": new TextEncoder().encode(nedbStr) });
+
+    const { modal, panel } = openModalWithNaturalWidth(2000);
+    modal.importFoundryZip(zipBytes);
+
+    expect(panel.commitWalls).toHaveBeenCalledTimes(1);
+    const walls = panel.commitWalls.mock.calls[0][0] as MapWall[];
+    // scale = 2000 / (10 * 100) = 2
+    expect(walls).toHaveLength(2);
+    expect(walls[0]).toMatchObject({ x1: 0, y1: 0, x2: 2000, y2: 0 });
+    expect(walls[1]).toMatchObject({ x1: 0, y1: 0, x2: 0, y2: 1600 });
+
+    // pxPerSquare = 2000 / 10 = 200
+    expect(panel.applyGridConfig).toHaveBeenCalledWith(200, 0, 0);
+
+    modal.onClose();
+  });
+
+  it("bad zip (no db/log/ldb entries) shows Notice and does not call commitWalls", async () => {
+    const obsidian = await import("obsidian");
+    const noticeSpy = vi.spyOn(obsidian, "Notice");
+
+    const zipBytes = zipSync({ "readme.txt": new TextEncoder().encode("hello") });
+    const { modal, panel } = openModalWithNaturalWidth(1000);
+    modal.importFoundryZip(zipBytes);
+
+    expect(panel.commitWalls).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenCalledWith(expect.stringContaining("Foundry import failed"), 6000);
 
     noticeSpy.mockRestore();
     modal.onClose();

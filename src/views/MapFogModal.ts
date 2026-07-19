@@ -1,4 +1,5 @@
 import { App, Modal, Notice } from "obsidian";
+import { unzipSync } from "fflate";
 import type DmScreenPlugin from "../main";
 import type { MapScreenPanel, ActiveMap } from "./MapScreenPanel";
 import { fogCanvasSize, gridCellRectAt } from "../map/fog";
@@ -7,12 +8,15 @@ import { blocksSight } from "../map/los";
 import { vaultPathFromUrl } from "../server";
 import type { MapWall } from "../map/types";
 import { parseUvttWalls } from "../map/uvtt";
+import type { UvttParseResult } from "../map/uvtt";
+import { parseFoundryModule } from "../map/foundry";
+import type { FoundryImportResult } from "../map/foundry";
 import { debug } from "../debug";
 
 type FogTool = "brush" | "rect" | "cell" | "gridrect" | "room";
 type FogMode = "reveal" | "cover";
 type EditorMode = "fog" | "walls";
-type WallsTool = "wall" | "door" | "erase" | "toggle";
+type WallsTool = "wall" | "door" | "erase" | "toggle" | "rect";
 
 export class MapFogModal extends Modal {
   private tool: FogTool = "brush";
@@ -30,6 +34,8 @@ export class MapFogModal extends Modal {
   private chainAnchor: { x: number; y: number } | null = null;
   // cursor in natural map coords for preview segment
   private cursorNatural: { x: number; y: number } | null = null;
+  // rect wall tool: natural-coord corner of in-progress drag
+  private rectAnchor: { x: number; y: number } | null = null;
 
   constructor(
     app: App,
@@ -148,6 +154,20 @@ export class MapFogModal extends Modal {
         octx.setLineDash([]);
         octx.restore();
       }
+      // Draw rect wall tool preview
+      if (this.editorMode === "walls" && this.wallsTool === "rect" && this.rectAnchor && this.cursorNatural) {
+        octx.save();
+        octx.strokeStyle = "#f5d90a";
+        octx.lineWidth = 2;
+        octx.setLineDash([6, 4]);
+        const ax = this.rectAnchor.x * fogScale;
+        const ay = this.rectAnchor.y * fogScale;
+        const bx = this.cursorNatural.x * fogScale;
+        const by = this.cursorNatural.y * fogScale;
+        octx.strokeRect(ax, ay, bx - ax, by - ay);
+        octx.setLineDash([]);
+        octx.restore();
+      }
     };
     this.redrawOverlay = redraw;
     redraw();
@@ -204,7 +224,7 @@ export class MapFogModal extends Modal {
       const syncActive = () => {
         for (const [t, b] of Object.entries(wallToolBtns)) b.classList.toggle("dm-fog-active", this.wallsTool === (t as WallsTool));
       };
-      for (const [t, label] of [["wall", "Wall"], ["door", "Door"], ["erase", "Erase"], ["toggle", "Toggle door"]] as [WallsTool, string][]) {
+      for (const [t, label] of [["wall", "Wall"], ["door", "Door"], ["erase", "Erase"], ["toggle", "Toggle door"], ["rect", "Rect"]] as [WallsTool, string][]) {
         wallToolBtns[t] = barEl.createEl("button", { text: label });
         wallToolBtns[t].addEventListener("click", () => {
           this.wallsTool = t;
@@ -244,14 +264,30 @@ export class MapFogModal extends Modal {
         input.click();
       });
 
+      const importFoundryBtn = barEl.createEl("button", { text: "Import Foundry" });
+      importFoundryBtn.addEventListener("click", () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".zip";
+        input.addEventListener("change", () => {
+          const file = input.files?.[0];
+          if (!file) return;
+          void file.arrayBuffer().then((buf) => {
+            this.importFoundryZip(new Uint8Array(buf));
+          });
+        });
+        input.click();
+      });
+
       this.setupWallsDrawing(overlay, redraw, fogScale);
     };
 
     const switchTab = (mode: EditorMode) => {
       this.editorMode = mode;
-      // End any chain on mode switch
+      // End any chain and rect drag on mode switch
       this.chainAnchor = null;
       this.cursorNatural = null;
+      this.rectAnchor = null;
       // Remove existing drawing listeners by cloning the overlay
       const newOverlay = overlay.cloneNode(false) as HTMLCanvasElement;
       overlay.replaceWith(newOverlay);
@@ -298,6 +334,19 @@ export class MapFogModal extends Modal {
           newOctx.moveTo(this.chainAnchor.x * fogScale, this.chainAnchor.y * fogScale);
           newOctx.lineTo(this.cursorNatural.x * fogScale, this.cursorNatural.y * fogScale);
           newOctx.stroke();
+          newOctx.setLineDash([]);
+          newOctx.restore();
+        }
+        if (this.editorMode === "walls" && this.wallsTool === "rect" && this.rectAnchor && this.cursorNatural) {
+          newOctx.save();
+          newOctx.strokeStyle = "#f5d90a";
+          newOctx.lineWidth = 2;
+          newOctx.setLineDash([6, 4]);
+          const ax = this.rectAnchor.x * fogScale;
+          const ay = this.rectAnchor.y * fogScale;
+          const bx = this.cursorNatural.x * fogScale;
+          const by = this.cursorNatural.y * fogScale;
+          newOctx.strokeRect(ax, ay, bx - ax, by - ay);
           newOctx.setLineDash([]);
           newOctx.restore();
         }
@@ -544,12 +593,12 @@ export class MapFogModal extends Modal {
 
     overlay.addEventListener("mousemove", (e: MouseEvent) => {
       this.cursorNatural = this.toNatural(overlay, e.clientX, e.clientY);
-      if (this.chainAnchor) redraw();
+      if (this.chainAnchor || this.rectAnchor) redraw();
     });
 
     overlay.addEventListener("mouseleave", () => {
       this.cursorNatural = null;
-      if (this.chainAnchor) redraw();
+      if (this.chainAnchor || this.rectAnchor) redraw();
     });
 
     overlay.addEventListener("contextmenu", (e: MouseEvent) => {
@@ -631,20 +680,56 @@ export class MapFogModal extends Modal {
         }
         return;
       }
+
+      if (this.wallsTool === "rect") {
+        this.rectAnchor = nat;
+        const onMove = (me: MouseEvent) => {
+          this.cursorNatural = this.toNatural(overlay, me.clientX, me.clientY);
+          redraw();
+        };
+        const onUp = (me: MouseEvent) => {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          this.cleanupDrag = null;
+          const end = this.toNatural(overlay, me.clientX, me.clientY);
+          const snapped = this.wallsSnap ? this.snapPoint(end.x, end.y) : end;
+          const anchor = this.wallsSnap && this.rectAnchor
+            ? this.snapPoint(this.rectAnchor.x, this.rectAnchor.y)
+            : this.rectAnchor!;
+          this.rectAnchor = null;
+          const minX = Math.min(anchor.x, snapped.x);
+          const minY = Math.min(anchor.y, snapped.y);
+          const maxX = Math.max(anchor.x, snapped.x);
+          const maxY = Math.max(anchor.y, snapped.y);
+          if (maxX - minX < 0.5 || maxY - minY < 0.5) {
+            redraw();
+            return;
+          }
+          const newWalls: MapWall[] = [
+            { x1: minX, y1: minY, x2: maxX, y2: minY },
+            { x1: maxX, y1: minY, x2: maxX, y2: maxY },
+            { x1: maxX, y1: maxY, x2: minX, y2: maxY },
+            { x1: minX, y1: maxY, x2: minX, y2: minY },
+          ];
+          this.walls = [...this.walls, ...newWalls];
+          void this.panel.commitWalls([...this.walls]);
+          redraw();
+        };
+        this.cleanupDrag = () => {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          this.rectAnchor = null;
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+        return;
+      }
     });
   }
 
-  importUvttDoc(doc: unknown) {
-    let parsed;
-    try {
-      parsed = parseUvttWalls(doc);
-    } catch (err) {
-      new Notice(`UVTT import failed: ${(err as Error).message}`, 6000);
-      return;
-    }
-
-    const scale = this.map.naturalWidth / (parsed.gridSquares.x * parsed.pixelsPerGrid);
-    const scaledWalls: MapWall[] = parsed.walls.map((w) => ({
+  private applyImportedWalls(result: UvttParseResult | FoundryImportResult, sourceLabel: string) {
+    const scale = this.map.naturalWidth / (result.gridSquares.x * result.pixelsPerGrid);
+    const scaledWalls: MapWall[] = result.walls.map((w) => ({
       x1: w.x1 * scale,
       y1: w.y1 * scale,
       x2: w.x2 * scale,
@@ -657,13 +742,42 @@ export class MapFogModal extends Modal {
     void this.panel.commitWalls([...this.walls]);
     this.redrawOverlay?.();
 
-    const rawPxPerSquare = this.map.naturalWidth / parsed.gridSquares.x;
+    const rawPxPerSquare = this.map.naturalWidth / result.gridSquares.x;
     const pxPerSquare = Number.isInteger(rawPxPerSquare) ? rawPxPerSquare : parseFloat(rawPxPerSquare.toFixed(2));
     this.panel.applyGridConfig(pxPerSquare, 0, 0);
 
     const doors = scaledWalls.filter((w) => w.door).length;
-    debug("MapFogModal: importUvttDoc —", scaledWalls.length, "walls,", doors, "doors, pxPerSquare", pxPerSquare);
+    debug(`MapFogModal: ${sourceLabel} —`, scaledWalls.length, "walls,", doors, "doors, pxPerSquare", pxPerSquare);
     new Notice(`Imported ${scaledWalls.length} walls (${doors} doors) — grid set to ${pxPerSquare} px/square`);
+  }
+
+  importUvttDoc(doc: unknown) {
+    let parsed;
+    try {
+      parsed = parseUvttWalls(doc);
+    } catch (err) {
+      new Notice(`UVTT import failed: ${(err as Error).message}`, 6000);
+      return;
+    }
+    this.applyImportedWalls(parsed, "importUvttDoc");
+  }
+
+  importFoundryZip(zipBytes: Uint8Array) {
+    let entries: Record<string, Uint8Array>;
+    try {
+      entries = unzipSync(zipBytes, { filter: (f) => /\.(db|log|ldb)$/i.test(f.name) });
+    } catch (err) {
+      new Notice(`Foundry import failed: ${(err as Error).message}`, 6000);
+      return;
+    }
+    let result: FoundryImportResult;
+    try {
+      result = parseFoundryModule(entries);
+    } catch (err) {
+      new Notice(`Foundry import failed: ${(err as Error).message}`, 6000);
+      return;
+    }
+    this.applyImportedWalls(result, "importFoundryZip");
   }
 
   onClose() {
@@ -673,6 +787,7 @@ export class MapFogModal extends Modal {
     this.cleanupDrag = null;
     this.chainAnchor = null;
     this.cursorNatural = null;
+    this.rectAnchor = null;
     this.redrawOverlay = null;
     this.contentEl.empty();
   }
