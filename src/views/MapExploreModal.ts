@@ -357,10 +357,26 @@ export class MapExploreModal extends Modal {
     overlay.addEventListener("mousedown", onDown);
     overlay.addEventListener("mousemove", onMove);
     overlay.addEventListener("mouseleave", onLeave);
+
+    // Hold Shift to focus exploration: the markers layer goes pointer-transparent
+    // so clicks fall straight through to the overlay's door/room gestures — even
+    // over the viewport rect and AoE/vision dots — without locking the view.
+    // Released the instant Shift is up; blur resets it (Shift held during alt-tab).
+    const setFocus = (on: boolean) => markers.toggleClass("dm-explore-focus", on);
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Shift") setFocus(true); };
+    const onKeyUp = (e: KeyboardEvent) => { if (e.key === "Shift") setFocus(false); };
+    const onBlur = () => setFocus(false);
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+
     this.cleanupListeners = () => {
       overlay.removeEventListener("mousedown", onDown);
       overlay.removeEventListener("mousemove", onMove);
       overlay.removeEventListener("mouseleave", onLeave);
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
     };
   }
 

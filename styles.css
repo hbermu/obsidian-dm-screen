@@ -2152,3 +2152,9 @@
 .dm-explore-markers .dm-map-viewport-rect {
   pointer-events: auto;
 }
+/* Shift-held exploration focus: every marker goes pointer-transparent so clicks
+   pass through to the overlay's door/room gestures anywhere on the map. */
+.dm-explore-markers.dm-explore-focus,
+.dm-explore-markers.dm-explore-focus * {
+  pointer-events: none;
+}

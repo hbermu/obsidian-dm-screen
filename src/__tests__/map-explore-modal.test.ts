@@ -474,6 +474,54 @@ describe("MapExploreModal — view lock", () => {
   });
 });
 
+describe("MapExploreModal — Shift focus (door/room without locking)", () => {
+  function fireKey(type: "keydown" | "keyup", key: string) {
+    document.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true }));
+  }
+
+  it("holding Shift makes the markers layer pointer-transparent; releasing restores it", () => {
+    const panel = makePanelStub([], { mode: "physical" });
+    const { modal, markers } = openModal(panel);
+    expect(markers.classList.contains("dm-explore-focus")).toBe(false);
+
+    fireKey("keydown", "Shift");
+    expect(markers.classList.contains("dm-explore-focus")).toBe(true);
+
+    fireKey("keyup", "Shift");
+    expect(markers.classList.contains("dm-explore-focus")).toBe(false);
+
+    modal.onClose();
+  });
+
+  it("window blur resets the focus (Shift held during alt-tab)", () => {
+    const panel = makePanelStub([], { mode: "physical" });
+    const { modal, markers } = openModal(panel);
+    fireKey("keydown", "Shift");
+    expect(markers.classList.contains("dm-explore-focus")).toBe(true);
+
+    window.dispatchEvent(new Event("blur"));
+    expect(markers.classList.contains("dm-explore-focus")).toBe(false);
+
+    modal.onClose();
+  });
+
+  it("a non-Shift key does not trigger focus", () => {
+    const panel = makePanelStub([]);
+    const { modal, markers } = openModal(panel);
+    fireKey("keydown", "a");
+    expect(markers.classList.contains("dm-explore-focus")).toBe(false);
+    modal.onClose();
+  });
+
+  it("after close, a Shift keydown is inert (listeners removed)", () => {
+    const panel = makePanelStub([]);
+    const { modal, markers } = openModal(panel);
+    modal.onClose();
+    fireKey("keydown", "Shift");
+    expect(markers.classList.contains("dm-explore-focus")).toBe(false);
+  });
+});
+
 describe("MapExploreModal — view-bound vision", () => {
   it("dragging the viewport rect drags a view-bound vision along with it", () => {
     const vision: MapVision = {
