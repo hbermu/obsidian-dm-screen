@@ -189,12 +189,12 @@ The plugin does not collect telemetry, phone home, or transmit any data to third
 
 ## Credits & attribution
 
-The battlemap shown in the map-screen screenshots is by **[Czepeku](https://www.czepeku.com/)**, whose gorgeous, prolific map packs make examples like these possible. If you run in-person or virtual games, their work is well worth supporting:
+The battlemap in the map-screen screenshots is by **[Czepeku](https://www.czepeku.com/)**. They make beautiful maps, a lot of them, and if you run games in person or online their packs are worth every penny.
 
-- 🌐 Website & shop — [czepeku.com](https://www.czepeku.com/)
-- ❤️ Patreon — [patreon.com/czepeku](https://www.patreon.com/czepeku)
+- 🌐 Website & shop: [czepeku.com](https://www.czepeku.com/)
+- ❤️ Patreon: [patreon.com/czepeku](https://www.patreon.com/czepeku)
 
-The map is used here only to illustrate the plugin's features; it is not redistributed with DM Screen, and all rights to it remain with Czepeku. DM Screen itself ships no map assets.
+The map is only here to show off the plugin. It isn't bundled with DM Screen, and all rights to it stay with Czepeku. The plugin ships no map assets of its own.
 
 ## License
 
