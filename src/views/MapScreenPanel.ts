@@ -845,6 +845,10 @@ export class MapScreenPanel {
       });
     }
 
+    // A vision bound to the view moves via syncBoundVisions on pan; collect each
+    // dot's positioner so applyPan can re-place the DOM markers (redrawAoes only
+    // repaints the canvas outline, not these dots).
+    const repositionVisionDots: Array<() => void> = [];
     for (const vision of this.visions) {
       const dot = stage.createDiv("dm-map-vision-dot");
       dot.title = `${vision.shape} ${vision.sizeFt}ft vision — drag to move`;
@@ -853,6 +857,7 @@ export class MapScreenPanel {
         dot.style.top = `${(vision.y / nh) * 100}%`;
       };
       positionVisionDot();
+      repositionVisionDots.push(positionVisionDot);
       dot.addEventListener("mousedown", (ev: MouseEvent) => {
         if (ev.button !== 0) return;
         ev.preventDefault();
@@ -904,7 +909,10 @@ export class MapScreenPanel {
       this.state.panY = clamped.panY;
       positionRect();
       this.broadcastView();
-      if (this.syncBoundVisions()) redrawAoes();
+      if (this.syncBoundVisions()) {
+        redrawAoes();
+        for (const reposition of repositionVisionDots) reposition();
+      }
     };
 
     preview.addEventListener("mousedown", (e: MouseEvent) => {
