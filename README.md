@@ -19,11 +19,16 @@ Built for in-person 5e games where the DM wants a clean visual layer for the pla
 - **Statblock display** — inline 5e statblocks via Fantasy Statblocks.
 - **Multi-screen aware** — multiple connected players with per-client resolution detection.
 - **Map screen for TV tables** — a dedicated `/map` endpoint renders one battlemap (image or animated video) at true 1-inch-per-square physical scale for miniatures on a horizontal TV: per-screen calibration with a ruler test pattern, DM-side panning, fit/physical toggle, and an optional grid overlay for gridless maps.
+- **Battlemap fog of war** — paint a persistent fog mask over any map with brush / rectangle / grid-cell / whole-room tools; it is saved per map (note images and Hydrus files alike) and re-applied whenever you push the same map again.
+- **Dynamic vision & line of sight** — drop feathered vision shapes measured in feet, define walls and doors, and the fog carves out exactly what a token can see; opening a door lets sight spill through.
+- **Import walls automatically** — load line-of-sight and doors from a UVTT file (`.dd2vtt` / `.uvtt`) or a Foundry VTT module `.zip` (Czepeku and friends), so you skip drawing walls by hand.
+- **Spell AoE overlays** — drop circle / square / cone / line / ring templates (or search the 5e spell catalog) at true grid scale, drag to place, rotate to aim.
+- **Exploration Mode** — a near-fullscreen table-play surface: click doors to open/close them and rooms to reveal/hide their fog, drag the players' viewport, and bind a vision to follow the view for a moving "torchlight" as the party explores.
 - **Send layer to webhook** — right-click an image layer to POST it to Telegram, Discord, or any `multipart/form-data` endpoint with an editable caption.
 
 ![Fog of war on the DM preview](docs/screenshots/fog-of-war.png)
 
-*Fog of war is drawn per layer with reveal / fog circle, rectangle, and freehand tools.*
+*Player-screen fog of war is drawn per image layer with reveal / fog circle, rectangle, and freehand tools. The map screen has its own, richer fog system — see [Battlemap fog of war, walls, and vision](#battlemap-fog-of-war-walls-and-vision).*
 
 ## Quickstart
 
@@ -52,6 +57,54 @@ A second endpoint dedicated to battlemaps for in-person play with miniatures on 
 - Everything — scale mode, pan, rotation, grid — is remembered **per map** and restored when you push the same map again.
 
 If the TV isn't calibrated yet, physical mode falls back to 96 px/inch and both the TV and the panel show a warning until you calibrate.
+
+### Battlemap fog of war, walls, and vision
+
+<!-- TODO screenshot: docs/screenshots/map-fog-editor.png — the Fog modal open over a map, showing the Fog/Walls tabs and a partially revealed mask -->
+![Map fog editor](docs/screenshots/map-fog-editor.png)
+
+*The Fog editor: reveal / cover with brush, rectangle, grid-cell, and whole-room tools, plus a Walls tab for line of sight.*
+
+While a map is active, the MAP SCREEN section gains a **Fog** button (it reads `Fog ●` once a map has fog). It opens a dedicated editor with two tabs:
+
+- **Fog tab** — a single mask over the map: black hides, transparent reveals. Paint with a sized **brush**, a **rectangle** marquee, a snapped **grid cell** or **grid rectangle**, or the **Room** tool (one click floods a whole walled room). Reveal and Cover are the two modes; **Reveal All** / **Cover All** reset the whole map. The mask is saved as a sidecar next to nothing you have to manage — it lives in `.dm-screen/fog/`, keyed to the map, and comes back whenever you show that map again (note images and Hydrus-cached files alike). TV opacity of the fog layer is adjustable in settings.
+- **Walls tab** — draw line-of-sight **walls** and **doors** (chained clicks or a rectangle drag), toggle a door open/closed, or erase. Walls power dynamic vision and the Room flood.
+
+**Dynamic vision** lives in its own panel section: add a **Circle** or **Square** vision (range in feet, with a soft feather), drag it onto a token, and the fog carves out exactly what it can see. Where walls block the line of sight the reveal stops at the wall; an **open door** lets vision spill through while a closed one blocks it. **Bake into fog** burns the current vision permanently into the mask (for "we've explored this" areas) and clears the live layer.
+
+**Importing walls** — drawing walls by hand is optional. On the Walls tab:
+
+<!-- TODO screenshot: docs/screenshots/map-walls-import.png — the Walls tab toolbar with Import UVTT / Import Foundry buttons, walls drawn over a map -->
+![Import walls from UVTT or Foundry](docs/screenshots/map-walls-import.png)
+
+- **Import UVTT** — load a `.dd2vtt` / `.uvtt` / `.df2vtt` export (Dungeondraft and most VTT map packs). Walls, objects, and portals become walls and doors, and the map's grid size is set automatically.
+- **Import Foundry** — load a Foundry VTT module `.zip` (the format Czepeku and other creators ship). The scene's walls and doors are extracted and scaled to your map. Both old (NeDB) and new (LevelDB) Foundry module layouts are supported.
+
+### Spell AoE overlays
+
+<!-- TODO screenshot: docs/screenshots/map-aoe-overlays.png — a couple of AoE templates (e.g. a fireball circle and a cone) drawn over a map with their control rows -->
+![AoE overlays on a map](docs/screenshots/map-aoe-overlays.png)
+
+*Templates render at true grid scale (1 square = 5 ft) on both the panel preview and the TV.*
+
+The **AoE Overlays** section drops spell templates onto the map: **Circle**, **Square**, **Cone**, **Line**, and **Ring** presets, or a **Spells…** search over the 5e catalog that pre-fills the shape, size, and color for a chosen spell. Set size (and width, for lines and rings), color, opacity, and rotation per template; drag the anchor dot on the preview to place it and the diamond handle to aim it. AoEs are ephemeral combat state — they clear when you stop the map.
+
+### Exploration Mode
+
+<!-- TODO screenshot: docs/screenshots/map-explore-mode.png — the near-fullscreen Explore modal: door markers (green/grey), the players' viewport rectangle, and the AoE/Vision sidebar -->
+![Exploration Mode](docs/screenshots/map-explore-mode.png)
+
+*A table-play surface for running the map live: toggle doors and rooms, move the players' view, and light the way.*
+
+The **Explore** button opens a near-fullscreen surface built for running the session, not editing it:
+
+- **Click a door** to open or close it — green means open, grey means closed. The players' TV recomputes line of sight instantly.
+- **Click a room** to reveal or hide its fog in one gesture; a green hover highlight shows which room you're about to toggle. Doors always bound a room here, so an open door lights up without merging rooms.
+- **Move the players' view** — in physical mode, drag the viewport rectangle to pan what the table sees. A **lock** button freezes it so you can't nudge it by accident; hold **Shift** to momentarily click straight through to doors and rooms without moving anything.
+- **Bind a vision to the view** — flip the ⦿ toggle on a vision and its lit circle/square follows the players' viewport as you pan, a moving pool of light that makes exploration feel alive.
+- A side panel carries the full **AoE and Vision** controls, so you can add, tweak, and place templates without leaving the modal.
+
+Everything here reuses the same fog, walls, and vision the editor produced — Exploration Mode is where you *drive* them at the table.
 
 ## Installation
 
