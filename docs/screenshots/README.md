@@ -16,10 +16,7 @@ Conventions:
 - `fog-of-war.png` — per-layer fog on the DM preview (player screen).
 - `hydrus-explorer.png` — the Hydrus explorer modal.
 - `dndbeyond-encounter.png` — D&D Beyond encounter sync.
-
-## Needed (referenced by the README, not yet captured)
-
-- `map-fog-editor.png` — the Fog modal open over a map, showing the Fog / Walls tabs and a partially revealed mask.
+- `map-fog-editor.png` — the Fog modal over a map, showing the Fog / Walls tabs and a partially revealed mask.
 - `map-walls-import.png` — the Walls tab toolbar with Import UVTT / Import Foundry, walls drawn over a map.
-- `map-aoe-overlays.png` — a couple of AoE templates (e.g. a fireball circle and a cone) over a map, with their control rows.
-- `map-explore-mode.png` — the near-fullscreen Exploration modal: door markers (green/grey), the players' viewport rectangle, and the AoE/Vision sidebar.
+- `map-aoe-overlays.png` — AoE templates over a map, with their control rows.
+- `map-explore-mode.png` — the near-fullscreen Exploration modal: door markers, the players' viewport rectangle, and the AoE/Vision sidebar.

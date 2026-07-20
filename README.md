@@ -1,6 +1,6 @@
 # DM Screen
 
-> Player screen for in-person D&D 5e sessions, powered by Obsidian.
+> Player screen and battle screen for in-person D&D 5e sessions, powered by Obsidian.
 
 ![Player screen mid-session](docs/screenshots/player-screen-hero.png)
 
@@ -60,7 +60,6 @@ If the TV isn't calibrated yet, physical mode falls back to 96 px/inch and both 
 
 ### Battlemap fog of war, walls, and vision
 
-<!-- TODO screenshot: docs/screenshots/map-fog-editor.png — the Fog modal open over a map, showing the Fog/Walls tabs and a partially revealed mask -->
 ![Map fog editor](docs/screenshots/map-fog-editor.png)
 
 *The Fog editor: reveal / cover with brush, rectangle, grid-cell, and whole-room tools, plus a Walls tab for line of sight.*
@@ -74,7 +73,6 @@ While a map is active, the MAP SCREEN section gains a **Fog** button (it reads `
 
 **Importing walls** — drawing walls by hand is optional. On the Walls tab:
 
-<!-- TODO screenshot: docs/screenshots/map-walls-import.png — the Walls tab toolbar with Import UVTT / Import Foundry buttons, walls drawn over a map -->
 ![Import walls from UVTT or Foundry](docs/screenshots/map-walls-import.png)
 
 - **Import UVTT** — load a `.dd2vtt` / `.uvtt` / `.df2vtt` export (Dungeondraft and most VTT map packs). Walls, objects, and portals become walls and doors, and the map's grid size is set automatically.
@@ -82,7 +80,6 @@ While a map is active, the MAP SCREEN section gains a **Fog** button (it reads `
 
 ### Spell AoE overlays
 
-<!-- TODO screenshot: docs/screenshots/map-aoe-overlays.png — a couple of AoE templates (e.g. a fireball circle and a cone) drawn over a map with their control rows -->
 ![AoE overlays on a map](docs/screenshots/map-aoe-overlays.png)
 
 *Templates render at true grid scale (1 square = 5 ft) on both the panel preview and the TV.*
@@ -91,7 +88,6 @@ The **AoE Overlays** section drops spell templates onto the map: **Circle**, **S
 
 ### Exploration Mode
 
-<!-- TODO screenshot: docs/screenshots/map-explore-mode.png — the near-fullscreen Explore modal: door markers (green/grey), the players' viewport rectangle, and the AoE/Vision sidebar -->
 ![Exploration Mode](docs/screenshots/map-explore-mode.png)
 
 *A table-play surface for running the map live: toggle doors and rooms, move the players' view, and light the way.*
