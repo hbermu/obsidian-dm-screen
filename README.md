@@ -187,6 +187,15 @@ The plugin does not collect telemetry, phone home, or transmit any data to third
 - Found a bug or want to request a feature? [Open an issue](https://github.com/hbermu/obsidian-dm-screen/issues).
 - Contributing? Start with [AGENTS.md](AGENTS.md) for build, test, branch, and release conventions.
 
+## Credits & attribution
+
+The battlemap in the map-screen screenshots is by **[Czepeku](https://www.czepeku.com/)**. They make beautiful maps, a lot of them, and if you run games in person or online their packs are worth every penny.
+
+- 🌐 Website & shop: [czepeku.com](https://www.czepeku.com/)
+- ❤️ Patreon: [patreon.com/czepeku](https://www.patreon.com/czepeku)
+
+The map is only here to show off the plugin. It isn't bundled with DM Screen, and all rights to it stay with Czepeku. The plugin ships no map assets of its own.
+
 ## License
 
 [MIT](LICENSE)
