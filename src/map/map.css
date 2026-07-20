@@ -69,6 +69,17 @@ body {
   max-height: none;
 }
 
+/* Fog mask — overlays the media at stage-local coordinates; inherits the stage transform */
+#map-fog {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  pointer-events: none;
+}
+
 /* Grid overlay above the map, below UI chrome */
 #grid-overlay {
   position: fixed;

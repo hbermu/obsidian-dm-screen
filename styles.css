@@ -682,6 +682,7 @@
 
 .dm-layer-btn-row {
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-wrap: wrap;
 }
@@ -1958,6 +1959,17 @@
   z-index: 5;
 }
 
+.dm-map-vision-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #ffd23f;
+  border: 2px dashed rgba(0, 0, 0, 0.7);
+  transform: translate(-50%, -50%) rotate(45deg) scale(calc(1 / var(--dm-map-zoom, 1)));
+  cursor: move;
+  z-index: 5;
+}
+
 .dm-map-aoe-rot-handle {
   position: absolute;
   width: 8px;
@@ -2001,4 +2013,148 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ─── Map fog modal ─────────────────────────────────────────────── */
+.dm-fog-modal {
+  width: 90vw;
+  max-width: 1400px;
+}
+.dm-fog-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.dm-fog-toolbar button.dm-fog-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.dm-fog-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--background-secondary);
+}
+.dm-fog-stage img,
+.dm-fog-stage video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.dm-fog-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.dm-fog-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.dm-explore-modal {
+  width: 96vw;
+  height: 96vh;
+  max-width: none;
+}
+.dm-explore-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+/* The content column fills the modal so the body can claim the leftover
+   height below the bar. */
+.dm-explore-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+/* Body is a row: the map stage grows to fill, the control sidebar sits at a
+   fixed width on the right. */
+.dm-explore-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+}
+.dm-explore-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--background-secondary);
+}
+/* The AoE/Vision control panel, reusing the DM panel's row layout. */
+.dm-explore-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.dm-explore-lock-btn.dm-fog-active,
+.dm-map-vision-bind.dm-fog-active {
+  color: var(--text-normal);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+.dm-map-vision-bind {
+  min-width: 28px;
+  padding: 2px 6px;
+}
+/* A locked viewport rect is a passive dashed outline — not draggable. */
+.dm-explore-markers .dm-map-viewport-rect.dm-explore-rect-locked {
+  pointer-events: none;
+  border-style: dashed;
+  cursor: default;
+}
+/* The rotated map box: sized to the map's aspect, centred, spun to the TV
+   orientation. Its children (media, overlay, markers) rotate solidly with it. */
+.dm-explore-inner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.dm-explore-inner > img,
+.dm-explore-inner > video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+}
+.dm-explore-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+/* Marker layer passes clicks to the overlay; only dots and the viewport rect
+   opt back in to pointer events. */
+.dm-explore-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.dm-explore-markers .dm-map-aoe-dot,
+.dm-explore-markers .dm-map-aoe-rot-handle,
+.dm-explore-markers .dm-map-vision-dot,
+.dm-explore-markers .dm-map-viewport-rect {
+  pointer-events: auto;
+}
+/* Shift-held exploration focus: every marker goes pointer-transparent so clicks
+   pass through to the overlay's door/room gestures anywhere on the map. */
+.dm-explore-markers.dm-explore-focus,
+.dm-explore-markers.dm-explore-focus * {
+  pointer-events: none;
 }

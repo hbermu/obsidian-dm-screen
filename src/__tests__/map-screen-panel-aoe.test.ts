@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MapScreenPanel } from "../views/MapScreenPanel";
-import type { MapAoe } from "../map/types";
+import type { MapAoe, MapVision } from "../map/types";
 
 interface Broadcast {
   type: string;
@@ -18,11 +18,12 @@ function makePanel() {
       tvHeight: 1080,
       hydrusDefaultLoop: true,
       hydrusDefaultMuted: true,
+      mapFogTvOpacity: 1,
     },
     server: { broadcast: (msg: Broadcast) => broadcasts.push(msg) },
     saveSettings: () => Promise.resolve(),
     broadcastMapCalibration: () => {},
-    app: {},
+    app: { vault: { adapter: { exists: () => Promise.resolve(false) } } },
   };
   const host = { render: vi.fn() };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,13 +95,44 @@ describe("MapScreenPanel AoE lifecycle", () => {
     const { panel, broadcasts } = makePanel();
     panel.activeMap = { url: "/vault/m.jpg", mediaType: "image", naturalWidth: 4480, naturalHeight: 7000 };
     panel.republish();
-    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view"]);
+    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view", "map-fog", "map-walls"]);
 
     broadcasts.length = 0;
     panel.aoes = [AOE];
     panel.republish();
-    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view", "map-aoe-sync"]);
+    expect(broadcasts.map((b) => b.type)).toEqual(["map-show", "map-config", "map-view", "map-aoe-sync", "map-fog", "map-walls"]);
     expect(broadcasts[3].payload).toEqual({ aoes: [AOE] });
+  });
+
+  it("syncBoundVisions snaps a followsView vision onto the pan centre and broadcasts", () => {
+    const { panel, broadcasts } = makePanel();
+    panel.activeMap = { url: "/vault/m.jpg", mediaType: "image", naturalWidth: 4480, naturalHeight: 7000 };
+    panel.state.panX = 1000;
+    panel.state.panY = 1500;
+    const bound: MapVision = { id: "v-1", shape: "circle", x: 10, y: 20, sizeFt: 30, featherFt: 5, followsView: true };
+    const free: MapVision = { id: "v-2", shape: "square", x: 999, y: 888, sizeFt: 30, featherFt: 5 };
+    panel.visions = [bound, free];
+
+    const changed = panel.syncBoundVisions(true);
+
+    expect(changed).toBe(true);
+    // The bound vision moved to the view centre; the free one is untouched.
+    expect([bound.x, bound.y]).toEqual([1000, 1500]);
+    expect([free.x, free.y]).toEqual([999, 888]);
+    const vis = broadcasts.filter((b) => b.type === "map-vision");
+    expect(vis).toHaveLength(1);
+    expect((vis[0].payload as { visions: MapVision[] }).visions[0].x).toBe(1000);
+  });
+
+  it("syncBoundVisions is a no-op (no broadcast) when no vision follows the view", () => {
+    const { panel, broadcasts } = makePanel();
+    panel.activeMap = { url: "/vault/m.jpg", mediaType: "image", naturalWidth: 4480, naturalHeight: 7000 };
+    panel.state.panX = 1000;
+    panel.state.panY = 1500;
+    panel.visions = [{ id: "v-1", shape: "circle", x: 10, y: 20, sizeFt: 30, featherFt: 5 }];
+
+    expect(panel.syncBoundVisions(true)).toBe(false);
+    expect(broadcasts.filter((b) => b.type === "map-vision")).toHaveLength(0);
   });
 
   it("broadcastAoes throttles trailing sends and flushes immediately when forced", () => {

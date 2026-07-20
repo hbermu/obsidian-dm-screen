@@ -357,6 +357,7 @@ function buildMapHtml(): string {
     <div id="map-stage">
       <video id="map-video" muted loop playsinline></video>
       <img id="map-image" alt="" />
+      <canvas id="map-fog"></canvas>
     </div>
     <canvas id="grid-overlay"></canvas>
     <div id="calibration-overlay"></div>

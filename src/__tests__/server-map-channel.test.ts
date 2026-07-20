@@ -106,11 +106,17 @@ describe("channel-scoped cache purge", () => {
     server.broadcast({ type: "show-background-media", payload: { url: "/vault/a.png" } });
     server.broadcast({ type: "map-show", payload: { url: "/vault/m.jpg", mediaType: "image" } });
     server.broadcast({ type: "map-config", payload: { pxPerSquare: 70 } });
+    server.broadcast({ type: "map-fog", payload: { dataUrl: "data:image/png;base64,AAAA", opacity: 1 } });
+    server.broadcast({ type: "map-vision", payload: { visions: [{ id: "v1", shape: "circle", x: 10, y: 10, sizeFt: 30, featherFt: 5 }] } });
+    server.broadcast({ type: "map-walls", payload: { walls: [{ x1: 0, y1: 0, x2: 10, y2: 0 }] } });
     server.broadcast({ type: "map-clear", payload: {} });
 
     const cache = (server as any).lastState as Map<string, string>;
     expect(cache.has("map-show")).toBe(false);
     expect(cache.has("map-config")).toBe(false);
+    expect(cache.has("map-fog")).toBe(false);
+    expect(cache.has("map-vision")).toBe(false);
+    expect(cache.has("map-walls")).toBe(false);
     expect(cache.has("map-clear")).toBe(false);
     expect(cache.has("show-background-media")).toBe(true);
   });
@@ -122,10 +128,13 @@ describe("channel-filtered late-joiner replay", () => {
     server.broadcast({ type: "show-background-media", payload: { url: "/vault/a.png" } });
     server.broadcast({ type: "map-show", payload: { url: "/vault/m.jpg", mediaType: "image" } });
     server.broadcast({ type: "map-view", payload: { mode: "fit", panX: 0, panY: 0 } });
+    server.broadcast({ type: "map-fog", payload: { dataUrl: "data:image/png;base64,AAAA", opacity: 1 } });
+    server.broadcast({ type: "map-vision", payload: { visions: [{ id: "v1", shape: "circle", x: 10, y: 10, sizeFt: 30, featherFt: 5 }] } });
+    server.broadcast({ type: "map-walls", payload: { walls: [{ x1: 0, y1: 0, x2: 10, y2: 0 }] } });
 
     const mapJoiner = makeWsStub();
     (server as any).replayCachedState(mapJoiner, "map");
-    expect(mapJoiner._sent.map((d: string) => JSON.parse(d).type).sort()).toEqual(["map-show", "map-view"]);
+    expect(mapJoiner._sent.map((d: string) => JSON.parse(d).type).sort()).toEqual(["map-fog", "map-show", "map-view", "map-vision", "map-walls"]);
 
     const playerJoiner = makeWsStub();
     (server as any).replayCachedState(playerJoiner, "player");

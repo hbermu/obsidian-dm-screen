@@ -13,8 +13,9 @@ import {
   DEFAULT_GRID_CONFIG,
   FALLBACK_PPI,
 } from "./transform";
-import type { MapAoe, MapGridConfig, MapMediaPayload, MapView, ScreenProfile } from "./types";
+import type { MapAoe, MapGridConfig, MapMediaPayload, MapView, MapVision, MapWall, ScreenProfile } from "./types";
 import { renderAoe } from "./aoe";
+import { eraseVisionWithWalls } from "./vision";
 
 interface MapMessage {
   type: string;
@@ -32,6 +33,10 @@ class MapScreen {
   private profiles: Record<string, ScreenProfile> = {};
   private calibrationVisible = false;
   private aoes: MapAoe[] = [];
+  private fogImage: HTMLImageElement | null = null;
+  private fogOpacity = 1;
+  private visions: MapVision[] = [];
+  private walls: MapWall[] = [];
 
   constructor() {
     this.connect();
@@ -161,6 +166,17 @@ class MapScreen {
         this.aoes = ((msg.payload as { aoes?: unknown }).aoes ?? []) as MapAoe[];
         this.applyLayout();
         break;
+      case "map-fog":
+        this.showFog(msg.payload as { dataUrl?: string | null; opacity?: number });
+        break;
+      case "map-vision":
+        this.visions = ((msg.payload as { visions?: unknown }).visions ?? []) as MapVision[];
+        this.recompositeFog();
+        break;
+      case "map-walls":
+        this.walls = ((msg.payload as { walls?: unknown }).walls ?? []) as MapWall[];
+        this.recompositeFog();
+        break;
       case "map-clear":
         this.clearMap();
         break;
@@ -209,6 +225,56 @@ class MapScreen {
     this.media = payload;
     document.getElementById("waiting-screen")!.style.display = "none";
     this.applyLayout();
+    // Fog may have loaded before the map (replay order is not guaranteed) —
+    // recomposite now that naturalSize() is known so vision holes land.
+    this.recompositeFog();
+  }
+
+  private showFog(payload: { dataUrl?: string | null; opacity?: number }) {
+    this.fogOpacity = payload.opacity ?? 1;
+    if (!payload.dataUrl) {
+      this.fogImage = null;
+      this.recompositeFog();
+      return;
+    }
+    const safeSrc = safePlayerUrl(payload.dataUrl, "image");
+    if (!safeSrc) {
+      console.warn("[Map Screen] Rejected fog data URL");
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      this.fogImage = img;
+      this.recompositeFog();
+    };
+    img.src = safeSrc;
+  }
+
+  private recompositeFog() {
+    const canvas = document.getElementById("map-fog") as HTMLCanvasElement;
+    if (!this.fogImage) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      canvas.style.display = "none";
+      return;
+    }
+    const { w: nw } = this.naturalSize();
+    const fw = this.fogImage.naturalWidth;
+    const fh = this.fogImage.naturalHeight;
+    if (canvas.width !== fw) canvas.width = fw;
+    if (canvas.height !== fh) canvas.height = fh;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, fw, fh);
+    ctx.drawImage(this.fogImage, 0, 0);
+    if (nw > 0) {
+      const scale = fw / nw;
+      const { h: nh } = this.naturalSize();
+      for (const v of this.visions) {
+        eraseVisionWithWalls(ctx, v, scale, this.config.pxPerSquare, this.walls, nw, nh);
+      }
+    }
+    canvas.style.opacity = String(this.fogOpacity);
+    canvas.style.display = "block";
   }
 
   private clearMap() {
@@ -219,6 +285,10 @@ class MapScreen {
     video.style.display = "none";
     image.src = "";
     image.style.display = "none";
+    this.fogImage = null;
+    this.visions = [];
+    this.walls = [];
+    this.recompositeFog();
     this.media = null;
     this.aoes = [];
     document.getElementById("waiting-screen")!.style.display = "flex";

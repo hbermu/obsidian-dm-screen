@@ -1,0 +1,13 @@
+{
+  "planPath": "docs/superpowers/plans/2026-07-14-map-fog-of-war.md",
+  "tasks": [
+    { "id": 5, "subject": "Task 1: Pure fog helpers (src/map/fog.ts) with tests", "status": "completed" },
+    { "id": 6, "subject": "Task 2+3: mapFogTvOpacity setting + MapScreenPanel fog lifecycle", "status": "completed", "blockedBy": [5] },
+    { "id": 7, "subject": "Task 4: MapFogModal drawing UI + styles", "status": "completed", "blockedBy": [5] },
+    { "id": 8, "subject": "Task 5: Map client fog rendering + server HTML + channel test", "status": "completed", "blockedBy": [6, 7] },
+    { "id": 9, "subject": "Task 6: Playwright visual regression for map fog", "status": "completed", "blockedBy": [8] },
+    { "id": 10, "subject": "Task 7: Feature specs (.agent/features)", "status": "completed", "blockedBy": [8] },
+    { "id": 11, "subject": "Task 8: Full verify, PR, minor release", "status": "pending", "blockedBy": [9, 10] }
+  ],
+  "lastUpdated": "2026-07-14T00:00:00Z"
+}

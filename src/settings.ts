@@ -79,6 +79,7 @@ export interface DmScreenSettings {
   mapScreenProfiles: Record<string, ScreenProfile>; // "WxH@dpr" → physical calibration
   mapConfigs: Record<string, StoredMapState>; // map /vault/ URL → remembered grid/view state
   mapDefaultPxPerSquare: number; // map pixels per grid square for maps without a remembered config
+  mapFogTvOpacity: number; // fog opacity rendered on the map screen (1 = players see nothing beneath)
   // Server limits
   maxClients: number;
   // Waiting screen (player-side)
@@ -121,6 +122,7 @@ export const DEFAULT_SETTINGS: DmScreenSettings = {
   mapScreenProfiles: {},
   mapConfigs: {},
   mapDefaultPxPerSquare: 140,
+  mapFogTvOpacity: 1,
   maxClients: 10,
   waitingTitle: "Player Screen",
   waitingSubtitle: "Waiting for DM to push content...",
@@ -217,6 +219,22 @@ export class DmScreenSettingTab extends PluginSettingTab {
             const v = parseInt(value, 10);
             this.plugin.settings.mapDefaultPxPerSquare = Number.isFinite(v) && v >= 5 ? v : 140;
             await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Fog opacity on the map screen")
+      .setDesc("How dark fog of war renders on the table TV. 1 = fully opaque; lower lets players faintly see the map beneath.")
+      .addSlider((slider) =>
+        slider
+          .setLimits(0.3, 1, 0.05)
+          .setValue(this.plugin.settings.mapFogTvOpacity)
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            this.plugin.settings.mapFogTvOpacity = v;
+            await this.plugin.saveSettings();
+            const panel = await this.plugin.findOpenDmControlPanel();
+            panel?.mapPanel.broadcastFog();
           })
       );
 
