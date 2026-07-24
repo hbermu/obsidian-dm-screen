@@ -40,16 +40,18 @@ export async function waitForHealth(port: number): Promise<{ status: string; cli
   throw new Error(`server never became healthy on :${port} (${lastError})`);
 }
 
+// The executeObsidian bridge serializes args as JSON, so undefined arrives as
+// null — pass null explicitly and gate on typeof to avoid clobbering the port.
 export async function startServer(port?: number): Promise<number> {
-  const actual = await browser.executeObsidian(async ({ app }, wanted: number | undefined) => {
+  const actual = await browser.executeObsidian(async ({ app }, wanted: number | null) => {
     const plugin = (app as any).plugins.plugins["dm-screen"];
-    if (wanted !== undefined) {
+    if (typeof wanted === "number") {
       plugin.settings.serverPort = wanted;
       await plugin.saveSettings();
     }
     await plugin.startServer();
     return plugin.settings.serverPort as number;
-  }, port);
+  }, port ?? null);
   await waitForHealth(actual);
   return actual;
 }
