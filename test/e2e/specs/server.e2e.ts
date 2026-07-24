@@ -1,5 +1,6 @@
 import { browser, expect } from "@wdio/globals";
 import { openPanel, panelButton, waitForHealth, DEFAULT_PORT } from "../helpers/obsidian";
+import { httpGet } from "../helpers/http";
 import { WsRecorder } from "../helpers/ws";
 
 describe("player screen server", function () {
@@ -12,16 +13,16 @@ describe("player screen server", function () {
     const health = await waitForHealth(DEFAULT_PORT);
     expect(health.status).toBe("ok");
 
-    const player = await fetch(`http://127.0.0.1:${DEFAULT_PORT}/`);
+    const player = await httpGet(`http://127.0.0.1:${DEFAULT_PORT}/`);
     expect(player.status).toBe(200);
-    expect(await player.text()).toContain("DM Screen - Player View");
+    expect(player.body.toString()).toContain("DM Screen - Player View");
 
-    const map = await fetch(`http://127.0.0.1:${DEFAULT_PORT}/map`);
+    const map = await httpGet(`http://127.0.0.1:${DEFAULT_PORT}/map`);
     expect(map.status).toBe(200);
-    expect(await map.text()).toContain("DM Screen - Map View");
+    expect(map.body.toString()).toContain("DM Screen - Map View");
 
     for (const asset of ["/player.js", "/player.css", "/map.js", "/map.css"]) {
-      const res = await fetch(`http://127.0.0.1:${DEFAULT_PORT}${asset}`);
+      const res = await httpGet(`http://127.0.0.1:${DEFAULT_PORT}${asset}`);
       expect(res.status).toBe(200);
     }
 
@@ -62,7 +63,7 @@ describe("player screen server", function () {
 
     let oldPortRefused = false;
     try {
-      await fetch(`http://127.0.0.1:${DEFAULT_PORT}/health`);
+      await httpGet(`http://127.0.0.1:${DEFAULT_PORT}/health`);
     } catch {
       oldPortRefused = true;
     }
@@ -79,7 +80,7 @@ describe("player screen server", function () {
 
     let refused = false;
     try {
-      await fetch("http://127.0.0.1:3210/health");
+      await httpGet("http://127.0.0.1:3210/health");
     } catch {
       refused = true;
     }

@@ -1,4 +1,5 @@
 import { browser } from "@wdio/globals";
+import { httpGet } from "./http";
 
 export const PLUGIN_ID = "dm-screen";
 export const DEFAULT_PORT = 3000;
@@ -30,8 +31,8 @@ export async function waitForHealth(port: number): Promise<{ status: string; cli
   let lastError: unknown;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/health`);
-      if (res.ok) return (await res.json()) as { status: string; clients: number };
+      const res = await httpGet(`http://127.0.0.1:${port}/health`);
+      if (res.status === 200) return JSON.parse(res.body.toString()) as { status: string; clients: number };
     } catch (e) {
       lastError = e;
     }

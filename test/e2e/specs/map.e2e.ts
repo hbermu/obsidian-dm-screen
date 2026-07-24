@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import { browser, expect } from "@wdio/globals";
 import { openPanel, openFixtureNote, startServer, panelButton, addMap, DEFAULT_PORT } from "../helpers/obsidian";
+import { httpGet } from "../helpers/http";
 import { WsRecorder } from "../helpers/ws";
 
 const FIXTURE_BYTES = fs.statSync("test/e2e/vault/attachments/map.png").size;
@@ -38,10 +39,10 @@ describe("map screen", function () {
     const walls = await rec.waitFor("map-walls");
     expect(walls.payload.walls).toEqual([]);
 
-    const res = await fetch(`http://127.0.0.1:${DEFAULT_PORT}${show.payload.url}`);
+    const res = await httpGet(`http://127.0.0.1:${DEFAULT_PORT}${show.payload.url}`);
     expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toContain("image/png");
-    expect((await res.arrayBuffer()).byteLength).toBe(FIXTURE_BYTES);
+    expect(res.headers["content-type"]).toContain("image/png");
+    expect(res.body.byteLength).toBe(FIXTURE_BYTES);
 
     const late = await WsRecorder.connect(DEFAULT_PORT, "map");
     await late.waitFor("map-show");
