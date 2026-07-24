@@ -35,6 +35,7 @@
 ## Tests covering this
 
 - `src/__tests__/map-transform.test.ts` — `profileKey` encoding, diagonal→ppi math, fine-tune multiplier, 96-ppi fallback
+- `test/e2e/specs/map-controls.e2e.ts` — real Obsidian: a `client-info` report surfaces the resolution badge; the calibration modal's test-pattern checkbox broadcasts `map-calibration-overlay`
 
 ## Non-goals
 

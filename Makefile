@@ -1,4 +1,4 @@
-.PHONY: help up down build dev typecheck test test-watch test-visual test-visual-update test-e2e logs ps clean
+.PHONY: help up down build dev typecheck test test-coverage test-watch test-visual test-visual-update test-e2e logs ps clean
 
 help:                ## list available targets
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -24,6 +24,9 @@ typecheck:           ## tsc --noEmit
 
 test:                ## vitest run
 	docker compose --profile tools run --rm test
+
+test-coverage:       ## vitest run --coverage (report in ./coverage/)
+	docker compose --profile tools run --rm test sh -c "npm install --no-audit --no-fund && npx vitest run --coverage"
 
 test-watch:          ## vitest in watch mode (interactive)
 	docker compose --profile tools run --rm -e CI=0 test sh -c "npm install --no-audit --no-fund && npx vitest"

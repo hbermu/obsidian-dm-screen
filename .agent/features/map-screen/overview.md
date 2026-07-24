@@ -56,7 +56,7 @@ All map traffic uses the `map` channel (types prefixed `map-`); the full table l
 - `src/__tests__/server-map-channel.test.ts` — channel-filtered broadcast and replay, channel-scoped cache purge (including `map-fog`), allowlist map slot
 - `src/__tests__/bundle-smoke.integration.test.ts` — production build inlines the map bundle
 - `test/e2e/specs/map.e2e.ts` — real Obsidian: Add Map broadcasts `map-show`/`map-view`/`map-config` and the `/vault/` allowlist serves the file; Rotate updates `map-view`; Stop Map purges the map channel cache
-- `test/e2e/specs/explore.e2e.ts` — real Obsidian: Explore modal renders near-fullscreen, Shift toggles the `dm-explore-focus` class, a Shift-click on a door marker opens the door and broadcasts `map-walls`
+- `test/e2e/specs/explore.e2e.ts` — real Obsidian: Explore modal renders near-fullscreen, Shift toggles the `dm-explore-focus` class, a Shift-click on a door marker opens the door and broadcasts `map-walls`; a room click toggles its fog and commits `map-fog`
 
 ## Non-goals
 

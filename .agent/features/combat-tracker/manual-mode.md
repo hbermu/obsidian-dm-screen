@@ -25,6 +25,7 @@
 ## Tests covering this
 
 - `src/__tests__/dm-control-combat.test.ts` — sort order, broadcast wiring (manual mode shares the broadcast pipeline)
+- `test/e2e/specs/combat.e2e.ts` — real Obsidian: add combatants through the panel form (sorted `initiative-update`), Next Turn cycling with round advance, scale buttons (`combat-scale`), Clear All empties the tracker
 
 ## Non-goals
 
