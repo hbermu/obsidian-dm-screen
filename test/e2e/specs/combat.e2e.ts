@@ -24,10 +24,9 @@ async function addCombatant(name: string, init: number, hp: number): Promise<voi
 describe("manual combat tracker", function () {
   let rec: WsRecorder;
 
-  // The combatants are added BEFORE the recorder connects: a client connection
-  // triggers a deferred panel re-render that recreates the add-form inputs and
-  // can swallow a click typed mid-render. The recorder then receives the
-  // cached initiative-update as a late joiner, which is asserted in test 1.
+  // Combatants are added before the recorder connects so test 1 can assert the
+  // late-joiner cache replay; the mid-typing regression is covered on its own at
+  // the end of the file.
   before(async function () {
     await openPanel();
     await startServer();
@@ -107,5 +106,29 @@ describe("manual combat tracker", function () {
     await browser.waitUntil(() =>
       browser.executeObsidian(() => document.querySelectorAll(".dm-combatant-row").length === 0),
     );
+  });
+
+  it("a client connecting mid-typing does not discard the add-combatant draft", async function () {
+    const nameInput = browser.$(".dm-control-panel .dm-add-combatant").$('input[placeholder="Name"]');
+    await nameInput.click();
+    await nameInput.setValue("Mid Render");
+
+    // A second player client connects while the field is focused → the panel's
+    // debounced background re-render must be deferred, not wipe the draft.
+    const intruder = await WsRecorder.connect(DEFAULT_PORT, "player");
+    await browser.pause(400);
+    expect(await nameInput.getValue()).toBe("Mid Render");
+
+    const initRow = browser.$(".dm-control-panel .dm-add-combatant");
+    await initRow.$('input[placeholder="Init"]').setValue("15");
+    await initRow.$('input[placeholder="HP"]').setValue("12");
+    const seen = rec.count("initiative-update");
+    await initRow.$("button=+").click();
+
+    await rec.waitFor("initiative-update", {
+      skip: seen,
+      where: (m) => combatants(m).some((c) => c.name === "Mid Render"),
+    });
+    intruder.close();
   });
 });

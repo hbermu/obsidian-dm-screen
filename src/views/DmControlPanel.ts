@@ -133,6 +133,8 @@ export class DmControlPanel extends ItemView {
   async onOpen() {
     debug("DmControlPanel: onOpen");
     document.addEventListener("keydown", this.escHandler);
+    // Survives render() (which only empties children, not contentEl's listeners).
+    this.contentEl.addEventListener("focusout", this.flushPendingRender);
     // DM-side viewport is session-scoped: reset to 100% / 0,0 on every open,
     // even if the same view instance is reopened (see
     // .agent/features/image-layers/persistence.md → Non-goals).
@@ -321,10 +323,43 @@ export class DmControlPanel extends ItemView {
     this.render();
   }
 
+  private pendingBackgroundRender = false;
+
   debouncedRender() {
     if (this.renderDebounceTimer) clearTimeout(this.renderDebounceTimer);
-    this.renderDebounceTimer = setTimeout(() => this.render(), 100);
+    this.renderDebounceTimer = setTimeout(() => this.renderFromBackground(), 100);
   }
+
+  // A background-triggered render (a client connecting/disconnecting) must not
+  // wipe the DOM out from under a field the DM is typing in. Defer it until the
+  // field loses focus; the client-count state is already updated on the view,
+  // so the deferred render still shows the current count.
+  private renderFromBackground() {
+    if (this.isEditingPanelField()) {
+      this.pendingBackgroundRender = true;
+      return;
+    }
+    this.render();
+  }
+
+  private isEditingPanelField(): boolean {
+    const active = this.contentEl.ownerDocument.activeElement;
+    return (
+      active instanceof HTMLElement &&
+      this.contentEl.contains(active) &&
+      (active.tagName === "INPUT" || active.tagName === "TEXTAREA")
+    );
+  }
+
+  private flushPendingRender = () => {
+    // Focus may hop straight to another panel field; re-check on the next tick.
+    setTimeout(() => {
+      if (this.pendingBackgroundRender && !this.isEditingPanelField()) {
+        this.pendingBackgroundRender = false;
+        this.render();
+      }
+    }, 0);
+  };
 
   render() {
     const container = this.contentEl;
