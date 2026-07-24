@@ -88,6 +88,35 @@ describe("exploration mode", function () {
       where: (m) => (m.payload.walls as Record<string, unknown>[]).some((w) => w.door === true && w.open === true),
     });
     expect((walls.payload.walls as unknown[]).length).toBe(3);
+  });
+
+  it("clicking inside a room toggles its fog and commits map-fog twice", async function () {
+    const r = await browser.executeObsidian(() => {
+      const rect = document.querySelector(".dm-explore-modal .dm-explore-overlay")!.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    });
+    const x = Math.round(r.left + (70 * r.width) / MAP_W);
+    const y = Math.round(r.top + (210 * r.height) / MAP_H);
+
+    let seen = rec.count("map-fog");
+    await browser
+      .action("pointer", { parameters: { pointerType: "mouse" } })
+      .move({ x, y })
+      .down()
+      .up()
+      .perform();
+    const first = await rec.waitFor("map-fog", { skip: seen });
+    expect(typeof first.payload.dataUrl).toBe("string");
+
+    seen = rec.count("map-fog");
+    await browser
+      .action("pointer", { parameters: { pointerType: "mouse" } })
+      .move({ x, y })
+      .down()
+      .up()
+      .perform();
+    const second = await rec.waitFor("map-fog", { skip: seen });
+    expect(second.payload.dataUrl).not.toBe(first.payload.dataUrl);
 
     await browser.$(".dm-explore-modal").$("button=Exit").click();
     await browser.waitUntil(async () => !(await browser.$(".dm-explore-modal").isExisting()));

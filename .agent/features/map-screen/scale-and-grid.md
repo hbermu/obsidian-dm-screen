@@ -40,6 +40,7 @@
 ## Tests covering this
 
 - `src/__tests__/map-transform.test.ts` — fit/physical scale, 1-inch invariant (`140 × scale = ppi`), translation centering and pan-at-center, clamping, grid pitch/phase/degenerate cases, defaults, rotation (point mapping, rotated fit bbox, rotation-independent physical scale, centered rotated fit, grid axis routing)
+- `test/e2e/specs/map-controls.e2e.ts` — real Obsidian: scale toggle to physical, viewport-rect drag broadcasts panned `map-view`, px/square input broadcasts `map-config`
 
 ## Non-goals
 

@@ -38,6 +38,7 @@
 - `src/__tests__/main.test.ts` — round-1 reveal applied by `onInitiativeStateChange`, hidden filter in `sendInitiativeUpdate`
 - `src/__tests__/ddb-panel-tracking-state.test.ts` — DDB reveal rule with `showFullTurnOrder` toggle, defaults by round, sticky override
 - `src/__tests__/dm-control-combat.test.ts` — manual broadcast applies the round-1 rule
+- `test/e2e/specs/combat.e2e.ts` — real Obsidian: during round 1 the wire conceals combatants after the active one and reveals everyone once the round wraps
 
 ## Non-goals
 

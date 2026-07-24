@@ -52,6 +52,7 @@
 - `src/__tests__/server-bootstrap.integration.test.ts` — wires the DM → player flow
 - `src/__tests__/dm-preview-bg.test.ts` — `resolveBackgroundPreviewUrl` and `isVideoBackgroundUrl` helpers used by the DM-side preview overlay
 - `test/visual/background.spec.ts` — Playwright visual regression: deterministic grid PNG broadcast via `show-background-media` is rendered by the real player bundle on `#image-background`.
+- `test/e2e/specs/background.e2e.ts` — real Obsidian: Add BG from a note embed broadcasts `show-background-media`; Stop BG broadcasts `hide-background-media`
 
 ## Non-goals
 

@@ -69,6 +69,7 @@ All targets run inside Docker; the container manages `node_modules`.
 |--------|--------------|
 | `make typecheck` | `tsc --noEmit` |
 | `make test` | `vitest run` (all unit + integration tests) |
+| `make test-coverage` | `vitest run --coverage` — report in `./coverage/`; the `test` CI job runs this and posts the summary as a sticky PR comment |
 | `make test-watch` | `vitest` in watch mode (interactive) |
 | `make test-visual` | Playwright visual regression suite (inside the official `mcr.microsoft.com/playwright` image) |
 | `make test-visual-update` | Refresh committed visual baselines (inside container — host-generated PNGs WILL diff) |

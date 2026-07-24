@@ -49,6 +49,10 @@ export class WsRecorder {
     throw new Error(`no matching '${type}' within ${timeout}ms (saw: ${seen})`);
   }
 
+  send(msg: WsMessage): void {
+    this.ws.send(JSON.stringify(msg));
+  }
+
   close(): void {
     this.ws.close();
   }

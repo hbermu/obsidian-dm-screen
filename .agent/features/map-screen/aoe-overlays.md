@@ -38,6 +38,7 @@ none — AoEs live in DM-panel memory and the server's late-joiner cache, never 
 
 - `src/__tests__/map-aoe-render.test.ts` — shape paths (incl. ring outer/reversed-inner arcs and inner-radius clamp), ft→px sizing, rotation-composed placement, fill/stroke styling
 - `src/__tests__/map-screen-panel-aoe.test.ts` — restore from cache, stopMap reset, republish inclusion, broadcast throttle with forced flush
+- `test/e2e/specs/aoe-vision.e2e.ts` — real Obsidian: Add AoE > Circle syncs and renders row + anchor dot, dragging the dot moves and broadcasts, remove empties the sync
 
 ## Non-goals
 

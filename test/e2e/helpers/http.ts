@@ -22,3 +22,22 @@ export function httpGet(url: string): Promise<HttpResponse> {
     req.on("error", reject);
   });
 }
+
+// Sends the path verbatim — new URL() would collapse "../" segments before the
+// server ever saw them, defeating traversal-guard asserts.
+export function httpGetRaw(port: number, rawPath: string): Promise<HttpResponse> {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      { host: "127.0.0.1", port, path: rawPath, method: "GET", agent: false },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () =>
+          resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks) }),
+        );
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}

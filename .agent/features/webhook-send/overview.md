@@ -39,6 +39,7 @@
 - `src/__tests__/webhooks-client.test.ts` — `sendWebhookImage` POSTs the correct URL/method/headers/body, propagates non-2xx with webhook name, skips empty extras, omits caption when `captionField` is empty
 - `src/__tests__/send-to-webhook-modal.test.ts` — modal renders dropdown / preview / caption defaulting to `layer.label`; Send button calls `sendWebhookImage` with the currently selected webhook and caption value; empty-webhooks state shows the configure-first message
 - `src/__tests__/layer-context-menu.test.ts` — menu items are emitted in the right order with and without webhooks; click handlers route to the right callbacks
+- `test/e2e/specs/webhook.e2e.ts` — real Obsidian: layer context menu → send modal → real multipart POST (via `requestUrl`) captured by a local HTTP receiver, asserting image/caption/extra fields
 
 ## Non-goals
 
