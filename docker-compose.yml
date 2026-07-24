@@ -89,6 +89,35 @@ services:
         npx playwright test
       "
 
+  # Real-Obsidian e2e (wdio-obsidian-service): downloads Obsidian + chromedriver
+  # into .obsidian-cache/, boots real Electron under Xvfb and drives it. Same
+  # jammy Playwright base as `visual` (glibc + GUI libs + xvfb preinstalled);
+  # own node_modules volume — jammy binaries are not interchangeable with the
+  # alpine services'. No published ports: specs reach the plugin's server on
+  # localhost inside this container.
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.60.0-jammy
+    profiles: ["tools"]
+    working_dir: /app
+    # platform: linux/amd64  # uncomment if obsidian-launcher has no linux-arm64 asset for the requested version
+    environment:
+      TZ: Europe/Madrid
+      CI: "1"
+      OBSIDIAN_VERSIONS: ${OBSIDIAN_VERSIONS:-latest/latest}
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+    shm_size: "1gb"
+    volumes:
+      - .:/app
+      - e2e_modules:/app/node_modules
+    command: >
+      sh -c "
+        npm install --no-audit --no-fund &&
+        npx tsc -p test/e2e --noEmit &&
+        npm run build &&
+        xvfb-run -a npx wdio run wdio.conf.mts
+      "
+
 volumes:
   node_modules: {}
   playwright_modules: {}
+  e2e_modules: {}

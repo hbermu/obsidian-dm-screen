@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "mocha", "@wdio/globals/types", "wdio-obsidian-service"]
+  },
+  "include": ["./**/*.ts", "./**/*.mts", "../../wdio.conf.mts"]
+}
