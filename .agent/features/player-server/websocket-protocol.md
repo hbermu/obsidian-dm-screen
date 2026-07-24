@@ -62,6 +62,7 @@
 - `src/__tests__/server-bootstrap.integration.test.ts` — real `ws` client receives the cached state on connect
 - `src/__tests__/ddb-to-player.integration.test.ts` — D&D Beyond poll cycle → `initiative-update` on the wire
 - `src/__tests__/ddb-fixture-replay.integration.test.ts` — recorded D&D Beyond fixture replays through the server and produces `initiative-update` messages
+- `test/e2e/specs/server.e2e.ts` — real Obsidian: per-channel late-joiner replay (`waiting-screen`/`inspiration-style` on player, `map-calibration` on map, no cross-channel leaks) over a real WebSocket
 
 ## Non-goals
 

@@ -61,6 +61,8 @@ The server is the transport for every DM → player and player → DM message. T
 - `src/__tests__/smoke.test.ts` — module loads, exports present
 - `src/__tests__/bundle-smoke.integration.test.ts` — production `main.js` builds and contains the server class
 - `test/visual/*.spec.ts` — Playwright visual regression suite. Boots a real `PlayerScreenServer` against the production player bundle (via `scripts/build-player.mjs` + a CJS-bundled `server-entry.ts` built in `test/visual/harness/build-host.mjs`) and asserts pixel-stable screenshots of waiting screen, background image, image-layers-sync, fog overlays (full / circle / rect / freehand), and the initiative tracker. Baselines must be generated inside the official Microsoft Playwright container so local and CI render identically.
+- `test/e2e/specs/smoke.e2e.ts` — real Obsidian: plugin loads and enables, both commands registered, ribbon icon present, DM Control Panel opens with its sections
+- `test/e2e/specs/server.e2e.ts` — real Obsidian: Start Server button serves the player/map endpoints over real HTTP, channel-scoped late-joiner replay over real sockets, port change takes effect after restart, settings persist across a plugin disable/enable cycle
 
 ## Non-goals
 

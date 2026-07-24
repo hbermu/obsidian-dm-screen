@@ -1,4 +1,4 @@
-.PHONY: help up down build dev typecheck test test-watch test-visual test-visual-update logs ps clean
+.PHONY: help up down build dev typecheck test test-watch test-visual test-visual-update test-e2e logs ps clean
 
 help:                ## list available targets
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -33,6 +33,9 @@ test-visual:         ## playwright visual regression (inside the official playwr
 
 test-visual-update:  ## refresh visual baselines (inside container — host PNGs WILL diff)
 	docker compose --profile tools run --rm visual sh -c "npm install --no-audit --no-fund && npx playwright test --update-snapshots"
+
+test-e2e:            ## real-Obsidian e2e suite (wdio; OBSIDIAN_VERSIONS=app/installer pairs, default latest/latest)
+	docker compose --profile tools run --rm e2e
 
 logs:                ## tail combined logs
 	docker compose logs -f --tail=50

@@ -26,6 +26,12 @@ test-results/
 test/visual/.harness/
 
 # ===========================
+# Real-Obsidian e2e (wdio-obsidian-service — the fixture vault under test/e2e/vault/ IS committed)
+# ===========================
+.obsidian-cache/
+wdio-logs/
+
+# ===========================
 # Dev vault runtime state
 # (the .dev/vault skeleton itself IS committed; only generated files inside it are ignored)
 # ===========================
