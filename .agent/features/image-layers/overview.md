@@ -52,6 +52,7 @@ The cache rule for both is the standard one in `../player-server/websocket-proto
 - `src/__tests__/server-broadcast.test.ts` — `image-layers-sync` is cached and replayed to late joiners
 - `src/__tests__/ddb-to-player.integration.test.ts` — DDB monster-image layers reach the player
 - `test/visual/layers-fog.spec.ts` — Playwright visual regression: two stacked image layers rendered on the real player bundle, with and without fog overlays. Asserts wrapper geometry, frame sizing (aspect-preserving), and z-order. See `../player-server/overview.md`.
+- `test/e2e/specs/layers.e2e.ts` — real Obsidian: Add Image from a real note embed pushes a hidden layer (`image-layers-sync` + geometry pair on the wire, `dm-layer-hidden` row); Clear All Layers empties the sync
 
 ## Non-goals
 

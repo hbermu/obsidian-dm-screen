@@ -41,3 +41,33 @@ jobs:
             test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - versions: earliest/earliest
+            slug: earliest
+          - versions: latest/latest
+            slug: latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: .obsidian-cache
+          key: obsidian-cache-${{ matrix.slug }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            obsidian-cache-${{ matrix.slug }}-
+      - run: make test-e2e
+        env:
+          OBSIDIAN_VERSIONS: ${{ matrix.versions }}
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-${{ matrix.slug }}
+          path: wdio-logs/
+          retention-days: 7
+          if-no-files-found: ignore
