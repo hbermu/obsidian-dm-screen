@@ -25,6 +25,10 @@ jobs:
       - run: make test-coverage
       - name: Build coverage summary
         if: always()
+        env:
+          # coverage/ is written by the root Docker container; the summary is
+          # written to RUNNER_TEMP (runner-owned) to avoid a permission clash.
+          SUMMARY: ${{ runner.temp }}/coverage-summary.md
         run: |
           if [ ! -f coverage/coverage-summary.json ]; then exit 0; fi
           {
@@ -37,22 +41,23 @@ jobs:
               "| \(.key) | \(.value.covered) | \(.value.total) | \(.value.pct)% |"' coverage/coverage-summary.json
             echo ""
             echo "_Unit + integration (vitest) over \`src/**\`. The player/map browser bundles and the DM UI flows are additionally covered by the Playwright visual suite and the real-Obsidian e2e suite, which do not feed this metric._"
-          } > coverage/summary.md
-          cat coverage/summary.md >> "$GITHUB_STEP_SUMMARY"
+          } > "$SUMMARY"
+          cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
       - name: Comment coverage on PR
         if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          SUMMARY: ${{ runner.temp }}/coverage-summary.md
         run: |
-          if [ ! -f coverage/summary.md ]; then exit 0; fi
+          if [ ! -f "$SUMMARY" ]; then exit 0; fi
           PR=${{ github.event.pull_request.number }}
           REPO=${{ github.repository }}
           CID=$(gh api "repos/$REPO/issues/$PR/comments" --jq '.[] | select(.body | startswith("<!-- coverage-report -->")) | .id' | head -1)
           if [ -n "$CID" ]; then
-            gh api -X PATCH "repos/$REPO/issues/comments/$CID" -F body=@coverage/summary.md
+            gh api -X PATCH "repos/$REPO/issues/comments/$CID" -F body=@"$SUMMARY"
           else
-            gh api "repos/$REPO/issues/$PR/comments" -F body=@coverage/summary.md
+            gh api "repos/$REPO/issues/$PR/comments" -F body=@"$SUMMARY"
           fi
 
   build:
