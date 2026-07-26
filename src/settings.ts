@@ -5,13 +5,13 @@ import type { ScreenProfile, StoredMapState } from "./map/types";
 
 export type { WebhookConfig } from "./webhooks/types";
 
-function newWebhookId(): string {
+export function newWebhookId(): string {
   const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
   if (c?.randomUUID) return c.randomUUID();
   return `wh-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-const WEBHOOK_TEMPLATES: { label: string; build: () => Omit<WebhookConfig, "id"> }[] = [
+export const WEBHOOK_TEMPLATES: { label: string; build: () => Omit<WebhookConfig, "id"> }[] = [
   {
     label: "Telegram bot",
     build: () => ({

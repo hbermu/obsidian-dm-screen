@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS } from "../settings";
+import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_SETTINGS, WEBHOOK_TEMPLATES, newWebhookId } from "../settings";
 import type { DmScreenSettings } from "../settings";
 
 describe("DEFAULT_SETTINGS", () => {
@@ -257,5 +257,54 @@ describe("Settings input validation logic", () => {
     it("invalid string falls back to 10", () => {
       expect(parseInt("nope") || 10).toBe(10);
     });
+  });
+});
+
+describe("newWebhookId", () => {
+  it("returns a non-empty unique id on each call", () => {
+    const a = newWebhookId();
+    const b = newWebhookId();
+    expect(a).toBeTruthy();
+    expect(a).not.toBe(b);
+  });
+
+  it("falls back to a wh- id when crypto.randomUUID is unavailable", () => {
+    vi.stubGlobal("crypto", {});
+    try {
+      expect(newWebhookId()).toMatch(/^wh-/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe("WEBHOOK_TEMPLATES", () => {
+  it("exposes the Telegram, Discord, and Generic presets", () => {
+    expect(WEBHOOK_TEMPLATES.map((t) => t.label)).toEqual([
+      "Telegram bot",
+      "Discord webhook",
+      "Generic multipart",
+    ]);
+  });
+
+  it("each preset builds a config without an id and with image + caption fields", () => {
+    for (const tmpl of WEBHOOK_TEMPLATES) {
+      const cfg = tmpl.build();
+      expect(cfg).not.toHaveProperty("id");
+      expect(cfg.imageField).toBeTruthy();
+      expect(cfg.captionField).toBeTruthy();
+      expect(Array.isArray(cfg.extraFields)).toBe(true);
+    }
+  });
+
+  it("the Telegram preset carries the chat_id extra field", () => {
+    const telegram = WEBHOOK_TEMPLATES[0].build();
+    expect(telegram.url).toContain("api.telegram.org");
+    expect(telegram.extraFields).toEqual([{ key: "chat_id", value: "<CHAT_ID>" }]);
+  });
+
+  it("the Discord and Generic presets ship no extra fields", () => {
+    expect(WEBHOOK_TEMPLATES[1].build().extraFields).toEqual([]);
+    expect(WEBHOOK_TEMPLATES[2].build().extraFields).toEqual([]);
   });
 });

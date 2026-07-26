@@ -8,6 +8,7 @@ import type { ClientInfo } from "../server";
 import { SendToWebhookModal } from "./SendToWebhookModal";
 import { buildLayerContextMenu } from "./layerContextMenu";
 import { parseHydrusRefs, resolveHydrusRefs, ensureLocalCopy, type ResolvedHydrusRef } from "../hydrus/noteRefs";
+import { sortByInitiative, clampTrackerScale, advanceTurn, applyRound1Reveal } from "../combat/tracker";
 import { encodeForVaultUrl, uniqueLayerLabel } from "./HydrusExplorerModal";
 import { debug, debugWarn, debugError } from "../debug";
 import { CONDITIONS, decodeStatus, encodeExhaustion } from "../conditions";
@@ -1111,7 +1112,7 @@ export class DmControlPanel extends ItemView {
   }
 
   private async setCombatTrackerScale(value: number) {
-    const clamped = Math.max(0.5, Math.min(2, Math.round(value * 10) / 10));
+    const clamped = clampTrackerScale(value);
     if (clamped === (this.plugin.settings.combatTrackerScale ?? 1)) return;
     this.plugin.settings.combatTrackerScale = clamped;
     await this.plugin.saveSettings();
@@ -2294,19 +2295,15 @@ export class DmControlPanel extends ItemView {
   // ─── Manual Tracker Helpers ────────────────────────────────────────
 
   private sortManualCombatants() {
-    this.manualCombatants.sort((a, b) => b.initiative - a.initiative);
+    sortByInitiative(this.manualCombatants);
   }
 
   private advanceManualTurn() {
     if (this.manualCombatants.length === 0) return;
     this.manualCombatants.forEach(c => (c.active = false));
-    const next = this.currentTurn + 1;
-    if (next >= this.manualCombatants.length) {
-      this.currentTurn = 0;
-      this.manualRound += 1;
-    } else {
-      this.currentTurn = next;
-    }
+    const advanced = advanceTurn(this.currentTurn, this.manualRound, this.manualCombatants.length);
+    this.currentTurn = advanced.currentTurn;
+    this.manualRound = advanced.round;
     this.manualCombatants[this.currentTurn].active = true;
     this.broadcastManualInitiative();
     this.render();
@@ -2382,12 +2379,7 @@ export class DmControlPanel extends ItemView {
   }
 
   private broadcastManualInitiative() {
-    const isRoundOne = this.manualRound === 1;
-    const activeIdx = this.manualCombatants.findIndex(c => c.active);
-    const out = this.manualCombatants.map((c, i) => ({
-      ...c,
-      hidden: isRoundOne && activeIdx >= 0 && i > activeIdx,
-    }));
+    const out = applyRound1Reveal(this.manualCombatants, this.manualRound);
     this.plugin.sendInitiativeUpdate(out, this.manualRound);
   }
 

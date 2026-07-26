@@ -30,6 +30,7 @@
 ## Tests covering this
 
 - (Settings tab UI is not unit-tested; behaviour is verified manually via `make up`.) Programmatic webhook config behaviour is exercised indirectly through `webhooks-client.test.ts` and `send-to-webhook-modal.test.ts`.
+- `src/__tests__/settings.test.ts` — `WEBHOOK_TEMPLATES` preset labels and built configs (reqs 12), `newWebhookId` uniqueness and `wh-` fallback when `crypto.randomUUID` is unavailable (req 13).
 
 ## Non-goals
 

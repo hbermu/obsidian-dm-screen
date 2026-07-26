@@ -5,6 +5,7 @@
 ## Source files
 
 - `src/views/DmControlPanel.ts` — `renderManualTracker`, `sortManualCombatants`, `advanceManualTurn`, `broadcastManualInitiative`, `manualCombatants`, `currentTurn`, `manualRound`
+- `src/combat/tracker.ts` — pure helpers `sortByInitiative`, `advanceTurn`, `clampTrackerScale`, `applyRound1Reveal` that the view methods above delegate to
 
 ## Settings used
 
@@ -25,6 +26,7 @@
 ## Tests covering this
 
 - `src/__tests__/dm-control-combat.test.ts` — sort order, broadcast wiring (manual mode shares the broadcast pipeline)
+- `src/__tests__/combat-tracker.test.ts` — pure helpers: `sortByInitiative` (in-place DESC), `clampTrackerScale` ([0.5, 2] tenths), `advanceTurn` (wrap + round bump), `applyRound1Reveal`
 - `test/e2e/specs/combat.e2e.ts` — real Obsidian: add combatants through the panel form (sorted `initiative-update`), Next Turn cycling with round advance, scale buttons (`combat-scale`), Clear All empties the tracker
 
 ## Non-goals
