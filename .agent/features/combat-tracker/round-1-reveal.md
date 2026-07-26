@@ -5,7 +5,8 @@
 ## Source files
 
 - `src/main.ts` — `onInitiativeStateChange` applies the rule for the Initiative Tracker plugin source
-- `src/views/DmControlPanel.ts` — `broadcastManualInitiative` applies the rule for manual mode
+- `src/views/DmControlPanel.ts` — `broadcastManualInitiative` applies the rule for manual mode via `applyRound1Reveal`
+- `src/combat/tracker.ts` — `applyRound1Reveal` is the pure implementation of the rule
 - `src/views/DnDBeyondPanel.ts` — `broadcastToPlayerScreen` applies the rule for D&D Beyond
 - `src/main.ts` — `sendInitiativeUpdate` filters `hidden` before broadcasting
 
@@ -38,6 +39,7 @@
 - `src/__tests__/main.test.ts` — round-1 reveal applied by `onInitiativeStateChange`, hidden filter in `sendInitiativeUpdate`
 - `src/__tests__/ddb-panel-tracking-state.test.ts` — DDB reveal rule with `showFullTurnOrder` toggle, defaults by round, sticky override
 - `src/__tests__/dm-control-combat.test.ts` — manual broadcast applies the round-1 rule
+- `src/__tests__/combat-tracker.test.ts` — `applyRound1Reveal` hides post-active entries in round 1, reveals all from round 2, no-op with no active combatant, does not mutate inputs
 - `test/e2e/specs/combat.e2e.ts` — real Obsidian: during round 1 the wire conceals combatants after the active one and reveals everyone once the round wraps
 
 ## Non-goals
