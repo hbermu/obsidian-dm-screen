@@ -36,9 +36,9 @@
 12. When the DM calls `broadcast(message)`, the server shall serialise the message and send it to every client of the message's channel (`map-` prefixed types → map clients, all others → player clients) whose `readyState` is `1` (OPEN).
 13. When the DM calls `broadcast({type: "clear"})`, the server shall purge the `player`-channel entries from the late-joiner cache before sending; `broadcast({type: "map-clear"})` shall purge the `map-*` entries symmetrically.
 14. When the DM calls `broadcast(message)` with any type other than `clear`/`map-clear`, the server shall store the serialised message in the late-joiner cache, keyed by `message.type`, overwriting any previous entry of that type.
-15. When the server stops, the server shall close every active WebSocket connection, clear its client set, and close the HTTP listener.
+15. When the server stops, the server shall close every active WebSocket connection, clear its client set, close the HTTP listener, and destroy any lingering HTTP connections (via `httpServer.closeAllConnections()`) so idle keep-alive sockets do not hold the port bound on older runtimes.
 16. If `autoStartServer` is true, then on plugin load the server shall start.
-17. If the workspace contains an open DM Control Panel, when the connected-client count changes the server shall trigger that panel to re-render so it can reflect the new count and resolutions.
+17. If the workspace contains an open DM Control Panel, when the connected-client count changes the server shall trigger that panel to re-render (debounced) so it can reflect the new count and resolutions. This background re-render shall be deferred while an `INPUT`/`TEXTAREA` inside the panel is focused, and flushed when that field loses focus, so a client connecting mid-typing does not discard the DM's in-progress entry (e.g. the manual add-combatant form).
 18. The server shall expose a `clientCount` accessor and a `getConnectedClients()` accessor returning the array of `ClientInfo` payloads.
 19. `buildPlayerHtml()` shall inline the current `waitingTitle` and `waitingSubtitle` into the `#waiting-screen` markup, HTML-escaping the values. Empty values shall cause the corresponding `<h1>` or `<p>` to be omitted entirely.
 20. After `startServer()` succeeds, the plugin shall call `broadcastWaitingScreen()` to seed the late-joiner cache with the current waiting-screen text.
@@ -59,6 +59,8 @@ The server is the transport for every DM → player and player → DM message. T
 - `src/__tests__/server-vault-path.test.ts` — `/vault/` path-traversal guard (see `vault-routing.md`)
 - `src/__tests__/server-combat-scale.test.ts` — `combat-scale` broadcast end-to-end
 - `src/__tests__/smoke.test.ts` — module loads, exports present
+- `src/__tests__/server-stop-keepalive.integration.test.ts` — `stop()` destroys idle keep-alive sockets so the port rebinds immediately (req 15)
+- `src/__tests__/dm-control-render-guard.test.ts` — a background re-render is deferred while a panel input is focused and flushed on blur (req 17)
 - `src/__tests__/bundle-smoke.integration.test.ts` — production `main.js` builds and contains the server class
 - `test/visual/*.spec.ts` — Playwright visual regression suite. Boots a real `PlayerScreenServer` against the production player bundle (via `scripts/build-player.mjs` + a CJS-bundled `server-entry.ts` built in `test/visual/harness/build-host.mjs`) and asserts pixel-stable screenshots of waiting screen, background image, image-layers-sync, fog overlays (full / circle / rect / freehand), and the initiative tracker. Baselines must be generated inside the official Microsoft Playwright container so local and CI render identically.
 - `test/e2e/specs/smoke.e2e.ts` — real Obsidian: plugin loads and enables, both commands registered, ribbon icon present, DM Control Panel opens with its sections

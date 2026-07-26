@@ -185,6 +185,10 @@ export class PlayerScreenServer {
       this.clients.clear();
       this.clientChannels.clear();
       this.httpServer.close();
+      // close() stops accepting new sockets but, on Node <19, leaves idle
+      // keep-alive HTTP connections parked — they hold the port bound until
+      // they time out. Destroy them so the port is released immediately.
+      this.httpServer.closeAllConnections?.();
       this.httpServer = null;
     }
   }
