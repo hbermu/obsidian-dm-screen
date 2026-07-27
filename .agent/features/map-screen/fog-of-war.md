@@ -97,6 +97,7 @@ Full channel routing in `../player-server/websocket-protocol.md`.
 - `test/e2e/specs/fog-tools.e2e.ts` — real Obsidian: the remaining Fog tools (Reveal All, Rectangle, Grid cell, Grid rect, Room flood + wall-pixel no-commit) drive `map-fog`, and the Walls tab (draw Wall/Door chain, Toggle door, Erase) drives `map-walls`
 - `test/e2e/specs/aoe-vision.e2e.ts` — real Obsidian: Add Vision > Circle broadcasts `map-vision`, the bind toggle marks `followsView`, Bake into fog commits `map-fog` and clears the live vision layer
 - `test/e2e/specs/explore.e2e.ts` — real Obsidian: a room click in Exploration Mode toggles its fog and commits `map-fog` twice (reveal, then cover)
+- `test/e2e/specs/map-import.e2e.ts` — real Obsidian: driving the real file `<input>` for Import UVTT (4 walls / 1 door) and Import Foundry (3 walls / 1 door) commits scaled walls (`map-walls`) and the derived grid (`map-config`, pxPerSquare 56, offsets 0); a malformed UVTT file shows a Notice and commits nothing
 - `test/visual/map-fog.spec.ts` — Playwright rendering: full fog, revealed hole, cleared fog, physical mode
 - `test/visual/map-vision.spec.ts` — Playwright rendering: feathered circle vision hole, wall-clipped asymmetric hole, open-door symmetric hole
 - `test/visual/map-fog-video.spec.ts` — Playwright rendering: full fog over video shows black; cleared fog shows green video
