@@ -37,6 +37,7 @@
 
 - `src/__tests__/effective-resolution.test.ts` — the selection / fallback chain in `getEffectiveResolution`
 - `test/visual/tablet.spec.ts` — Playwright visual regression at a 1280×800 tablet viewport (separate Playwright project), exercising the `client-info` round-trip and verifying that layer geometry renders correctly at a non-desktop resolution.
+- `test/e2e/specs/dm-preview.e2e.ts` — real Obsidian: a `client-info` message over a real WebSocket renders one `dm-client-resolution` badge per distinct player resolution (`<W>×<H>`, deduped to `<W>×<H> ×<count>`), marks the effective one `dm-client-resolution-active`, sets `selectedResolution` on click, and keeps `map`-channel clients out of the player row
 
 ## Non-goals
 

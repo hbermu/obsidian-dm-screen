@@ -24,6 +24,7 @@
 ## Tests covering this
 
 - `src/__tests__/viewport-calc.test.ts` — the geometry math used here is the same `getPlayerViewport` helper exercised in that test
+- `test/e2e/specs/dm-preview.e2e.ts` — real Obsidian: with exactly one `client-info`-announced player the `.dm-player-viewport-rect` renders inside `.dm-layer-preview-inner`; a second connected client removes it (requirement 1)
 
 ## Non-goals
 
