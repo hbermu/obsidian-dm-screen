@@ -58,7 +58,8 @@
 ## Tests covering this
 
 - `src/__tests__/dm-control-combat.test.ts` — visibility / z-order / remove flows
-- `src/__tests__/viewport-calc.test.ts` — viewport rect math feeds the `W`/`H` / align buttons
+- `src/__tests__/viewport-calc.test.ts` — viewport rect math feeds the `W`/`H` / align buttons (the fit / align buttons themselves stay unit-covered here — their positive path needs a connected player reporting a viewport)
+- `test/e2e/specs/layer-controls.e2e.ts` — real Obsidian: the row buttons drive live broadcasts — visibility toggles `visible` (row gains `dm-layer-hidden`), border toggles `bordered`, rotate-right advances `rotation` by 15°, the down button swaps `zIndex` with the layer below, remove drops the layer, and the scale slider streams `image-layers-geometry` then commits an aspect-preserving, centre-preserving resize via `image-layers-sync`. The multi-image Add Image picker opens an Obsidian `Menu` and `Add all` commits every source (frontmatter `image:` + body embed)
 
 ## Non-goals
 
