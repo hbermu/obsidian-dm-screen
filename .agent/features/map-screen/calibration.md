@@ -36,6 +36,7 @@
 
 - `src/__tests__/map-transform.test.ts` — `profileKey` encoding, diagonal→ppi math, fine-tune multiplier, 96-ppi fallback
 - `test/e2e/specs/map-controls.e2e.ts` — real Obsidian: a `client-info` report surfaces the resolution badge; the calibration modal's test-pattern checkbox broadcasts `map-calibration-overlay`
+- `test/e2e/specs/calibration.e2e.ts` — real Obsidian: entering a diagonal saves the `1920x1080@1` profile and broadcasts `map-calibration` with it; the badge gains a `✓`; the fine-tune slider updates the broadcast profile; clearing the diagonal deletes the profile and broadcasts its removal
 
 ## Non-goals
 

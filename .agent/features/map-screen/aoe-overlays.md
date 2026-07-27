@@ -39,6 +39,7 @@ none — AoEs live in DM-panel memory and the server's late-joiner cache, never 
 - `src/__tests__/map-aoe-render.test.ts` — shape paths (incl. ring outer/reversed-inner arcs and inner-radius clamp), ft→px sizing, rotation-composed placement, fill/stroke styling
 - `src/__tests__/map-screen-panel-aoe.test.ts` — restore from cache, stopMap reset, republish inclusion, broadcast throttle with forced flush
 - `test/e2e/specs/aoe-vision.e2e.ts` — real Obsidian: Add AoE > Circle syncs and renders row + anchor dot, dragging the dot moves and broadcasts, remove empties the sync
+- `test/e2e/specs/aoe-shapes.e2e.ts` — real Obsidian: Cone/Line/Ring add with their per-shape fields (line width, ring band thickness) and rotation-handle presence (cone/line rotatable, ring symmetric); dragging the `.dm-map-aoe-rot-handle` rotates and broadcasts; Clear All empties the sync; Add AoE > Spells… picks from the catalog and adds a labeled `cone` AoE (Burning Hands, 15 ft)
 
 ## Non-goals
 
