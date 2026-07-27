@@ -26,6 +26,11 @@
 8. When the DM Control Panel restores state and the server is running with at least one restored layer, the panel shall broadcast a fresh `image-layers-sync` so the server's `lastState` reflects the authoritative current layers (overwriting any stale or missing cache entry). The panel shall also expose a public `republishToServer()` method.
 9. When the player-screen server starts, the plugin shall call `republishToServer()` on every open DM Control Panel so any client that connects later receives the current layer state via the late-joiner cache.
 
+## Tests covering this
+
+- `src/__tests__/dm-control-combat.test.ts` — `republishToServer` emits the sync + geometry pair (requirement 8)
+- `test/e2e/specs/layer-controls.e2e.ts` — real Obsidian: detaching the DM panel leaf runs `onClose → saveState`; reopening it runs `onOpen → restoreState`, which rebuilds `imageLayers` from `settings.lastImageLayers` (same layer ids survive) and `republishToServer` broadcasts a fresh `image-layers-sync` (requirements 1, 4, 8)
+
 ## Non-goals
 
 - Compressing or trimming the cached `dataUrl` strings; they are stored as-is.
