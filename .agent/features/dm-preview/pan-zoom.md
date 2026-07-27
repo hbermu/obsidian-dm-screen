@@ -19,6 +19,10 @@
 5. The zoom slider shall have range `67`–`100` and step `1`; `100` = the player's view fills the preview (max zoom), `67` ≈ 1/1.5 = the player's view plus surrounding area (min zoom). Changing it shall set `dmZoom = value / 100` and re-apply the inner transform without re-rendering the full panel.
 6. The zoom controls (`dm-preview-zoom-controls`) shall be positioned as an absolute overlay inside `dm-layer-preview` (top-right, `z-index: 10`), following the same pattern as the map panel's `dm-map-zoom-controls`. Mousedown on the controls shall be stopPropagated so it cannot trigger a layer drag or pan.
 
+## Tests covering this
+
+- `test/e2e/specs/dm-preview.e2e.ts` — real Obsidian: the zoom slider (67–100) sets `dmZoom = value/100` and rewrites the `.dm-layer-preview-inner` `transform` (`scale(...)`); a middle-button (`button 1`) drag advances `dmPanX`/`dmPanY` proportionally (`translate(...)`); Reset View restores `1 / 0 / 0` (`translate(0%, 0%) scale(1)`). All local — no WebSocket message is emitted (`viewport-update` count stays 0)
+
 ## Non-goals
 
 - Wheel-driven zoom. Removed because it swallowed page scroll whenever the cursor was over the preview.
