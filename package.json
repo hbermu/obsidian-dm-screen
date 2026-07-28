@@ -43,5 +43,8 @@
   "dependencies": {
     "fflate": "^0.8.3",
     "ws": "^8.20.1"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.5"
   }
 }
